@@ -4,6 +4,13 @@ import type { FishSave } from './save';
 
 export const HUNGER_RATE = 1 / (90 * 60); // saniyede — 90 dk'da tok -> aç
 export const SAD_THRESHOLD = 0.25;
+/** Açlık büyümeyi hiç durdurmaz: %100 tokken tam hız, %0 tokken bile bu oranda devam eder. */
+export const HUNGER_GROWTH_FLOOR = 0.3;
+
+/** Açlığa göre büyüme hız çarpanı: 0 tokluk -> HUNGER_GROWTH_FLOOR, 1 tokluk -> 1. */
+export function hungerGrowthMult(hunger: number): number {
+  return HUNGER_GROWTH_FLOOR + (1 - HUNGER_GROWTH_FLOOR) * hunger;
+}
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -192,8 +199,8 @@ export class Fish {
     this.hunger = Math.max(0, this.hunger - dt * HUNGER_RATE);
 
     let justGrown = false;
-    if (!this.isSad && this.progress < 1) {
-      this.progress += (dt * 1000 * growthMult) / this.sp.growthMs;
+    if (this.progress < 1) {
+      this.progress += (dt * 1000 * growthMult * hungerGrowthMult(this.hunger)) / this.sp.growthMs;
       if (this.progress >= 1 && !this.wasAdult) {
         this.progress = 1;
         this.wasAdult = true;

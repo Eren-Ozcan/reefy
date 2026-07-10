@@ -115,6 +115,7 @@ class AudioMan {
     }
   }
   error(): void { this.ensure(); this.tone(220, 0.15, 'sawtooth', 0.06); }
+  clean(): void { this.ensure(); this.tone(900, 0.06, 'sine', 0.09, 0, 500); this.tone(650, 0.07, 'sine', 0.07, 0.045, 380); }
   place(): void { this.ensure(); this.tone(180, 0.14, 'sine', 0.16, 0, 90); this.tone(420, 0.08, 'triangle', 0.07, 0.05); }
   quest(): void {
     this.ensure();

@@ -1,7 +1,7 @@
-import { Application, Container, FillGradient, Graphics } from 'pixi.js';
+import { Application, BlurFilter, Container, FillGradient, Graphics } from 'pixi.js';
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
-import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD } from './fish';
+import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay } from './quests';
 import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
 import { Services, createServices } from './services';
@@ -19,6 +19,11 @@ const OFFLINE_CAP_MS = 8 * 3600_000;
 const OFFLINE_SPEED = 0.5;
 const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsinden
 
+const MAX_DIRT_SPOTS = 6;              // akvaryum başına en fazla temizlenmemiş kir lekesi
+const DIRT_SPAWN_MS = 100_000;         // ortalama bu sürede yeni bir leke oluşur
+const DIRT_PENALTY_MAX = 0.35;         // tamamen kirli akvaryumda üretim/büyüme %35 azalır
+const DIRT_BLUR_MAX = 7;               // tamamen kirli akvaryumda cam bulanıklığı (piksel)
+
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
 /** Kazanç raporu satırı: balık başına saatlik üretim (akvaryum+dekor bonuslu) ve satış değeri. */
@@ -33,7 +38,7 @@ export interface FishEarning {
   live?: Fish;
   saved?: FishSave;
 }
-export interface TankEarnings { tank: TankDef; boostPct: number; count: number; perHour: number; fishes: FishEarning[] }
+export interface TankEarnings { tank: TankDef; boostPct: number; dirtPct: number; count: number; perHour: number; fishes: FishEarning[] }
 
 export const INCOME_CAP_HOURS = 4; // biriken gelir en fazla bu kadar saatlik üretim olabilir
 
@@ -61,6 +66,9 @@ export class Game {
   private pelletG = new Graphics();
   private fxG = new Graphics();
   private bubbleG = new Graphics();
+  private dirtG = new Graphics();
+  private glassBlur = new BlurFilter({ strength: 0 });
+  private dirtTimer = DIRT_SPAWN_MS * (0.3 + Math.random() * 0.7);
 
   private pellets: Pellet[] = [];
   private particles: Particle[] = [];
@@ -104,9 +112,23 @@ export class Game {
     return Math.min(DECOR_BOOST_CAP, pct);
   }
 
+  /** Akvaryumun kirlilik seviyesi (0..1): temizlenmemiş leke sayısına göre. */
+  dirtLevel(tankId: string): number {
+    return Math.min(1, (this.save.dirtSpots[tankId]?.length ?? 0) / MAX_DIRT_SPOTS);
+  }
+  /** Kirlilik yüzdesi (0..100), üretim/büyüme kaybına karşılık gelir. */
+  dirtPct(tankId: string): number {
+    return Math.round(this.dirtLevel(tankId) * DIRT_PENALTY_MAX * 100);
+  }
+
+  /** Akvaryumun net çarpanı: dekor/tema bonusu eksi kirlilik cezası. Büyüme VE gelire işler. */
+  tankNetMult(tankId: string): number {
+    return (1 + this.tankBoostPct(tankId) / 100) * (1 - this.dirtLevel(tankId) * DIRT_PENALTY_MAX);
+  }
+
   /** Aktif akvaryumun büyüme çarpanı. */
   get growthMult(): number {
-    return 1 + this.tankBoostPct(this.save.activeTank) / 100;
+    return this.tankNetMult(this.save.activeTank);
   }
 
   /**
@@ -122,7 +144,7 @@ export class Game {
   get incomePerHour(): number {
     let rate = 0;
     const cache: Record<string, number> = {};
-    const mult = (tid: string) => (cache[tid] ??= 1 + this.tankBoostPct(tid) / 100);
+    const mult = (tid: string) => (cache[tid] ??= this.tankNetMult(tid));
     for (const f of this.fishes) if (f.isAdult) rate += RARITY_INCOME[f.sp.rarity] * mult(f.tank);
     for (const d of this.dormant) if (d.progress >= 1) rate += RARITY_INCOME[speciesById(d.sp).rarity] * mult(d.tank);
     return Math.round(rate);
@@ -158,7 +180,7 @@ export class Game {
 
     this.world.addChild(
       this.bgG, this.rayLayer, this.biomeG, this.biomeAnimG, this.ambientG, this.decorAnimG, this.sandG,
-      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.moodG,
+      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.moodG,
     );
     this.app.stage.addChild(this.world);
 
@@ -182,6 +204,9 @@ export class Game {
     if (!this.save.decorPlaced[this.save.activeTank]) this.save.decorPlaced[this.save.activeTank] = [];
     for (const t of Object.keys(this.save.decorPlaced)) {
       if (!knownTanks.has(t)) delete this.save.decorPlaced[t];
+    }
+    for (const t of Object.keys(this.save.dirtSpots)) {
+      if (!knownTanks.has(t)) delete this.save.dirtSpots[t];
     }
 
     const knownSpecies = new Set(SPECIES.map((s) => s.id));
@@ -851,13 +876,13 @@ export class Game {
       if (grown) this.onGrown(f);
     }
 
-    // Diğer akvaryumlardaki balıklar da yaşar: acıkır, tok oldukça büyür
+    // Diğer akvaryumlardaki balıklar da yaşar: acıkır, tok oldukça büyür (aç iken de yavaş devam eder)
     const boostCache: Record<string, number> = {};
-    const tmult = (tid: string) => (boostCache[tid] ??= 1 + this.tankBoostPct(tid) / 100);
+    const tmult = (tid: string) => (boostCache[tid] ??= this.tankNetMult(tid));
     for (const d of this.dormant) {
       d.hunger = Math.max(0, d.hunger - dt * HUNGER_RATE);
-      if (d.progress < 1 && d.hunger > SAD_THRESHOLD) {
-        d.progress = Math.min(1, d.progress + (dt * 1000 * tmult(d.tank)) / speciesById(d.sp).growthMs);
+      if (d.progress < 1) {
+        d.progress = Math.min(1, d.progress + (dt * 1000 * tmult(d.tank) * hungerGrowthMult(d.hunger)) / speciesById(d.sp).growthMs);
         if (d.progress >= 1) this.onDormantGrown(d);
       }
     }
@@ -871,6 +896,21 @@ export class Game {
     this.fxG.clear();
     for (const p of this.particles) {
       this.fxG.circle(p.x, p.y, p.r * p.life).fill({ color: p.color, alpha: p.life });
+    }
+
+    // Kir lekeleri: zamanla oluşur, temizlenmedikçe camı bulanıklaştırır
+    this.dirtTimer -= dt * 1000;
+    if (this.dirtTimer <= 0) {
+      this.dirtTimer = DIRT_SPAWN_MS * (0.6 + Math.random() * 0.8);
+      this.maybeSpawnDirt(this.save.activeTank);
+    }
+    this.drawDirt(w, h);
+    const dl = this.dirtLevel(this.save.activeTank);
+    if (dl > 0.02) {
+      this.glassBlur.strength = 0.5 + dl * DIRT_BLUR_MAX;
+      this.world.filters = [this.glassBlur];
+    } else {
+      this.world.filters = null;
     }
   }
 
@@ -908,11 +948,12 @@ export class Game {
   private applyOffline(): void {
     const elapsed = Math.min(OFFLINE_CAP_MS, Date.now() - this.save.lastSeen);
     if (elapsed < 60_000) return;
+    this.applyOfflineDirt(elapsed);
     let grown = 0;
-    // Offline pasif gelir: yetişkinler yarım hızda üretir (bonuslar dahil)
+    // Offline pasif gelir: yetişkinler yarım hızda üretir (bonuslar + kirlilik cezası dahil)
     let rate = 0;
     const cache: Record<string, number> = {};
-    const mult = (tid: string) => (cache[tid] ??= 1 + this.tankBoostPct(tid) / 100);
+    const mult = (tid: string) => (cache[tid] ??= this.tankNetMult(tid));
     for (const fs of this.save.fishes) {
       if (fs.progress >= 1) rate += RARITY_INCOME[speciesById(fs.sp).rarity] * mult(fs.tank);
     }
@@ -923,17 +964,36 @@ export class Game {
       this.offline.income = Math.floor(this.save.incomePot - before);
     }
     for (const fs of this.save.fishes) {
-      const tillSad = Math.max(0, (fs.hunger - SAD_THRESHOLD) / HUNGER_RATE_MS);
-      const growMs = Math.min(elapsed, tillSad);
+      // Açlık zamanla lineer düşer (0.05 tabanına kadar); büyüme, dönemin ortalama açlığına göre ölçeklenir
+      const hunger1 = Math.max(0.05, fs.hunger - elapsed * HUNGER_RATE_MS);
+      const avgHungerMult = hungerGrowthMult((fs.hunger + hunger1) / 2);
       const before = fs.progress;
       if (fs.progress < 1) {
-        fs.progress = Math.min(1, fs.progress + (growMs * OFFLINE_SPEED * mult(fs.tank)) / speciesById(fs.sp).growthMs);
+        fs.progress = Math.min(1, fs.progress + (elapsed * avgHungerMult * OFFLINE_SPEED * mult(fs.tank)) / speciesById(fs.sp).growthMs);
         if (before < 1 && fs.progress >= 1) grown++;
       }
-      fs.hunger = Math.max(0.05, fs.hunger - elapsed * HUNGER_RATE_MS);
+      fs.hunger = hunger1;
     }
     this.offline.minutes = Math.round(elapsed / 60_000);
     this.offline.grown = grown;
+  }
+
+  /** Uzakta geçen sürede sahip olunan tüm akvaryumlara orantılı kir lekesi ekler. */
+  private applyOfflineDirt(elapsed: number): void {
+    const avgSpawns = elapsed / DIRT_SPAWN_MS;
+    for (const tid of this.save.tanksOwned) {
+      const spots = this.save.dirtSpots[tid] ?? (this.save.dirtSpots[tid] = []);
+      let toAdd = Math.floor(avgSpawns + Math.random());
+      while (toAdd-- > 0 && spots.length < MAX_DIRT_SPOTS) {
+        spots.push({
+          id: Date.now() + Math.floor(Math.random() * 1000) + spots.length,
+          fx: 0.08 + Math.random() * 0.84,
+          fy: 0.14 + Math.random() * 0.62,
+          r: 0.7 + Math.random() * 0.6,
+          kind: Math.random() < 0.5 ? 0 : 1,
+        });
+      }
+    }
   }
 
   private applyDailyGift(): void {
@@ -1046,6 +1106,8 @@ export class Game {
       this.dropPellet(x, y);
     } else if (this.inputMode === 'edit') {
       this.dragIndex = this.decorAt(x, y);
+    } else {
+      this.cleanDirtAt(x, y);
     }
   }
 
@@ -1079,6 +1141,72 @@ export class Game {
       if (x >= cx - half && x <= cx + half && y >= baseY - 110 * d.scale && y <= baseY + 14) return i;
     }
     return -1;
+  }
+
+  // ---------- kir / temizlik ----------
+
+  /** Aktif akvaryuma, yer varsa yeni bir kir lekesi ekler. */
+  private maybeSpawnDirt(tankId: string): void {
+    const spots = this.save.dirtSpots[tankId] ?? (this.save.dirtSpots[tankId] = []);
+    if (spots.length >= MAX_DIRT_SPOTS) return;
+    spots.push({
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      fx: 0.08 + Math.random() * 0.84,
+      fy: 0.14 + Math.random() * 0.62,
+      r: 0.7 + Math.random() * 0.6,
+      kind: Math.random() < 0.5 ? 0 : 1,
+    });
+    this.syncSave();
+  }
+
+  /** Verilen noktadaki en üstteki kir lekesinin dizinini döndürür (yoksa -1). */
+  private dirtAt(x: number, y: number): number {
+    const { w, h } = this.bounds;
+    const spots = this.save.dirtSpots[this.save.activeTank] ?? [];
+    for (let i = spots.length - 1; i >= 0; i--) {
+      const s = spots[i];
+      const cx = s.fx * w, cy = s.fy * h;
+      const hit = 15 * s.r + 12; // tıklama toleransı
+      if (Math.hypot(x - cx, y - cy) <= hit) return i;
+    }
+    return -1;
+  }
+
+  /** Dokunulan noktadaki kir lekesini temizler (varsa); parçacık efekti ve ses çalar. */
+  private cleanDirtAt(x: number, y: number): void {
+    const idx = this.dirtAt(x, y);
+    if (idx < 0) return;
+    const spots = this.save.dirtSpots[this.save.activeTank]!;
+    const s = spots[idx];
+    spots.splice(idx, 1);
+    const { w, h } = this.bounds;
+    const cx = s.fx * w, cy = s.fy * h;
+    for (let k = 0; k < 9; k++) {
+      this.particles.push({
+        x: cx + (Math.random() - 0.5) * 22, y: cy + (Math.random() - 0.5) * 22,
+        vy: -26 - Math.random() * 18, life: 1,
+        color: 0xcdf5ff, r: 2 + Math.random() * 2,
+      });
+    }
+    audio.clean();
+    this.syncSave();
+    this.ui.refreshHUD();
+  }
+
+  /** Aktif akvaryumdaki kir lekelerini çizer. */
+  private drawDirt(w: number, h: number): void {
+    const g = this.dirtG;
+    g.clear();
+    const spots = this.save.dirtSpots[this.save.activeTank] ?? [];
+    for (const s of spots) {
+      const cx = s.fx * w, cy = s.fy * h;
+      const r = 15 * s.r;
+      const c1 = s.kind === 0 ? 0x4a5c34 : 0x5c4a34;
+      const c2 = s.kind === 0 ? 0x39481f : 0x483519;
+      g.circle(cx, cy, r).fill({ color: c1, alpha: 0.32 });
+      g.circle(cx + r * 0.35, cy - r * 0.25, r * 0.55).fill({ color: c2, alpha: 0.3 });
+      g.circle(cx - r * 0.3, cy + r * 0.2, r * 0.4).fill({ color: c2, alpha: 0.22 });
+    }
   }
 
   /** Tek yem tanesi at (dokunulan noktadan batar). Ücretli yem önce stoktan, stok yoksa altından düşer. */
@@ -1348,7 +1476,7 @@ export class Game {
   earningsByTank(): TankEarnings[] {
     const byTank: Record<string, FishEarning[]> = {};
     const push = (tankId: string, fe: Omit<FishEarning, 'perHour' | 'sellValue'>, bonus: number) => {
-      const mult = 1 + this.tankBoostPct(tankId) / 100;
+      const mult = this.tankNetMult(tankId);
       (byTank[tankId] ??= []).push({
         ...fe,
         perHour: Math.round(RARITY_INCOME[fe.sp.rarity] * mult),
@@ -1367,6 +1495,7 @@ export class Game {
         return {
           tank: tankById(tid),
           boostPct: this.tankBoostPct(tid),
+          dirtPct: this.dirtPct(tid),
           count: fishes.length,
           perHour: fishes.reduce((sum, x) => sum + (x.adult ? x.perHour : 0), 0),
           fishes,

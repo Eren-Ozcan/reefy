@@ -13,6 +13,14 @@ export interface PlacedDecor {
   fx: number;   // 0..1 yatay konum
 }
 
+export interface DirtSpot {
+  id: number;
+  fx: number;   // 0..1 yatay konum
+  fy: number;   // 0..1 dikey konum
+  r: number;    // boyut çarpanı
+  kind: 0 | 1;  // görsel çeşit
+}
+
 export interface QuestState {
   day: string;                       // görevlerin üretildiği gün
   progress: Record<string, number>;  // questId -> ilerleme
@@ -32,6 +40,7 @@ export interface SaveData {
   feedOwned: Record<string, number>;          // feedId -> stok (paketten alınan yem taneleri)
   decorOwned: Record<string, number>;         // defId -> adet (yerleştirilmemiş)
   decorPlaced: Record<string, PlacedDecor[]>; // tankId -> yerleştirilenler
+  dirtSpots: Record<string, DirtSpot[]>;      // tankId -> temizlenmemiş kir lekeleri
   tanksOwned: string[];
   activeTank: string;
   friends: { code: string; name: string }[];
@@ -82,6 +91,7 @@ export function defaultSave(): SaveData {
     feedOwned: {},
     decorOwned: {},
     decorPlaced: { [START_TANK]: [] },
+    dirtSpots: {},
     tanksOwned: [START_TANK],
     activeTank: START_TANK,
     friends: [],
@@ -125,6 +135,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (!merged.tanksOwned.includes(merged.activeTank)) merged.activeTank = merged.tanksOwned[0];
   if (!merged.decorPlaced) merged.decorPlaced = {};
   for (const t of merged.tanksOwned) if (!merged.decorPlaced[t]) merged.decorPlaced[t] = [];
+  if (!merged.dirtSpots) merged.dirtSpots = {};
   return merged;
 }
 
