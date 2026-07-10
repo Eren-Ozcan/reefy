@@ -18,6 +18,11 @@ export interface TankDef {
   desc: string;
 }
 
+/** Akvaryum kademesinin balık kapasitesine eklediği bonus. */
+export const TANK_CAP_BONUS: Record<Rarity, number> = {
+  common: 0, uncommon: 2, rare: 4, epic: 7, legendary: 10,
+};
+
 export const BIOME_INFO: Record<Biome, { name: string; emoji: string }> = {
   tropik:    { name: 'Tropik',     emoji: '🏝️' },
   lagun:     { name: 'Lagün',      emoji: '🌺' },

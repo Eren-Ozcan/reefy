@@ -8,7 +8,7 @@ import { Services, createServices } from './services';
 import {
   EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
 } from './species';
-import { Biome, TANKS, TankDef, tankById } from './tanks';
+import { Biome, TANKS, TANK_CAP_BONUS, TankDef, tankById } from './tanks';
 import type { UI } from './ui';
 
 interface Pellet { x: number; y: number; vy: number; sway: number; age: number }
@@ -62,7 +62,13 @@ export class Game {
     return { w: this.app.screen.width, h: this.app.screen.height };
   }
   get activeTank(): TankDef { return tankById(this.save.activeTank); }
-  get capacity(): number { return Math.min(6 + this.save.level, 24); }
+
+  /** Belirli bir akvaryumun kapasitesi: seviye tabanı + akvaryum kademesi bonusu. */
+  capacityFor(tankId: string): number {
+    return Math.min(6 + this.save.level, 24) + TANK_CAP_BONUS[tankById(tankId).rarity];
+  }
+  /** Aktif akvaryumun kapasitesi. */
+  get capacity(): number { return this.capacityFor(this.save.activeTank); }
 
   get sellMult(): number { return 1 + 0.05 * this.completedSets().length; }
 

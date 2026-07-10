@@ -5,7 +5,7 @@ import type { Fish } from './fish';
 import type { Game } from './game';
 import { ACHIEVEMENTS } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species } from './species';
-import { BIOME_INFO, TankDef } from './tanks';
+import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
 
 function hex(c: number): string {
   return '#' + c.toString(16).padStart(6, '0');
@@ -379,7 +379,7 @@ export class UI {
             <div class="card-name">${BIOME_INFO[t.biome].emoji} ${t.name}</div>
             ${rarityChip(t.rarity)}
             <div class="card-desc">${t.desc}</div>
-            <div class="card-meta">+%${t.growthBonus} büyüme & gelir${locked ? ` • Sv ${t.unlockLevel}` : ''}</div>
+            <div class="card-meta">+%${t.growthBonus} büyüme & gelir${TANK_CAP_BONUS[t.rarity] ? ` • 🐟 +${TANK_CAP_BONUS[t.rarity]} kapasite` : ''}${locked ? ` • Sv ${t.unlockLevel}` : ''}</div>
             ${ownedT
               ? '<button class="buy-btn owned" disabled>Sahipsin ✓</button>'
               : `<button class="buy-btn" data-tank="${t.id}" ${locked ? 'disabled' : ''}>${t.price === 0 ? 'Ücretsiz' : `${cur} ${fmt(t.price)}`}</button>`}
@@ -489,7 +489,7 @@ export class UI {
             <div class="card ${active ? 'active-tank' : ''}">
               ${tankSwatch(t)}
               <div class="card-name">${BIOME_INFO[t.biome].emoji} ${t.name}</div>
-              <div class="card-meta">🐟 ${count} balık • +%${this.game.tankBoostPct(t.id)} büyüme & gelir</div>
+              <div class="card-meta">🐟 ${count}/${this.game.capacityFor(t.id)} balık • +%${this.game.tankBoostPct(t.id)} büyüme & gelir</div>
               ${active
                 ? '<button class="buy-btn owned" disabled>Buradasın 📍</button>'
                 : `<button class="buy-btn" data-switch="${t.id}">Geç</button>`}
