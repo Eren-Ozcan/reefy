@@ -2,7 +2,7 @@ import { audio } from './audio';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
-import { INCOME_CAP_HOURS, type Game } from './game';
+import { INCOME_CAP_HOURS, type FishEarning, type Game } from './game';
 import { ACHIEVEMENTS } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species } from './species';
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
@@ -544,16 +544,25 @@ export class UI {
     ];
     let body = '';
 
+    const flat: FishEarning[] = []; // satış butonları için satır referansları
     if (tab === 'fish') {
       const groups = this.game.earningsByTank();
       body = groups.map((g) => {
         const rows = g.fishes.length
-          ? g.fishes.map((fe) => `
-              <div class="inv-row">
-                <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
-                <span class="inv-name">${fe.name}<small class="inv-sub">${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}</small></span>
-                <span class="inv-right">${fe.adult ? `🪙 ${fmt(fe.perHour)}/sa` : '🌱 büyüyor'}</span>
-              </div>`).join('')
+          ? g.fishes.map((fe) => {
+              const i = flat.push(fe) - 1;
+              const sub = fe.adult
+                ? `${fe.sp.name} • 🪙 ${fmt(fe.perHour)}/sa${fe.sad ? ' • 😢 aç' : ''}`
+                : `${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}${fe.sad ? ' • 😢 aç' : ''}`;
+              return `
+                <div class="inv-row">
+                  <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
+                  <span class="inv-name">${fe.name}<small class="inv-sub">${sub}</small></span>
+                  ${fe.adult
+                    ? `<button class="tgl on inv-sell" data-sell="${i}">🪙 ${fmt(fe.sellValue)} sat</button>`
+                    : '<span class="inv-right">🌱 büyüyor</span>'}
+                </div>`;
+            }).join('')
           : '<p class="empty">Bu akvaryumda balık yok.</p>';
         return `
           <h3 class="inv-head">${BIOME_INFO[g.tank.biome].emoji} ${g.tank.name} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}/sa` : ''}</h3>
@@ -631,6 +640,14 @@ export class UI {
     el.querySelector('#go-feed-shop')?.addEventListener('click', () => {
       audio.click();
       this.renderShop('feeds');
+    });
+    el.querySelectorAll<HTMLButtonElement>('[data-sell]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const res = this.game.sellEarning(flat[Number(btn.dataset.sell)]);
+        if (!res.ok) audio.error();
+        this.toast(res.msg);
+        if (res.ok) this.renderInventory('fish');
+      });
     });
     el.querySelector('.edit-mode-btn')?.addEventListener('click', () => {
       audio.click();
@@ -756,7 +773,7 @@ export class UI {
         ? grp.fishes.map((fe) => `
             <div class="inv-row">
               <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
-              <span class="inv-name">${fe.name}<small class="inv-sub">${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}</small></span>
+              <span class="inv-name">${fe.name}<small class="inv-sub">${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}${fe.sad ? ' • 😢 aç' : ''}</small></span>
               <span class="inv-right">${fe.adult ? `🪙 ${fmt(fe.perHour)}/sa` : `🌱 olunca ${fmt(fe.perHour)}/sa`}</span>
             </div>`).join('')
         : '<p class="empty">Bu akvaryumda balık yok.</p>';

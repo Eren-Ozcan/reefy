@@ -315,6 +315,7 @@ html, body {
 .inv-name { flex: 1; font-size: 13.5px; font-weight: 600; }
 .inv-sub { display: block; font-size: 11px; font-weight: 600; color: #8ba4b0; margin-top: 2px; }
 .inv-right { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
+.inv-sell { white-space: nowrap; padding: 8px 14px; }
 .empty { font-size: 13px; color: #8ba4b0; padding: 8px 2px; }
 .tank-swatch {
   width: 100%; height: 56px; border-radius: 10px;

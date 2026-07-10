@@ -22,7 +22,17 @@ const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsin
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
 /** Kazanç raporu satırı: balık başına saatlik üretim (akvaryum+dekor bonuslu) ve satış değeri. */
-export interface FishEarning { name: string; sp: Species; adult: boolean; perHour: number; sellValue: number }
+export interface FishEarning {
+  name: string;
+  sp: Species;
+  adult: boolean;
+  sad: boolean;
+  perHour: number;
+  sellValue: number;
+  /** Satış için canlı referans: aktif sahnedeki balık ya da uyuyan kayıt. */
+  live?: Fish;
+  saved?: FishSave;
+}
 export interface TankEarnings { tank: TankDef; boostPct: number; count: number; perHour: number; fishes: FishEarning[] }
 
 export const INCOME_CAP_HOURS = 4; // biriken gelir en fazla bu kadar saatlik üretim olabilir
@@ -841,6 +851,17 @@ export class Game {
       if (grown) this.onGrown(f);
     }
 
+    // Diğer akvaryumlardaki balıklar da yaşar: acıkır, tok oldukça büyür
+    const boostCache: Record<string, number> = {};
+    const tmult = (tid: string) => (boostCache[tid] ??= 1 + this.tankBoostPct(tid) / 100);
+    for (const d of this.dormant) {
+      d.hunger = Math.max(0, d.hunger - dt * HUNGER_RATE);
+      if (d.progress < 1 && d.hunger > SAD_THRESHOLD) {
+        d.progress = Math.min(1, d.progress + (dt * 1000 * tmult(d.tank)) / speciesById(d.sp).growthMs);
+        if (d.progress >= 1) this.onDormantGrown(d);
+      }
+    }
+
     // Parçacıklar
     for (const p of this.particles) {
       p.y += p.vy * dt;
@@ -857,6 +878,14 @@ export class Game {
     audio.grown();
     this.ui.toast(`🎉 ${f.name} yetişkin oldu! Satmak için üzerine dokun.`);
     this.addToCollection(f.sp);
+    this.syncSave();
+    this.ui.refreshHUD();
+  }
+
+  private onDormantGrown(d: FishSave): void {
+    audio.grown();
+    this.ui.toast(`🎉 ${d.name}, ${tankById(d.tank).name} akvaryumunda yetişkin oldu!`);
+    this.addToCollection(speciesById(d.sp));
     this.syncSave();
     this.ui.refreshHUD();
   }
@@ -1152,6 +1181,34 @@ export class Game {
     return { ok: true, msg: `${f.name} satıldı: +${gain} altın` };
   }
 
+  /** Uyuyan (başka akvaryumdaki) yetişkin balığı satar — akvaryum değiştirmeye gerek kalmaz. */
+  sellDormant(fs: FishSave): { ok: boolean; msg: string } {
+    if (fs.progress < 1) return { ok: false, msg: 'Henüz yavru — büyümesini bekle' };
+    const idx = this.dormant.indexOf(fs);
+    if (idx < 0) return { ok: false, msg: 'Balık bulunamadı' };
+    const sp = speciesById(fs.sp);
+    const gain = Math.round(sp.sellPrice * this.sellMult * (1 + (fs.bonus ?? 0)));
+    this.dormant.splice(idx, 1);
+    this.save.coins += gain;
+    if (sp.rarity === 'legendary') this.save.pearls += 2;
+    this.addXp(this.saleXp(sp.sellPrice));
+    this.save.stats.totalSold++;
+    this.save.stats.totalEarned += gain;
+    this.questEvent('sell', 1);
+    this.questEvent('earn', gain);
+    audio.coin();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${fs.name} satıldı: +${gain} altın` };
+  }
+
+  /** Kazanç/envanter satırından satış: aktif balığa ya da uyuyan kayda yönlenir. */
+  sellEarning(fe: FishEarning): { ok: boolean; msg: string } {
+    if (fe.live) return this.sellFish(fe.live);
+    if (fe.saved) return this.sellDormant(fe.saved);
+    return { ok: false, msg: 'Balık bulunamadı' };
+  }
+
   hatchEgg(tier: EggTier): { ok: boolean; msg: string; species?: Species } {
     if (this.fishes.length >= this.capacity) return { ok: false, msg: `Bu akvaryum dolu (${this.capacity} balık)` };
     if (tier.currency === 'coins') {
@@ -1290,16 +1347,20 @@ export class Game {
   /** Kazanç dökümü: her akvaryum için balık balık saatlik üretim (yavrular potansiyel olarak işaretli). */
   earningsByTank(): TankEarnings[] {
     const byTank: Record<string, FishEarning[]> = {};
-    const push = (tankId: string, name: string, sp: Species, adult: boolean, bonus: number) => {
+    const push = (tankId: string, fe: Omit<FishEarning, 'perHour' | 'sellValue'>, bonus: number) => {
       const mult = 1 + this.tankBoostPct(tankId) / 100;
       (byTank[tankId] ??= []).push({
-        name, sp, adult,
-        perHour: Math.round(RARITY_INCOME[sp.rarity] * mult),
-        sellValue: Math.round(sp.sellPrice * this.sellMult * (1 + bonus)),
+        ...fe,
+        perHour: Math.round(RARITY_INCOME[fe.sp.rarity] * mult),
+        sellValue: Math.round(fe.sp.sellPrice * this.sellMult * (1 + bonus)),
       });
     };
-    for (const f of this.fishes) push(this.save.activeTank, f.name, f.sp, f.isAdult, f.bonus);
-    for (const d of this.dormant) push(d.tank, d.name, speciesById(d.sp), d.progress >= 1, d.bonus ?? 0);
+    for (const f of this.fishes) {
+      push(this.save.activeTank, { name: f.name, sp: f.sp, adult: f.isAdult, sad: f.isSad, live: f }, f.bonus);
+    }
+    for (const d of this.dormant) {
+      push(d.tank, { name: d.name, sp: speciesById(d.sp), adult: d.progress >= 1, sad: d.hunger < SAD_THRESHOLD, saved: d }, d.bonus ?? 0);
+    }
     return this.save.tanksOwned
       .map((tid) => {
         const fishes = (byTank[tid] ?? []).sort((a, b) => Number(b.adult) - Number(a.adult) || b.perHour - a.perHour);

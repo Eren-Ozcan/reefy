@@ -236,6 +236,41 @@ await page.screenshot({ path: out + '/20-earnings.png' });
 await page.click('.close-btn');
 await page.waitForTimeout(200);
 
+// Uyuyan balıklar da yaşamalı: diğer akvaryumdaki balığın ilerlemesi artmalı
+await page.evaluate(() => {
+  const d = window.__reefyGame.dormant[0];
+  d.progress = 0.1;
+  d.hunger = 1;
+});
+const dormantP0 = await page.evaluate(() => window.__reefyGame.dormant[0].progress);
+await page.waitForTimeout(1500);
+const dormantP1 = await page.evaluate(() => window.__reefyGame.dormant[0].progress);
+if (!(dormantP1 > dormantP0)) {
+  throw new Error(`Uyuyan balık büyümedi: ${dormantP0} -> ${dormantP1}`);
+}
+
+// Envanterden satış: uyuyan balığı yetişkin yap, akvaryum değiştirmeden listeden sat
+await page.evaluate(() => { window.__reefyGame.dormant[0].progress = 1; });
+const sell0 = await page.evaluate(() => ({
+  coins: window.__reefyGame.save.coins,
+  total: window.__reefyGame.fishes.length + window.__reefyGame.dormant.length,
+}));
+await page.click('#bottombar button[data-act="inventory"]');
+await page.waitForTimeout(400);
+await page.screenshot({ path: out + '/21-inventory-sell.png' });
+await page.locator('.inv-sell').first().click();
+await page.waitForTimeout(300);
+const sell1 = await page.evaluate(() => ({
+  coins: window.__reefyGame.save.coins,
+  total: window.__reefyGame.fishes.length + window.__reefyGame.dormant.length,
+}));
+if (sell1.total !== sell0.total - 1 || sell1.coins <= sell0.coins) {
+  throw new Error(`Envanterden satış hatalı: balık ${sell0.total} -> ${sell1.total}, altın ${sell0.coins} -> ${sell1.coins}`);
+}
+await page.screenshot({ path: out + '/22-fish-sold.png' });
+await page.click('.close-btn');
+await page.waitForTimeout(200);
+
 // Kayıt doğrulaması
 await page.waitForTimeout(6500);
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('reefy-save-v1')));
