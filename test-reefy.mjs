@@ -271,6 +271,50 @@ await page.screenshot({ path: out + '/22-fish-sold.png' });
 await page.click('.close-btn');
 await page.waitForTimeout(200);
 
+// Akvaryum kirliliği: leke ekle -> büyüme/gelir cezası ve cam bulanıklığı uygulanmalı, tıklayınca temizlenmeli
+const dirty = await page.evaluate(() => {
+  const g = window.__reefyGame;
+  const tid = g.save.activeTank;
+  g.save.dirtSpots[tid] = [
+    { id: 1, fx: 0.3, fy: 0.4, r: 1, kind: 0 },
+    { id: 2, fx: 0.5, fy: 0.5, r: 1, kind: 1 },
+    { id: 3, fx: 0.7, fy: 0.35, r: 1, kind: 0 },
+  ];
+  g.ui.refreshHUD();
+  return { dirtPct: g.dirtPct(tid), growthMult: g.growthMult, w: g.bounds.w, h: g.bounds.h };
+});
+if (dirty.dirtPct <= 0 || dirty.growthMult >= 1) {
+  throw new Error(`Kirlilik cezası uygulanmadı: dirtPct=${dirty.dirtPct}, growthMult=${dirty.growthMult}`);
+}
+await page.waitForTimeout(300);
+const blurred = await page.evaluate(() => (window.__reefyGame.app.stage.children[0].filters || []).length > 0);
+if (!blurred) throw new Error('Kirli akvaryumda cam bulanıklık filtresi uygulanmadı');
+await page.screenshot({ path: out + '/23-dirty-tank.png' });
+
+await page.mouse.click(0.5 * dirty.w, 0.5 * dirty.h);
+await page.waitForTimeout(300);
+const cleaned = await page.evaluate(() => {
+  const g = window.__reefyGame;
+  return { count: g.save.dirtSpots[g.save.activeTank].length, growthMult: g.growthMult };
+});
+if (cleaned.count !== 2 || cleaned.growthMult <= dirty.growthMult) {
+  throw new Error(`Kir temizlenemedi: adet ${cleaned.count} (beklenen 2), growthMult ${dirty.growthMult} -> ${cleaned.growthMult}`);
+}
+await page.screenshot({ path: out + '/24-dirt-cleaned.png' });
+// Kalan lekeleri de temizle, cam netliğe dönmeli
+await page.mouse.click(0.3 * dirty.w, 0.4 * dirty.h);
+await page.waitForTimeout(200);
+await page.mouse.click(0.7 * dirty.w, 0.35 * dirty.h);
+await page.waitForTimeout(300);
+const spotless = await page.evaluate(() => ({
+  count: window.__reefyGame.save.dirtSpots[window.__reefyGame.save.activeTank].length,
+  blurred: (window.__reefyGame.app.stage.children[0].filters || []).length > 0,
+}));
+if (spotless.count !== 0 || spotless.blurred) {
+  throw new Error(`Akvaryum tam temizlenemedi: kalan ${spotless.count}, blur ${spotless.blurred}`);
+}
+await page.screenshot({ path: out + '/25-tank-spotless.png' });
+
 // Kayıt doğrulaması
 await page.waitForTimeout(6500);
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('reefy-save-v1')));
