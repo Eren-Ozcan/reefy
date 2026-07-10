@@ -300,6 +300,7 @@ html, body {
 /* HUD akvaryum çipi */
 .hud-tank { cursor: pointer; font-size: 13.5px; }
 .hud-tank .boost { color: #2f9e8f; }
+.inv-head .boost { color: #2f9e8f; font-weight: 800; }
 
 /* Envanter */
 .inv-head { font-size: 14px; color: var(--ink); margin: 14px 0 8px; }
@@ -310,7 +311,10 @@ html, body {
   box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
 }
 .inv-art { line-height: 0; flex-shrink: 0; }
+.inv-art.feed-art { font-size: 30px; line-height: 1; }
 .inv-name { flex: 1; font-size: 13.5px; font-weight: 600; }
+.inv-sub { display: block; font-size: 11px; font-weight: 600; color: #8ba4b0; margin-top: 2px; }
+.inv-right { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
 .empty { font-size: 13px; color: #8ba4b0; padding: 8px 2px; }
 .tank-swatch {
   width: 100%; height: 56px; border-radius: 10px;

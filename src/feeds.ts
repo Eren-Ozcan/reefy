@@ -39,5 +39,24 @@ export function feedById(id: string): FeedDef {
   return FEEDS.find((f) => f.id === id) ?? FEEDS[0];
 }
 
+/** Toplu yem paketleri: stok olarak çantaya girer; stok bitince tane başı normal fiyat işler. */
+export interface FeedPack {
+  id: string;
+  feed: string;   // FeedDef id
+  qty: number;
+  price: number;  // altın — tane başına normalden ucuz
+}
+
+export const FEED_PACKS: FeedPack[] = [
+  { id: 'pack-lezzet-10', feed: 'lezzet', qty: 10, price: 70 },    // 7/tane (normal 8)
+  { id: 'pack-lezzet-50', feed: 'lezzet', qty: 50, price: 320 },   // 6.4/tane
+  { id: 'pack-altin-10',  feed: 'altin',  qty: 10, price: 350 },   // 35/tane (normal 40)
+  { id: 'pack-altin-50',  feed: 'altin',  qty: 50, price: 1600 },  // 32/tane
+];
+
+export function feedPackById(id: string): FeedPack | undefined {
+  return FEED_PACKS.find((p) => p.id === id);
+}
+
 /** Bir balığın yemle biriktirebileceği en yüksek satış bonusu. */
 export const FISH_BONUS_CAP = 0.6;

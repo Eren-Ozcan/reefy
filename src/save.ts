@@ -29,6 +29,7 @@ export interface SaveData {
   friendCode: string;
   fishes: FishSave[];
   collection: string[];                       // yetişkinliğe ulaşmış tür id'leri
+  feedOwned: Record<string, number>;          // feedId -> stok (paketten alınan yem taneleri)
   decorOwned: Record<string, number>;         // defId -> adet (yerleştirilmemiş)
   decorPlaced: Record<string, PlacedDecor[]>; // tankId -> yerleştirilenler
   tanksOwned: string[];
@@ -78,6 +79,7 @@ export function defaultSave(): SaveData {
       { sp: 'neon-tetra', progress: 0.3, hunger: 0.85, name: 'Mercan', seed: 42, tank: START_TANK },
     ],
     collection: [],
+    feedOwned: {},
     decorOwned: {},
     decorPlaced: { [START_TANK]: [] },
     tanksOwned: [START_TANK],
@@ -118,6 +120,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
     merged.fishes = (merged.fishes || []).map((f) => ({ ...f, tank: f.tank ?? START_TANK }));
   }
   // Zorunlu alanları güvenceye al
+  if (!merged.feedOwned) merged.feedOwned = {};
   if (!merged.tanksOwned?.length) merged.tanksOwned = [START_TANK];
   if (!merged.tanksOwned.includes(merged.activeTank)) merged.activeTank = merged.tanksOwned[0];
   if (!merged.decorPlaced) merged.decorPlaced = {};

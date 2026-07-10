@@ -8,7 +8,7 @@ import { Services, createServices } from './services';
 import {
   EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
 } from './species';
-import { FISH_BONUS_CAP, FeedDef, feedById } from './feeds';
+import { FEEDS, FISH_BONUS_CAP, FeedDef, feedById, feedPackById } from './feeds';
 import { Biome, TANKS, TANK_CAP_BONUS, TankDef, tankById } from './tanks';
 import type { UI } from './ui';
 
@@ -20,6 +20,10 @@ const OFFLINE_SPEED = 0.5;
 const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsinden
 
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
+
+/** Kazanç raporu satırı: balık başına saatlik üretim (akvaryum+dekor bonuslu) ve satış değeri. */
+export interface FishEarning { name: string; sp: Species; adult: boolean; perHour: number; sellValue: number }
+export interface TankEarnings { tank: TankDef; boostPct: number; count: number; perHour: number; fishes: FishEarning[] }
 
 export const INCOME_CAP_HOURS = 4; // biriken gelir en fazla bu kadar saatlik üretim olabilir
 
@@ -155,6 +159,9 @@ export class Game {
     }
     for (const id of Object.keys(this.save.decorOwned)) {
       if (!known.has(id)) delete this.save.decorOwned[id];
+    }
+    for (const id of Object.keys(this.save.feedOwned)) {
+      if (!FEEDS.some((f) => f.id === id)) delete this.save.feedOwned[id];
     }
 
     // Kayıttaki bilinmeyen akvaryum/tür kimliklerini ayıkla (katalog değişirse çökmeyi önler)
@@ -1045,19 +1052,25 @@ export class Game {
     return -1;
   }
 
-  /** Tek yem tanesi at (dokunulan noktadan batar). Yem ücretliyse altın düşer. */
+  /** Tek yem tanesi at (dokunulan noktadan batar). Ücretli yem önce stoktan, stok yoksa altından düşer. */
   dropPellet(x: number, y: number): void {
     const f = this.feedType;
     if (!f) return;
     if (this.pellets.length >= 25) return;
     if (f.cost > 0) {
-      if (this.save.coins < f.cost) {
-        audio.error();
-        this.ui.toast(`Yeterli altın yok (${f.name}: ${f.cost} 🪙/tane)`);
-        return;
+      const stock = this.save.feedOwned[f.id] ?? 0;
+      if (stock > 0) {
+        this.save.feedOwned[f.id] = stock - 1;
+        this.ui.updateFeedChip(f);
+      } else {
+        if (this.save.coins < f.cost) {
+          audio.error();
+          this.ui.toast(`Yeterli altın yok (${f.name}: ${f.cost} 🪙/tane)`);
+          return;
+        }
+        this.save.coins -= f.cost;
+        this.ui.refreshHUD();
       }
-      this.save.coins -= f.cost;
-      this.ui.refreshHUD();
     }
     const { h } = this.bounds;
     this.pellets.push({
@@ -1069,6 +1082,19 @@ export class Game {
       feed: f.id,
     });
     audio.bubble();
+  }
+
+  /** Yem paketi satın al: stok çantaya eklenir. */
+  buyFeedPack(packId: string): { ok: boolean; msg: string } {
+    const p = feedPackById(packId);
+    if (!p) return { ok: false, msg: 'Bilinmeyen paket' };
+    if (this.save.coins < p.price) return { ok: false, msg: 'Yeterli altın yok' };
+    this.save.coins -= p.price;
+    this.save.feedOwned[p.feed] = (this.save.feedOwned[p.feed] ?? 0) + p.qty;
+    audio.coin();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${p.qty} × ${feedById(p.feed).name} çantana eklendi! 🎒` };
   }
 
   buyFish(spId: string): { ok: boolean; msg: string } {
@@ -1259,6 +1285,33 @@ export class Game {
   tankFishCount(tankId: string): number {
     if (tankId === this.save.activeTank) return this.fishes.length;
     return this.dormant.filter((d) => d.tank === tankId).length;
+  }
+
+  /** Kazanç dökümü: her akvaryum için balık balık saatlik üretim (yavrular potansiyel olarak işaretli). */
+  earningsByTank(): TankEarnings[] {
+    const byTank: Record<string, FishEarning[]> = {};
+    const push = (tankId: string, name: string, sp: Species, adult: boolean, bonus: number) => {
+      const mult = 1 + this.tankBoostPct(tankId) / 100;
+      (byTank[tankId] ??= []).push({
+        name, sp, adult,
+        perHour: Math.round(RARITY_INCOME[sp.rarity] * mult),
+        sellValue: Math.round(sp.sellPrice * this.sellMult * (1 + bonus)),
+      });
+    };
+    for (const f of this.fishes) push(this.save.activeTank, f.name, f.sp, f.isAdult, f.bonus);
+    for (const d of this.dormant) push(d.tank, d.name, speciesById(d.sp), d.progress >= 1, d.bonus ?? 0);
+    return this.save.tanksOwned
+      .map((tid) => {
+        const fishes = (byTank[tid] ?? []).sort((a, b) => Number(b.adult) - Number(a.adult) || b.perHour - a.perHour);
+        return {
+          tank: tankById(tid),
+          boostPct: this.tankBoostPct(tid),
+          count: fishes.length,
+          perHour: fishes.reduce((sum, x) => sum + (x.adult ? x.perHour : 0), 0),
+          fishes,
+        };
+      })
+      .sort((a, b) => b.perHour - a.perHour);
   }
 
   /** Aktif akvaryumdaki bir balığı sahip olunan başka bir akvaryuma taşır. */

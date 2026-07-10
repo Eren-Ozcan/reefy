@@ -70,9 +70,11 @@ await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/7-shop-iap.png' });
 await page.click('.close-btn');
 
-// Envanter: dekoru yerleştir
+// Envanter: dekor sekmesine geç, dekoru yerleştir
 await page.click('#bottombar button[data-act="inventory"]');
 await page.waitForTimeout(400);
+await page.click('.tab[data-tab="decor"]');
+await page.waitForTimeout(300);
 await page.locator('[data-place]').first().click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/8-inventory.png' });
@@ -181,10 +183,64 @@ if (moved.active !== fishBefore - 1 || moved.inKumsal !== 1) {
 }
 await page.screenshot({ path: out + '/16-fish-moved.png' });
 
+// Yem paketi: mağazadan stok al, stoktan yemle (altın düşmemeli)
+await page.click('#bottombar button[data-act="shop"]');
+await page.waitForTimeout(300);
+await page.click('.tab[data-tab="feeds"]');
+await page.waitForTimeout(300);
+const coinsBeforePack = await page.evaluate(() => window.__reefyGame.save.coins);
+await page.click('.buy-btn[data-feedpack="pack-lezzet-10"]');
+await page.waitForTimeout(300);
+await page.screenshot({ path: out + '/17-shop-feeds.png' });
+await page.click('.close-btn');
+await page.waitForTimeout(200);
+const pack = await page.evaluate(() => ({
+  coins: window.__reefyGame.save.coins,
+  stock: window.__reefyGame.save.feedOwned.lezzet,
+}));
+if (coinsBeforePack - pack.coins !== 70 || pack.stock !== 10) {
+  throw new Error(`Yem paketi hatalı: ${coinsBeforePack} -> ${pack.coins}, stok ${pack.stock} (beklenen -70, 10)`);
+}
+await page.click('#bottombar button[data-act="feed"]');
+await page.waitForTimeout(300);
+await page.click('.feed-opt[data-feed="lezzet"]');
+await page.waitForTimeout(200);
+await page.mouse.click(420, 300);
+await page.waitForTimeout(200);
+const afterStockFeed = await page.evaluate(() => ({
+  coins: window.__reefyGame.save.coins,
+  stock: window.__reefyGame.save.feedOwned.lezzet,
+}));
+if (afterStockFeed.coins !== pack.coins || afterStockFeed.stock !== 9) {
+  throw new Error(`Stoktan yemleme hatalı: altın ${pack.coins} -> ${afterStockFeed.coins}, stok ${afterStockFeed.stock} (beklenen aynı altın, stok 9)`);
+}
+await page.click('#mode-done');
+await page.waitForTimeout(200);
+
+// Envanter: balık listesi (akvaryuma göre gruplu, gelirli)
+await page.click('#bottombar button[data-act="inventory"]');
+await page.waitForTimeout(400);
+await page.screenshot({ path: out + '/18-inventory-fish.png' });
+await page.click('.tab[data-tab="feeds"]');
+await page.waitForTimeout(300);
+await page.screenshot({ path: out + '/19-inventory-feeds.png' });
+await page.click('.close-btn');
+await page.waitForTimeout(200);
+
+// Kazanç raporu
+await page.click('#bottombar button[data-act="more"]');
+await page.waitForTimeout(300);
+await page.click('.more-btn[data-go="earnings"]');
+await page.waitForTimeout(400);
+await page.screenshot({ path: out + '/20-earnings.png' });
+await page.click('.close-btn');
+await page.waitForTimeout(200);
+
 // Kayıt doğrulaması
 await page.waitForTimeout(6500);
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('reefy-save-v1')));
 console.log('SAVE: v=' + save.v, 'fish=' + save.fishes.length, 'coins=' + save.coins,
+  'feedOwned=' + JSON.stringify(save.feedOwned),
   'decorOwned=' + JSON.stringify(save.decorOwned),
   'placed=' + (save.decorPlaced[save.activeTank] || []).length,
   'friends=' + save.friends.length,

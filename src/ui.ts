@@ -2,10 +2,10 @@ import { audio } from './audio';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
-import type { Game } from './game';
+import { INCOME_CAP_HOURS, type Game } from './game';
 import { ACHIEVEMENTS } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species } from './species';
-import { FEEDS } from './feeds';
+import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
 
 function hex(c: number): string {
@@ -191,14 +191,7 @@ export class UI {
         <button data-act="more">☰<span>Daha</span></button>
       </div>
       <button id="collect-btn" class="empty">🪙 <b id="collect-amount">0</b><span id="collect-rate">0/sa</span></button>
-      <div id="feed-pop" class="hidden">
-        ${FEEDS.map((f) => `
-          <button class="feed-opt" data-feed="${f.id}">
-            <span class="feed-emoji">${f.emoji}</span>
-            <span class="feed-info"><b>${f.name}</b><small>${f.desc}</small></span>
-            <span class="feed-cost">${f.cost === 0 ? 'Ücretsiz' : `🪙 ${f.cost}/tane`}</span>
-          </button>`).join('')}
-      </div>
+      <div id="feed-pop" class="hidden"></div>
       <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">Bitti ✓</button></div>
       <div id="panel-host"></div>
       <div id="toasts"></div>
@@ -218,22 +211,12 @@ export class UI {
         const act = btn.dataset.act!;
         if (act === 'feed') this.toggleFeedPop();
         else if (act === 'shop') this.renderShop('fish');
-        else if (act === 'inventory') this.renderInventory('decor');
+        else if (act === 'inventory') this.renderInventory('fish');
         else if (act === 'social') this.renderSocial('leaderboard');
         else if (act === 'more') this.renderMore();
       });
     });
 
-    // Yem seçici
-    root.querySelectorAll<HTMLButtonElement>('.feed-opt').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const f = FEEDS.find((x) => x.id === btn.dataset.feed)!;
-        this.game.setFeedType(f);
-        root.querySelector('#feed-pop')!.classList.add('hidden');
-        this.showModeChip(`${f.emoji} ${f.name} — suya dokunarak yemle`);
-        audio.click();
-      });
-    });
     root.querySelector('#mode-done')!.addEventListener('click', () => {
       this.exitModes();
       audio.click();
@@ -266,7 +249,42 @@ export class UI {
 
   private toggleFeedPop(): void {
     if (this.game.inputMode !== 'normal') { this.exitModes(); return; }
-    this.root.querySelector('#feed-pop')!.classList.toggle('hidden');
+    const pop = this.root.querySelector('#feed-pop')!;
+    if (pop.classList.contains('hidden')) { this.renderFeedPop(); pop.classList.remove('hidden'); }
+    else pop.classList.add('hidden');
+  }
+
+  /** Yem seçiciyi güncel stoklarla yeniden çizer. */
+  private renderFeedPop(): void {
+    const pop = this.root.querySelector<HTMLElement>('#feed-pop')!;
+    const s = this.game.save;
+    pop.innerHTML = FEEDS.map((f) => {
+      const stock = s.feedOwned[f.id] ?? 0;
+      const cost = f.cost === 0 ? 'Ücretsiz' : stock > 0 ? `🎒 ${stock} stokta` : `🪙 ${f.cost}/tane`;
+      return `
+        <button class="feed-opt" data-feed="${f.id}">
+          <span class="feed-emoji">${f.emoji}</span>
+          <span class="feed-info"><b>${f.name}</b><small>${f.desc}</small></span>
+          <span class="feed-cost">${cost}</span>
+        </button>`;
+    }).join('');
+    pop.querySelectorAll<HTMLButtonElement>('.feed-opt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const f = FEEDS.find((x) => x.id === btn.dataset.feed)!;
+        this.game.setFeedType(f);
+        pop.classList.add('hidden');
+        this.showModeChip('');
+        this.updateFeedChip(f);
+        audio.click();
+      });
+    });
+  }
+
+  /** Yem modu etiketini stok durumuyla günceller (her stoktan yiyişte çağrılır). */
+  updateFeedChip(f: FeedDef): void {
+    const stock = this.game.save.feedOwned[f.id] ?? 0;
+    this.root.querySelector('#mode-label')!.textContent =
+      stock > 0 ? `${f.emoji} ${f.name} — 🎒 ${stock} kaldı` : `${f.emoji} ${f.name} — suya dokunarak yemle`;
   }
 
   private showModeChip(label: string): void {
@@ -354,6 +372,7 @@ export class UI {
     return [
       { id: 'fish', label: '🐟 Balık', active: active === 'fish' },
       { id: 'eggs', label: '🥚 Yumurta', active: active === 'eggs' },
+      { id: 'feeds', label: '🍤 Yem', active: active === 'feeds' },
       { id: 'decor', label: '🪸 Dekor', active: active === 'decor' },
       { id: 'tanks', label: '🏝️ Akvaryum', active: active === 'tanks' },
       { id: 'pearls', label: '💎 İnci', active: active === 'pearls' },
@@ -364,12 +383,12 @@ export class UI {
     el.querySelectorAll<HTMLButtonElement>('.tab').forEach((btn) => {
       btn.addEventListener('click', () => {
         audio.click();
-        this.renderShop(btn.dataset.tab as 'fish' | 'eggs' | 'decor' | 'tanks' | 'pearls');
+        this.renderShop(btn.dataset.tab as Parameters<UI['renderShop']>[0]);
       });
     });
   }
 
-  renderShop(tab: 'fish' | 'eggs' | 'decor' | 'tanks' | 'pearls', keepScroll = 0): void {
+  renderShop(tab: 'fish' | 'eggs' | 'feeds' | 'decor' | 'tanks' | 'pearls', keepScroll = 0): void {
     const s = this.game.save;
     let body = '';
 
@@ -405,6 +424,21 @@ export class UI {
             <button class="buy-btn" data-egg="${egg.id}">${cur} ${fmt(egg.cost)}</button>
           </div>`;
       }).join('')}</div>`;
+    } else if (tab === 'feeds') {
+      body = `
+        <p class="dex-info">Paketten alınan yem çantana stok olarak girer ve tane başına <b>normalden ucuza</b> gelir. Stok bitince seçili yem, tane başı normal fiyattan altınla atılmaya devam eder.</p>
+        <div class="grid">${FEED_PACKS.map((p) => {
+          const fd = feedById(p.feed);
+          const stock = s.feedOwned[fd.id] ?? 0;
+          return `
+            <div class="card">
+              <div class="egg-emoji">${fd.emoji}</div>
+              <div class="card-name">${fd.name} ×${p.qty}</div>
+              <div class="card-desc">${fd.desc}</div>
+              <div class="card-meta">Tane başı 🪙 ${(p.price / p.qty).toLocaleString('tr-TR')} (normal ${fd.cost})${stock ? ` • 🎒 ${stock} stokta` : ''}</div>
+              <button class="buy-btn" data-feedpack="${p.id}">🪙 ${fmt(p.price)}</button>
+            </div>`;
+        }).join('')}</div>`;
     } else if (tab === 'decor') {
       const list = [...DECOR].sort((a, b) => RARITY_INFO[a.rarity].order - RARITY_INFO[b.rarity].order || a.price - b.price);
       body = `<div class="grid">${list.map((d) => {
@@ -468,6 +502,11 @@ export class UI {
           const res = this.game.hatchEgg(egg);
           if (!res.ok) { audio.error(); this.toast(res.msg); return; }
           this.showEggReveal(egg, res.species!);
+        } else if (btn.dataset.feedpack) {
+          const res = this.game.buyFeedPack(btn.dataset.feedpack);
+          if (!res.ok) audio.error();
+          this.toast(res.msg);
+          if (res.ok) this.renderShop('feeds', st);
         } else if (btn.dataset.decor) {
           const res = this.game.buyDecor(btn.dataset.decor);
           if (!res.ok) audio.error();
@@ -495,15 +534,46 @@ export class UI {
 
   // ---------- ENVANTER ----------
 
-  renderInventory(tab: 'decor' | 'tanks'): void {
+  renderInventory(tab: 'fish' | 'feeds' | 'decor' | 'tanks'): void {
     const s = this.game.save;
     const tabs = [
+      { id: 'fish', label: '🐟 Balıklarım', active: tab === 'fish' },
+      { id: 'feeds', label: '🍤 Yemlerim', active: tab === 'feeds' },
       { id: 'decor', label: '🪸 Dekorlarım', active: tab === 'decor' },
       { id: 'tanks', label: '🏝️ Akvaryumlarım', active: tab === 'tanks' },
     ];
     let body = '';
 
-    if (tab === 'decor') {
+    if (tab === 'fish') {
+      const groups = this.game.earningsByTank();
+      body = groups.map((g) => {
+        const rows = g.fishes.length
+          ? g.fishes.map((fe) => `
+              <div class="inv-row">
+                <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
+                <span class="inv-name">${fe.name}<small class="inv-sub">${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}</small></span>
+                <span class="inv-right">${fe.adult ? `🪙 ${fmt(fe.perHour)}/sa` : '🌱 büyüyor'}</span>
+              </div>`).join('')
+          : '<p class="empty">Bu akvaryumda balık yok.</p>';
+        return `
+          <h3 class="inv-head">${BIOME_INFO[g.tank.biome].emoji} ${g.tank.name} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}/sa` : ''}</h3>
+          ${rows}`;
+      }).join('');
+    } else if (tab === 'feeds') {
+      const paid = FEEDS.filter((f) => f.cost > 0);
+      body = `
+        ${paid.map((f) => {
+          const stock = s.feedOwned[f.id] ?? 0;
+          return `
+            <div class="inv-row">
+              <span class="inv-art feed-art">${f.emoji}</span>
+              <span class="inv-name">${f.name}<small class="inv-sub">${f.desc}</small></span>
+              <span class="inv-right">${stock > 0 ? `🎒 ×${stock}` : 'stok yok'}</span>
+            </div>`;
+        }).join('')}
+        <p class="dex-info">Stok bittiğinde yem, tane başına normal fiyattan altınla atılır. Paketler tane başına daha ucuzdur.</p>
+        <button class="buy-btn" id="go-feed-shop">🛒 Yem paketlerine git</button>`;
+    } else if (tab === 'decor') {
       const placed = s.decorPlaced[s.activeTank] ?? [];
       const ownedIds = Object.keys(s.decorOwned).filter((id) => (s.decorOwned[id] ?? 0) > 0);
       const placedHTML = placed.length
@@ -555,8 +625,12 @@ export class UI {
     el.querySelectorAll<HTMLButtonElement>('.tab').forEach((btn) => {
       btn.addEventListener('click', () => {
         audio.click();
-        this.renderInventory(btn.dataset.tab as 'decor' | 'tanks');
+        this.renderInventory(btn.dataset.tab as 'fish' | 'feeds' | 'decor' | 'tanks');
       });
+    });
+    el.querySelector('#go-feed-shop')?.addEventListener('click', () => {
+      audio.click();
+      this.renderShop('feeds');
     });
     el.querySelector('.edit-mode-btn')?.addEventListener('click', () => {
       audio.click();
@@ -655,6 +729,7 @@ export class UI {
       <div class="more-grid">
         <button class="more-btn" data-go="quests">📋<span>Görevler</span></button>
         <button class="more-btn" data-go="collection">📖<span>Koleksiyon</span></button>
+        <button class="more-btn" data-go="earnings">📈<span>Kazanç</span></button>
         <button class="more-btn" data-go="settings">⚙️<span>Ayarlar</span></button>
       </div>`);
     el.querySelectorAll<HTMLButtonElement>('.more-btn').forEach((btn) => {
@@ -663,9 +738,37 @@ export class UI {
         const go = btn.dataset.go!;
         if (go === 'quests') this.renderQuests();
         else if (go === 'collection') this.renderCollection();
+        else if (go === 'earnings') this.renderEarnings();
         else this.renderSettings();
       });
     });
+  }
+
+  /** Kazanç raporu: toplam üretim, akvaryum başına alt toplam ve balık başına gelir. */
+  private renderEarnings(): void {
+    const g = this.game;
+    const groups = g.earningsByTank();
+    const total = g.incomePerHour;
+    const pot = Math.floor(g.save.incomePot);
+    const cap = total * INCOME_CAP_HOURS;
+    const blocks = groups.map((grp) => {
+      const rows = grp.fishes.length
+        ? grp.fishes.map((fe) => `
+            <div class="inv-row">
+              <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
+              <span class="inv-name">${fe.name}<small class="inv-sub">${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}</small></span>
+              <span class="inv-right">${fe.adult ? `🪙 ${fmt(fe.perHour)}/sa` : `🌱 olunca ${fmt(fe.perHour)}/sa`}</span>
+            </div>`).join('')
+        : '<p class="empty">Bu akvaryumda balık yok.</p>';
+      return `
+        <h3 class="inv-head">${BIOME_INFO[grp.tank.biome].emoji} ${grp.tank.name}
+          — 🪙 ${fmt(grp.perHour)}/sa${grp.boostPct > 0 ? ` <span class="boost">+%${grp.boostPct}</span>` : ''}</h3>
+        ${rows}`;
+    }).join('');
+    this.panelShell('📈 Kazanç Raporu', `
+      <p class="dex-info">Toplam üretim: <b>🪙 ${fmt(total)}/saat</b> • Birikmiş: <b>${fmt(pot)}</b>${total > 0 ? ` (tavan ${fmt(cap)})` : ''}.
+      Yalnızca yetişkin balıklar üretir; akvaryum + dekor bonusu üretime ve büyümeye işler.</p>
+      ${blocks}`);
   }
 
   private renderQuests(): void {
