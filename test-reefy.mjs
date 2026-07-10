@@ -19,9 +19,26 @@ if (await welcomeOk.count()) await welcomeOk.click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/2-aquarium.png' });
 
-// Besle
+// Besle: ücretli yem seç, 3 kez suya dokun, tam maliyet düşümünü HUD'dan doğrula
 await page.click('#bottombar button[data-act="feed"]');
-await page.waitForTimeout(1500);
+await page.waitForTimeout(300);
+await page.click('.feed-opt[data-feed="lezzet"]');
+await page.waitForTimeout(300);
+const coinsBefore = Number((await page.locator('#hud-coins').textContent()).trim());
+await page.mouse.click(300, 300);
+await page.waitForTimeout(150);
+await page.mouse.click(450, 320);
+await page.waitForTimeout(150);
+await page.mouse.click(380, 350);
+await page.waitForTimeout(150);
+const coinsAfter = Number((await page.locator('#hud-coins').textContent()).trim());
+const feedSpend = coinsBefore - coinsAfter;
+if (feedSpend !== 24) {
+  throw new Error(`Yem düşümü beklenmiyor: ${coinsBefore} -> ${coinsAfter} (fark ${feedSpend}, beklenen 24)`);
+}
+await page.click('#mode-done');
+await page.waitForTimeout(300);
+await page.screenshot({ path: out + '/2b-feeding.png' });
 
 // Mağaza: balık satın al
 await page.click('#bottombar button[data-act="shop"]');
@@ -59,8 +76,32 @@ await page.waitForTimeout(400);
 await page.locator('[data-place]').first().click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/8-inventory.png' });
-await page.click('.close-btn');
-await page.waitForTimeout(600);
+
+// Dekor sürükleme: düzenleme moduna gir, dekoru sürükle, konumun kayıtta değiştiğini doğrula
+await page.click('.edit-mode-btn');
+await page.waitForTimeout(300);
+const decorBefore = await page.evaluate(() => {
+  const save = JSON.parse(localStorage.getItem('reefy-save-v1'));
+  return save.decorPlaced[save.activeTank][0].fx;
+});
+const dragY = 560;
+const fromX = decorBefore * 900;
+const toX = fromX < 450 ? fromX + 300 : fromX - 300;
+await page.mouse.move(fromX, dragY);
+await page.mouse.down();
+await page.mouse.move((fromX + toX) / 2, dragY, { steps: 5 });
+await page.mouse.move(toX, dragY, { steps: 5 });
+await page.mouse.up();
+await page.waitForTimeout(200);
+const decorAfter = await page.evaluate(() => {
+  const save = JSON.parse(localStorage.getItem('reefy-save-v1'));
+  return save.decorPlaced[save.activeTank][0].fx;
+});
+if (Math.abs(decorAfter - decorBefore) < 0.15) {
+  throw new Error(`Dekor sürüklenmedi: ${decorBefore} -> ${decorAfter}`);
+}
+await page.click('#mode-done');
+await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/9-decor-placed.png' });
 
 // Sosyal
