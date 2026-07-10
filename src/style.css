@@ -464,6 +464,11 @@ hr { border: none; border-top: 1px solid #dfe9ee; margin: 6px 0; }
 .bar > div.hunger { background: linear-gradient(90deg, #ffc36e, #ff8a5c); }
 .growing { font-size: 13px; color: var(--ink-soft); }
 .sell { margin-top: 6px; }
+.fish-info .inv-head { width: 100%; max-width: 300px; text-align: left; }
+.move-list { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 6px; }
+.move-btn { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 14px; text-align: left; }
+.move-btn small { font-weight: 600; opacity: 0.7; }
+.move-btn:disabled { opacity: 0.45; cursor: default; }
 
 /* Hoş geldin */
 .welcome { text-align: center; padding: 6px 4px 4px; }

@@ -136,6 +136,51 @@ await page.waitForTimeout(300);
 await page.screenshot({ path: out + '/14-settings.png' });
 await page.click('.close-btn');
 
+// Balık taşıma: test kancasıyla altın+seviye ver, ikinci akvaryumu al, balığı kartından taşı
+await page.evaluate(() => {
+  const g = window.__reefyGame;
+  g.save.coins += 5000;
+  g.save.level = 5;
+  g.ui.refreshHUD();
+});
+await page.click('#bottombar button[data-act="shop"]');
+await page.waitForTimeout(300);
+await page.click('.tab[data-tab="tanks"]');
+await page.waitForTimeout(300);
+await page.click('.buy-btn[data-tank="tank-kumsal"]');
+await page.waitForTimeout(300);
+await page.click('.close-btn');
+await page.waitForTimeout(300);
+
+const fishBefore = await page.evaluate(() => window.__reefyGame.fishes.length);
+// Balığa dokun — konumu oyundan al; balık hareket ettiği için birkaç deneme yap
+for (let i = 0; i < 5; i++) {
+  const pos = await page.evaluate(() => {
+    const fs = window.__reefyGame.fishes;
+    let f = fs[0];
+    for (const c of fs) if (c.y > f.y) f = c; // HUD'dan uzak, en alttaki balık
+    return { x: f.x, y: f.y };
+  });
+  await page.mouse.click(pos.x, pos.y);
+  await page.waitForTimeout(350);
+  if (await page.locator('.fish-info').count()) break;
+}
+if (!(await page.locator('.fish-info').count())) throw new Error('Balık kartı açılamadı');
+await page.screenshot({ path: out + '/15-fish-card.png' });
+await page.click('.move-btn[data-move="tank-kumsal"]');
+await page.waitForTimeout(300);
+const moved = await page.evaluate(() => {
+  const g = window.__reefyGame;
+  return {
+    active: g.fishes.length,
+    inKumsal: g.save.fishes.filter((f) => f.tank === 'tank-kumsal').length,
+  };
+});
+if (moved.active !== fishBefore - 1 || moved.inKumsal !== 1) {
+  throw new Error(`Balık taşınamadı: aktif ${fishBefore} -> ${moved.active}, kumsalda ${moved.inKumsal}`);
+}
+await page.screenshot({ path: out + '/16-fish-moved.png' });
+
 // Kayıt doğrulaması
 await page.waitForTimeout(6500);
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('reefy-save-v1')));

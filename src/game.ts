@@ -1261,6 +1261,25 @@ export class Game {
     return this.dormant.filter((d) => d.tank === tankId).length;
   }
 
+  /** Aktif akvaryumdaki bir balığı sahip olunan başka bir akvaryuma taşır. */
+  moveFish(f: Fish, tankId: string): { ok: boolean; msg: string } {
+    if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: 'Önce bu akvaryumu satın almalısın' };
+    if (tankId === this.save.activeTank) return { ok: false, msg: 'Balık zaten bu akvaryumda' };
+    const cap = this.capacityFor(tankId);
+    if (this.tankFishCount(tankId) >= cap) return { ok: false, msg: `${tankById(tankId).name} dolu (${cap} balık)` };
+    const idx = this.fishes.indexOf(f);
+    if (idx < 0) return { ok: false, msg: 'Balık bulunamadı' };
+    this.fishes.splice(idx, 1);
+    const fs = f.toSave();
+    fs.tank = tankId;
+    this.dormant.push(fs);
+    f.root.destroy({ children: true });
+    audio.place();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${f.name}, ${tankById(tankId).name} akvaryumuna taşındı 🌊` };
+  }
+
   // ---------- ortak ----------
 
   private addXp(n: number): void {

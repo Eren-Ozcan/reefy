@@ -838,7 +838,24 @@ export class UI {
 
   showFishInfo(f: Fish): void {
     audio.click();
+    const s = this.game.save;
     const gain = Math.round(f.sp.sellPrice * this.game.sellMult * (1 + f.bonus));
+    const otherTanks = this.game.tankList().filter((t) => s.tanksOwned.includes(t.id) && t.id !== s.activeTank);
+    const moveHTML = otherTanks.length
+      ? `
+        <h3 class="inv-head">🔀 Başka akvaryuma taşı</h3>
+        <div class="move-list">${otherTanks.map((t) => {
+          const count = this.game.tankFishCount(t.id);
+          const cap = this.game.capacityFor(t.id);
+          const boost = this.game.tankBoostPct(t.id);
+          const full = count >= cap;
+          return `
+            <button class="tgl move-btn" data-move="${t.id}" ${full ? 'disabled' : ''}>
+              <span>${BIOME_INFO[t.biome].emoji} ${t.name}</span>
+              <small>🐟 ${count}/${cap}${boost > 0 ? ` • +%${boost}` : ''}${full ? ' • dolu' : ''}</small>
+            </button>`;
+        }).join('')}</div>`
+      : '';
     const el = this.panelShell(`${f.name}`, `
       <div class="fish-info">
         <div class="card-art">${fishSVG(f.sp, 120)}</div>
@@ -853,6 +870,7 @@ export class UI {
         ${f.isAdult
           ? `<button class="buy-btn sell">🪙 ${fmt(gain)} karşılığında sat</button>`
           : `<p class="growing">Büyüyor… satmak için yetişkin olmasını bekle 🌱</p>`}
+        ${moveHTML}
       </div>`);
     const sellBtn = el.querySelector<HTMLButtonElement>('.sell');
     if (sellBtn) {
@@ -862,6 +880,14 @@ export class UI {
         this.closePanel();
       });
     }
+    el.querySelectorAll<HTMLButtonElement>('[data-move]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const res = this.game.moveFish(f, btn.dataset.move!);
+        if (!res.ok) audio.error();
+        this.toast(res.msg);
+        if (res.ok) this.closePanel();
+      });
+    });
     this.fishInfoTimer = window.setInterval(() => {
       const g = el.querySelector<HTMLElement>('#fi-grow');
       const h = el.querySelector<HTMLElement>('#fi-hunger');
