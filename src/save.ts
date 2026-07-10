@@ -5,6 +5,7 @@ export interface FishSave {
   name: string;
   seed: number;
   tank: string;     // hangi akvaryumda yaşıyor
+  bonus?: number;   // kaliteli yemlerle biriken satış fiyatı bonusu (0..0.6)
 }
 
 export interface PlacedDecor {

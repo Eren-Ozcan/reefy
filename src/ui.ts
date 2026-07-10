@@ -5,6 +5,7 @@ import type { Fish } from './fish';
 import type { Game } from './game';
 import { ACHIEVEMENTS } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species } from './species';
+import { FEEDS } from './feeds';
 import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
 
 function hex(c: number): string {
@@ -190,6 +191,15 @@ export class UI {
         <button data-act="more">☰<span>Daha</span></button>
       </div>
       <button id="collect-btn" class="empty">🪙 <b id="collect-amount">0</b><span id="collect-rate">0/sa</span></button>
+      <div id="feed-pop" class="hidden">
+        ${FEEDS.map((f) => `
+          <button class="feed-opt" data-feed="${f.id}">
+            <span class="feed-emoji">${f.emoji}</span>
+            <span class="feed-info"><b>${f.name}</b><small>${f.desc}</small></span>
+            <span class="feed-cost">${f.cost === 0 ? 'Ücretsiz' : `🪙 ${f.cost}/tane`}</span>
+          </button>`).join('')}
+      </div>
+      <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">Bitti ✓</button></div>
       <div id="panel-host"></div>
       <div id="toasts"></div>
     `;
@@ -206,12 +216,27 @@ export class UI {
       btn.addEventListener('click', () => {
         audio.click();
         const act = btn.dataset.act!;
-        if (act === 'feed') this.game.feed();
+        if (act === 'feed') this.toggleFeedPop();
         else if (act === 'shop') this.renderShop('fish');
         else if (act === 'inventory') this.renderInventory('decor');
         else if (act === 'social') this.renderSocial('leaderboard');
         else if (act === 'more') this.renderMore();
       });
+    });
+
+    // Yem seçici
+    root.querySelectorAll<HTMLButtonElement>('.feed-opt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const f = FEEDS.find((x) => x.id === btn.dataset.feed)!;
+        this.game.setFeedType(f);
+        root.querySelector('#feed-pop')!.classList.add('hidden');
+        this.showModeChip(`${f.emoji} ${f.name} — suya dokunarak yemle`);
+        audio.click();
+      });
+    });
+    root.querySelector('#mode-done')!.addEventListener('click', () => {
+      this.exitModes();
+      audio.click();
     });
     this.hudTank.addEventListener('click', () => {
       audio.click();
@@ -237,6 +262,33 @@ export class UI {
     const t = this.game.activeTank;
     const boost = Math.round((this.game.growthMult - 1) * 100);
     this.hudTank.innerHTML = `${BIOME_INFO[t.biome].emoji} ${t.name}${boost > 0 ? ` <b class="boost">+%${boost}</b>` : ''}`;
+  }
+
+  private toggleFeedPop(): void {
+    if (this.game.inputMode !== 'normal') { this.exitModes(); return; }
+    this.root.querySelector('#feed-pop')!.classList.toggle('hidden');
+  }
+
+  private showModeChip(label: string): void {
+    this.root.querySelector('#mode-label')!.textContent = label;
+    this.root.querySelector('#mode-chip')!.classList.remove('hidden');
+    this.root.classList.add('mode-active'); // alt barı gizle — zemin dokunulabilir olsun
+  }
+
+  /** Yem/düzenleme modundan çık. */
+  exitModes(): void {
+    this.game.setFeedType(null);
+    this.game.setEditMode(false);
+    this.root.querySelector('#mode-chip')!.classList.add('hidden');
+    this.root.querySelector('#feed-pop')!.classList.add('hidden');
+    this.root.classList.remove('mode-active');
+  }
+
+  /** Envanterden çağrılır: dekor düzenleme modunu başlatır. */
+  startEditMode(): void {
+    this.closePanel();
+    this.game.setEditMode(true);
+    this.showModeChip('🛠️ Düzenleme — dekoru sürükle; bıraktığın en öne gelir');
   }
 
   /** Pasif gelir butonunu günceller (oyun döngüsünden ~saniyede 2 kez çağrılır). */
@@ -477,6 +529,7 @@ export class UI {
           }).join('')
         : '<p class="empty">Çantanda dekor yok — Mağaza → Dekor sekmesine göz at! 🛒</p>';
       body = `
+        ${placed.length ? '<button class="buy-btn edit-mode-btn">🛠️ Yerleşimi Düzenle</button>' : ''}
         <h3 class="inv-head">Bu akvaryumda (${placed.length}/${MAX_PLACED})</h3>${placedHTML}
         <h3 class="inv-head">Çantanda</h3>${ownedHTML}`;
     } else {
@@ -504,6 +557,10 @@ export class UI {
         audio.click();
         this.renderInventory(btn.dataset.tab as 'decor' | 'tanks');
       });
+    });
+    el.querySelector('.edit-mode-btn')?.addEventListener('click', () => {
+      audio.click();
+      this.startEditMode();
     });
     el.querySelectorAll<HTMLButtonElement>('[data-place]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -781,7 +838,7 @@ export class UI {
 
   showFishInfo(f: Fish): void {
     audio.click();
-    const gain = Math.round(f.sp.sellPrice * this.game.sellMult);
+    const gain = Math.round(f.sp.sellPrice * this.game.sellMult * (1 + f.bonus));
     const el = this.panelShell(`${f.name}`, `
       <div class="fish-info">
         <div class="card-art">${fishSVG(f.sp, 120)}</div>
@@ -792,6 +849,7 @@ export class UI {
         <div class="bar-row"><span>Tokluk ${f.isSad ? '😢 aç!' : ''}</span>
           <div class="bar"><div id="fi-hunger" class="hunger" style="width:${f.hunger * 100}%"></div></div></div>
         <div class="card-meta">Üretim: 🪙 ${RARITY_INCOME[f.sp.rarity]}/saat ${f.isAdult ? '(aktif)' : '(yetişkin olunca)'}</div>
+        ${f.bonus > 0 ? `<div class="card-meta bonus-line">✨ Yem bonusu: satış +%${Math.round(f.bonus * 100)}</div>` : ''}
         ${f.isAdult
           ? `<button class="buy-btn sell">🪙 ${fmt(gain)} karşılığında sat</button>`
           : `<p class="growing">Büyüyor… satmak için yetişkin olmasını bekle 🌱</p>`}
@@ -840,7 +898,7 @@ export class UI {
     s.tutorialDone = true;
     this.game.syncSave();
     setTimeout(() => this.toast('🌊 Reefy\'ye hoş geldin! Bu resif artık senin.'), 1200);
-    setTimeout(() => this.toast('🍤 "Besle" ile balıklarını doyur — tok balık hızlı büyür.'), 5200);
+    setTimeout(() => this.toast('🍤 "Besle"den yem seç, suya dokunarak yemle — kaliteli yem satış fiyatını artırabilir!'), 5200);
     setTimeout(() => this.toast('🐟 Yetişkin balıklara dokunup satabilir, kazancınla yeni türler alabilirsin.'), 9600);
     setTimeout(() => this.toast('📋 Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüt!'), 14200);
   }

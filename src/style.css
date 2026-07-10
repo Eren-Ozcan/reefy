@@ -230,6 +230,55 @@ html, body {
   50% { box-shadow: 0 6px 26px rgba(240, 168, 46, 0.85), inset 0 2px 0 rgba(255,255,255,0.4); }
 }
 
+/* Yem seçici */
+#feed-pop {
+  position: absolute; bottom: 96px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--panel-bg);
+  padding: 10px; border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(20, 60, 75, 0.3);
+  width: min(340px, 92vw);
+  animation: slide-up 0.25s ease;
+}
+#feed-pop.hidden { display: none; }
+.feed-opt {
+  display: flex; align-items: center; gap: 10px;
+  border: none; cursor: pointer;
+  background: #fff; border-radius: 12px;
+  padding: 9px 12px; text-align: left;
+  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+  transition: transform 0.12s ease;
+}
+.feed-opt:hover { transform: scale(1.02); }
+.feed-emoji { font-size: 24px; }
+.feed-info { flex: 1; display: flex; flex-direction: column; }
+.feed-info b { font-size: 13.5px; color: var(--ink); }
+.feed-info small { font-size: 11px; color: var(--ink-soft); }
+.feed-cost { font-size: 12px; font-weight: 700; color: #b0894a; white-space: nowrap; }
+
+/* Mod aktifken alt bar gizlenir — zemindeki dekor ve su dokunulabilir kalır */
+#ui.mode-active #bottombar { display: none; }
+
+/* Mod durum çubuğu (yemleme / düzenleme) */
+#mode-chip {
+  position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(23, 60, 74, 0.94); color: #fff;
+  font-size: 13px; font-weight: 600;
+  padding: 9px 10px 9px 18px; border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(12, 40, 52, 0.35);
+  max-width: 92vw;
+}
+#mode-chip.hidden { display: none; }
+#mode-done {
+  border: none; cursor: pointer;
+  background: linear-gradient(180deg, #57c9a6, #2f9e8f);
+  color: #fff; font-weight: 700; font-size: 12.5px;
+  padding: 7px 14px; border-radius: 999px;
+}
+.edit-mode-btn { width: 100%; margin-bottom: 4px; }
+.bonus-line { color: #b0894a; font-weight: 700; }
+
 /* Sekmeler — her zaman tamamı görünür, gerekirse alt satıra sarar */
 .tabs {
   display: flex; gap: 4px; padding: 0 14px 6px;

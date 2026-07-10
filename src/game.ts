@@ -1,6 +1,6 @@
 import { Application, Container, FillGradient, Graphics } from 'pixi.js';
 import { audio } from './audio';
-import { DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
+import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish } from './fish';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay } from './quests';
 import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
@@ -8,10 +8,11 @@ import { Services, createServices } from './services';
 import {
   EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
 } from './species';
+import { FISH_BONUS_CAP, FeedDef, feedById } from './feeds';
 import { Biome, TANKS, TANK_CAP_BONUS, TankDef, tankById } from './tanks';
 import type { UI } from './ui';
 
-interface Pellet { x: number; y: number; vy: number; sway: number; age: number }
+interface Pellet { x: number; y: number; vy: number; sway: number; age: number; feed: string }
 interface Particle { x: number; y: number; vy: number; life: number; color: number; r: number }
 
 const OFFLINE_CAP_MS = 8 * 3600_000;
@@ -49,6 +50,14 @@ export class Game {
 
   private pellets: Pellet[] = [];
   private particles: Particle[] = [];
+
+  /** Giriş modları: seçili yem varsa dokunuşlar yem atar; düzenleme modunda dekor sürüklenir. */
+  feedType: FeedDef | null = null;
+  editMode = false;
+  private dragIndex = -1;
+  get inputMode(): 'feed' | 'edit' | 'normal' {
+    return this.editMode ? 'edit' : this.feedType ? 'feed' : 'normal';
+  }
   private bubbles: { x: number; y: number; r: number; vy: number; phase: number }[] = [];
   private time = 0;
   offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0, income: 0 };
@@ -139,6 +148,15 @@ export class Game {
     );
     this.app.stage.addChild(this.world);
 
+    // Kayıttaki bilinmeyen dekor kimliklerini ayıkla (sürüm değişikliklerine karşı koruma)
+    const known = new Set(DECOR.map((d) => d.id));
+    for (const t of Object.keys(this.save.decorPlaced)) {
+      this.save.decorPlaced[t] = (this.save.decorPlaced[t] ?? []).filter((p) => known.has(p.def));
+    }
+    for (const id of Object.keys(this.save.decorOwned)) {
+      if (!known.has(id)) delete this.save.decorOwned[id];
+    }
+
     this.applyOffline();
     this.applyDailyGift();
     this.ensureQuestDay();
@@ -160,6 +178,14 @@ export class Game {
     }
 
     audio.setBiome(this.activeTank.biome);
+
+    // Sahne dokunuşları: yem modu tek tıkla yem atar, düzenleme modu dekor sürükler
+    this.app.stage.eventMode = 'static';
+    this.app.stage.hitArea = this.app.screen;
+    this.app.stage.on('pointerdown', (e) => this.onPointerDown(e.global.x, e.global.y));
+    this.app.stage.on('pointermove', (e) => this.onPointerMove(e.global.x));
+    this.app.stage.on('pointerup', () => this.onPointerUp());
+    this.app.stage.on('pointerupoutside', () => this.onPointerUp());
 
     this.app.ticker.add((t) => this.update(t.deltaMS / 1000));
 
@@ -472,8 +498,20 @@ export class Game {
     const g = this.decorAnimG;
     g.clear();
     const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
-    for (const p of placed) {
-      this.drawDecorItem(g, decorById(p.def), p.fx * w, h - 58);
+    for (let i = 0; i < placed.length; i++) {
+      const p = placed[i];
+      const d = decorById(p.def);
+      const cx = p.fx * w;
+      const baseY = h - 58;
+      // Düzenleme modu: sürüklenebilir parçaları vurgula
+      if (this.editMode) {
+        const half = 46 * d.scale;
+        const active = i === this.dragIndex;
+        g.roundRect(cx - half, baseY - 110 * d.scale, half * 2, 110 * d.scale + 12, 10)
+          .fill({ color: active ? 0xffd23e : 0xffffff, alpha: active ? 0.18 : 0.08 })
+          .stroke({ width: 2, color: active ? 0xffd23e : 0xffffff, alpha: active ? 0.9 : 0.4 });
+      }
+      this.drawDecorItem(g, d, cx, h - 58);
     }
   }
 
@@ -729,8 +767,9 @@ export class Game {
     this.pellets = this.pellets.filter((p) => p.age < 30);
     this.pelletG.clear();
     for (const p of this.pellets) {
-      this.pelletG.circle(p.x, p.y, 3.6).fill(0xc98a4b);
-      this.pelletG.circle(p.x - 1, p.y - 1, 1.3).fill(0xe8b078);
+      const fd = feedById(p.feed);
+      this.pelletG.circle(p.x, p.y, 3.6).fill(fd.color);
+      this.pelletG.circle(p.x - 1, p.y - 1, 1.3).fill(fd.color2);
     }
 
     // Balıklar
@@ -751,16 +790,25 @@ export class Game {
 
       if (target && ti >= 0 && ti < this.pellets.length) {
         if (Math.hypot(this.pellets[ti].x - f.x, this.pellets[ti].y - f.y) < 16) {
+          const fd = feedById(this.pellets[ti].feed);
           this.pellets.splice(ti, 1);
-          f.hunger = Math.min(1, f.hunger + 0.35);
+          f.hunger = Math.min(1, f.hunger + fd.hunger);
           audio.plop();
           this.addXp(1);
           this.save.stats.totalFed++;
           this.questEvent('feed', 1);
-          for (let k = 0; k < 3; k++) {
+          // Kaliteli yem: satış fiyatı bonusu şansı
+          let procced = false;
+          if (fd.bonusChance > 0 && f.bonus < FISH_BONUS_CAP && Math.random() < fd.bonusChance) {
+            f.bonus = Math.min(FISH_BONUS_CAP, f.bonus + fd.bonusAmount);
+            procced = true;
+            audio.coin();
+          }
+          for (let k = 0; k < (procced ? 7 : 3); k++) {
             this.particles.push({
-              x: f.x + (Math.random() - 0.5) * 20, y: f.y - 14,
-              vy: -22 - Math.random() * 16, life: 1, color: 0xff8fa8, r: 3,
+              x: f.x + (Math.random() - 0.5) * 24, y: f.y - 14,
+              vy: -22 - Math.random() * 16, life: 1,
+              color: procced ? 0xffd23e : 0xff8fa8, r: procced ? 4 : 3,
             });
           }
         }
@@ -918,27 +966,91 @@ export class Game {
 
   private spawnFish(fs: FishSave): Fish {
     const f = new Fish(fs, speciesById(fs.sp), this.bounds);
-    f.root.on('pointertap', () => this.ui.showFishInfo(f));
+    f.root.on('pointertap', () => {
+      if (this.inputMode !== 'normal') return; // yem/düzenleme modunda balık kartı açılmaz
+      this.ui.showFishInfo(f);
+    });
     this.fishLayer.addChild(f.root);
     this.fishes.push(f);
     return f;
   }
 
-  feed(): void {
-    if (this.pellets.length >= 20) {
-      this.ui.toast('Suda yeterince yem var! 🍤');
-      return;
+  // ---------- giriş modları ----------
+
+  setFeedType(f: FeedDef | null): void {
+    this.feedType = f;
+    if (f) this.editMode = false;
+  }
+
+  setEditMode(on: boolean): void {
+    this.editMode = on;
+    if (on) this.feedType = null;
+    this.dragIndex = -1;
+  }
+
+  private onPointerDown(x: number, y: number): void {
+    if (this.inputMode === 'feed') {
+      this.dropPellet(x, y);
+    } else if (this.inputMode === 'edit') {
+      this.dragIndex = this.decorAt(x, y);
     }
-    const { w } = this.bounds;
-    for (let i = 0; i < 8; i++) {
-      this.pellets.push({
-        x: 40 + Math.random() * (w - 80),
-        y: -6 - Math.random() * 30,
-        vy: 34 + Math.random() * 26,
-        sway: Math.random() * Math.PI * 2,
-        age: 0,
-      });
+  }
+
+  private onPointerMove(x: number): void {
+    if (this.inputMode !== 'edit' || this.dragIndex < 0) return;
+    const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
+    const p = placed[this.dragIndex];
+    if (p) p.fx = Math.min(0.97, Math.max(0.03, x / this.bounds.w));
+  }
+
+  private onPointerUp(): void {
+    if (this.inputMode !== 'edit' || this.dragIndex < 0) return;
+    // Bırakılan parça en öne gelir (dizinin sonu = en üst katman)
+    const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
+    const [p] = placed.splice(this.dragIndex, 1);
+    if (p) placed.push(p);
+    this.dragIndex = -1;
+    audio.place();
+    this.syncSave();
+  }
+
+  /** Verilen noktadaki en üstteki dekorun dizinini döndürür (yoksa -1). */
+  private decorAt(x: number, y: number): number {
+    const { w, h } = this.bounds;
+    const baseY = h - 58;
+    const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
+    for (let i = placed.length - 1; i >= 0; i--) {
+      const d = decorById(placed[i].def);
+      const cx = placed[i].fx * w;
+      const half = 46 * d.scale;
+      if (x >= cx - half && x <= cx + half && y >= baseY - 110 * d.scale && y <= baseY + 14) return i;
     }
+    return -1;
+  }
+
+  /** Tek yem tanesi at (dokunulan noktadan batar). Yem ücretliyse altın düşer. */
+  dropPellet(x: number, y: number): void {
+    const f = this.feedType;
+    if (!f) return;
+    if (this.pellets.length >= 25) return;
+    if (f.cost > 0) {
+      if (this.save.coins < f.cost) {
+        audio.error();
+        this.ui.toast(`Yeterli altın yok (${f.name}: ${f.cost} 🪙/tane)`);
+        return;
+      }
+      this.save.coins -= f.cost;
+      this.ui.refreshHUD();
+    }
+    const { h } = this.bounds;
+    this.pellets.push({
+      x,
+      y: Math.min(y, h - 90),
+      vy: 30 + Math.random() * 20,
+      sway: Math.random() * Math.PI * 2,
+      age: 0,
+      feed: f.id,
+    });
     audio.bubble();
   }
 
@@ -974,7 +1086,7 @@ export class Game {
 
   sellFish(f: Fish): { ok: boolean; msg: string } {
     if (!f.isAdult) return { ok: false, msg: 'Henüz yavru — büyümesini bekle' };
-    const gain = Math.round(f.sp.sellPrice * this.sellMult);
+    const gain = Math.round(f.sp.sellPrice * this.sellMult * (1 + f.bonus));
     this.save.coins += gain;
     if (f.sp.rarity === 'legendary') this.save.pearls += 2;
     this.addXp(this.saleXp(f.sp.sellPrice));

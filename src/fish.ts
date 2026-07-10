@@ -30,6 +30,7 @@ export class Fish {
   name: string;
   seed: number;
   tank: string;
+  bonus: number; // yem kaynaklı satış fiyatı bonusu
 
   x: number; y: number;
   private tx = 0; private ty = 0;
@@ -46,6 +47,7 @@ export class Fish {
     this.name = fs.name;
     this.seed = fs.seed;
     this.tank = fs.tank;
+    this.bonus = fs.bonus ?? 0;
     this.wasAdult = fs.progress >= 1;
 
     const rnd = mulberry32(fs.seed);
@@ -67,7 +69,10 @@ export class Fish {
   get scaleFactor(): number { return 0.4 + 0.6 * Math.min(1, this.progress); }
 
   toSave(): FishSave {
-    return { sp: this.sp.id, progress: this.progress, hunger: this.hunger, name: this.name, seed: this.seed, tank: this.tank };
+    return {
+      sp: this.sp.id, progress: this.progress, hunger: this.hunger,
+      name: this.name, seed: this.seed, tank: this.tank, bonus: this.bonus,
+    };
   }
 
   private buildSprite(): void {
