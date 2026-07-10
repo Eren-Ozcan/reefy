@@ -115,12 +115,47 @@ class AudioMan {
     }
   }
 
+  /** Müzik kanalına tek nota (mutlak zamanlı). */
+  private mnote(freq: number, dur: number, type: OscillatorType, vol: number, when: number, detune = 0): void {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.detune.value = detune;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(vol, when + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    osc.connect(g); g.connect(this.musicGain);
+    osc.start(when);
+    osc.stop(when + dur + 0.05);
+  }
+
+  /** Pizzicato tını: hızlı sönümlü tatlı vuruş. */
+  private pluck(freq: number, when: number, vol = 0.055): void {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(freq * 4, when);
+    lp.frequency.exponentialRampToValueAtTime(freq * 1.5, when + 0.25);
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(vol, when + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.34);
+    osc.connect(lp); lp.connect(g); g.connect(this.musicGain);
+    osc.start(when);
+    osc.stop(when + 0.4);
+  }
+
   startAmbient(): void {
     if (!this.music || this.ambientOn) return;
     const ctx = this.ensure();
     this.ambientOn = true;
 
-    // Okyanus uğultusu: filtrelenmiş gürültü döngüsü
+    // Hafif okyanus uğultusu (arka dokuda)
     const len = 2 * ctx.sampleRate;
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = buf.getChannelData(0);
@@ -130,36 +165,46 @@ class AudioMan {
     noise.loop = true;
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 260;
+    lp.frequency.value = 240;
     const ng = ctx.createGain();
-    ng.gain.value = 0.05;
+    ng.gain.value = 0.028;
     noise.connect(lp); lp.connect(ng); ng.connect(this.musicGain);
     noise.start();
 
-    // Lo-fi akor pedi — biyoma göre değişir
+    // Neşeli su altı ezgisi: bas + hafif pad + pizzicato arpej, biyoma göre tonalite
     const chords = BIOME_CHORDS[this.biome];
-    let ci = 0;
-    const playChord = () => {
+    const BAR = 3.2; // saniye — bir akorluk ölçü
+    let bar = 0;
+    const playBar = () => {
       if (!this.ctx || !this.ambientOn) return;
-      const t0 = this.ctx.currentTime;
-      for (const f of chords[ci % chords.length]) {
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.value = f;
-        osc.detune.value = (Math.random() - 0.5) * 8;
-        g.gain.setValueAtTime(0, t0);
-        g.gain.linearRampToValueAtTime(0.045, t0 + 2.4);
-        g.gain.linearRampToValueAtTime(0.0001, t0 + 7.6);
-        osc.connect(g); g.connect(this.musicGain);
-        osc.start(t0);
-        osc.stop(t0 + 8);
+      const t0 = this.ctx.currentTime + 0.06;
+      const chord = chords[bar % chords.length];
+      const root = chord[0];
+
+      // Yumuşak bas
+      this.mnote(root / 2, BAR * 0.85, 'sine', 0.06, t0);
+      this.mnote(root / 2, BAR * 0.35, 'sine', 0.045, t0 + BAR * 0.5);
+
+      // İnce pad
+      for (const f of chord) this.mnote(f, BAR, 'triangle', 0.02, t0, (Math.random() - 0.5) * 7);
+
+      // Pizzicato arpej (8'lik, hafif aksak — su damlası hissi)
+      const seq = [0, 1, 2, 1, 3, 2, 1, 2];
+      for (let i = 0; i < 8; i++) {
+        if ((bar * 3 + i) % 11 === 10) continue; // ara sıra nefes payı
+        const when = t0 + i * (BAR / 8) + (i % 2 === 1 ? 0.055 : 0);
+        const tone = chord[seq[i] % chord.length];
+        const oct = i >= 4 ? 2 : 1;
+        this.pluck(tone * oct, when, i % 4 === 0 ? 0.06 : 0.045);
       }
-      ci++;
+
+      // Dört ölçüde bir tepede parıltı
+      if (bar % 4 === 3) this.pluck(chord[chord.length - 1] * 4, t0 + BAR * 0.5, 0.028);
+      bar++;
     };
-    playChord();
-    this.chordTimer = window.setInterval(playChord, 8000);
-    this.musicGain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 2);
+    playBar();
+    this.chordTimer = window.setInterval(playBar, BAR * 1000);
+    this.musicGain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 1.2);
   }
 
   stopAmbient(): void {

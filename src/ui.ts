@@ -241,13 +241,16 @@ export class UI {
 
   /** Pasif gelir butonunu günceller (oyun döngüsünden ~saniyede 2 kez çağrılır). */
   updateIncome(pot: number, ratePerHour: number): void {
+    if (!this.root) return;
     const btn = this.root.querySelector<HTMLElement>('#collect-btn');
     if (!btn) return;
-    if (pot < 1) {
+    // Üretim varsa buton her zaman görünür (birikim 0 olsa bile keşfedilebilir olsun)
+    if (pot < 1 && ratePerHour <= 0) {
       btn.classList.add('hidden');
       return;
     }
     btn.classList.remove('hidden');
+    btn.classList.toggle('empty', pot < 1);
     this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
     this.root.querySelector('#collect-rate')!.textContent = ratePerHour > 0 ? `${fmt(ratePerHour)}/sa` : '';
   }
@@ -318,7 +321,7 @@ export class UI {
     });
   }
 
-  renderShop(tab: 'fish' | 'eggs' | 'decor' | 'tanks' | 'pearls'): void {
+  renderShop(tab: 'fish' | 'eggs' | 'decor' | 'tanks' | 'pearls', keepScroll = 0): void {
     const s = this.game.save;
     let body = '';
 
@@ -364,7 +367,7 @@ export class UI {
             <div class="card-art">${decorSVG(d, 60)}</div>
             <div class="card-name">${d.name}</div>
             ${rarityChip(d.rarity)}
-            <div class="card-meta">+%${DECOR_BOOST[d.rarity]} büyüme${owned ? ` • 🎒 ${owned}` : ''}</div>
+            <div class="card-meta">+%${DECOR_BOOST[d.rarity]} büyüme & gelir${owned ? ` • 🎒 ${owned}` : ''}</div>
             <button class="buy-btn" data-decor="${d.id}">${cur} ${fmt(d.price)}</button>
           </div>`;
       }).join('')}</div>`;
@@ -380,7 +383,7 @@ export class UI {
             <div class="card-name">${BIOME_INFO[t.biome].emoji} ${t.name}</div>
             ${rarityChip(t.rarity)}
             <div class="card-desc">${t.desc}</div>
-            <div class="card-meta">+%${t.growthBonus} büyüme${locked ? ` • Sv ${t.unlockLevel}` : ''}</div>
+            <div class="card-meta">+%${t.growthBonus} büyüme & gelir${locked ? ` • Sv ${t.unlockLevel}` : ''}</div>
             ${ownedT
               ? '<button class="buy-btn owned" disabled>Sahipsin ✓</button>'
               : `<button class="buy-btn" data-tank="${t.id}" ${locked ? 'disabled' : ''}>${t.price === 0 ? 'Ücretsiz' : `${cur} ${fmt(t.price)}`}</button>`}
@@ -401,14 +404,17 @@ export class UI {
 
     const el = this.panelShell('🛒 Mağaza', body, this.shopTabs(tab));
     this.bindShopTabs(el);
+    const bodyEl = el.querySelector<HTMLElement>('.panel-body')!;
+    if (keepScroll > 0) bodyEl.scrollTop = keepScroll;
 
     el.querySelectorAll<HTMLButtonElement>('.buy-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
+        const st = bodyEl.scrollTop; // toplu alımlarda kaydırma konumunu koru
         if (btn.dataset.sp) {
           const res = this.game.buyFish(btn.dataset.sp);
           if (!res.ok) audio.error();
           this.toast(res.msg);
-          if (res.ok) this.renderShop('fish');
+          if (res.ok) this.renderShop('fish', st);
         } else if (btn.dataset.egg) {
           const egg = this.game.eggList().find((e) => e.id === btn.dataset.egg)!;
           const res = this.game.hatchEgg(egg);
@@ -418,12 +424,12 @@ export class UI {
           const res = this.game.buyDecor(btn.dataset.decor);
           if (!res.ok) audio.error();
           this.toast(res.msg);
-          if (res.ok) this.renderShop('decor');
+          if (res.ok) this.renderShop('decor', st);
         } else if (btn.dataset.tank) {
           const res = this.game.buyTank(btn.dataset.tank);
           if (!res.ok) audio.error();
           this.toast(res.msg);
-          if (res.ok) this.renderShop('tanks');
+          if (res.ok) this.renderShop('tanks', st);
         } else if (btn.dataset.iap) {
           void this.game.services.iap.purchase(btn.dataset.iap).then((res) => {
             if (res.ok && res.grantPearls) {
@@ -487,7 +493,7 @@ export class UI {
             <div class="card ${active ? 'active-tank' : ''}">
               ${tankSwatch(t)}
               <div class="card-name">${BIOME_INFO[t.biome].emoji} ${t.name}</div>
-              <div class="card-meta">🐟 ${count} balık • +%${t.growthBonus} büyüme</div>
+              <div class="card-meta">🐟 ${count} balık • +%${this.game.tankBoostPct(t.id)} büyüme & gelir</div>
               ${active
                 ? '<button class="buy-btn owned" disabled>Buradasın 📍</button>'
                 : `<button class="buy-btn" data-switch="${t.id}">Geç</button>`}

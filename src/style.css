@@ -220,6 +220,7 @@ html, body {
 }
 #collect-btn:active { transform: translateX(-50%) scale(0.94); }
 #collect-btn.hidden { display: none; }
+#collect-btn.empty { opacity: 0.75; animation: none; }
 #collect-btn span { font-size: 10.5px; font-weight: 700; opacity: 0.8; }
 #collect-btn span:not(:empty)::before { content: "• "; }
 @keyframes coin-pulse {

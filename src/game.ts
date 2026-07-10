@@ -61,22 +61,30 @@ export class Game {
 
   get sellMult(): number { return 1 + 0.05 * this.completedSets().length; }
 
-  /** Akvaryum + yerleştirilmiş dekor büyüme bonusu (çarpan). */
-  get growthMult(): number {
-    const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
-    let pct = this.activeTank.growthBonus;
+  /** Akvaryumun toplam bonusu (%): tema bonusu + yerleştirilmiş dekorlar. Büyümeye VE pasif gelire işler. */
+  tankBoostPct(tankId: string): number {
+    const t = tankById(tankId);
+    const placed = this.save.decorPlaced[tankId] ?? [];
+    let pct = t.growthBonus;
     for (const p of placed) pct += DECOR_BOOST[decorById(p.def).rarity];
-    return 1 + Math.min(DECOR_BOOST_CAP, pct) / 100;
+    return Math.min(DECOR_BOOST_CAP, pct);
+  }
+
+  /** Aktif akvaryumun büyüme çarpanı. */
+  get growthMult(): number {
+    return 1 + this.tankBoostPct(this.save.activeTank) / 100;
   }
 
   xpNeed(level: number): number { return Math.round(120 * Math.pow(level, 1.35)); }
 
-  /** Tüm akvaryumlardaki yetişkin balıkların toplam saatlik üretimi. */
+  /** Tüm akvaryumlardaki yetişkin balıkların toplam saatlik üretimi (akvaryum+dekor bonuslu). */
   get incomePerHour(): number {
     let rate = 0;
-    for (const f of this.fishes) if (f.isAdult) rate += RARITY_INCOME[f.sp.rarity];
-    for (const d of this.dormant) if (d.progress >= 1) rate += RARITY_INCOME[speciesById(d.sp).rarity];
-    return rate;
+    const cache: Record<string, number> = {};
+    const mult = (tid: string) => (cache[tid] ??= 1 + this.tankBoostPct(tid) / 100);
+    for (const f of this.fishes) if (f.isAdult) rate += RARITY_INCOME[f.sp.rarity] * mult(f.tank);
+    for (const d of this.dormant) if (d.progress >= 1) rate += RARITY_INCOME[speciesById(d.sp).rarity] * mult(d.tank);
+    return Math.round(rate);
   }
 
   /** Biriken geliri kasaya aktarır. */
@@ -536,10 +544,12 @@ export class Game {
     const elapsed = Math.min(OFFLINE_CAP_MS, Date.now() - this.save.lastSeen);
     if (elapsed < 60_000) return;
     let grown = 0;
-    // Offline pasif gelir: yetişkinler yarım hızda üretir
+    // Offline pasif gelir: yetişkinler yarım hızda üretir (bonuslar dahil)
     let rate = 0;
+    const cache: Record<string, number> = {};
+    const mult = (tid: string) => (cache[tid] ??= 1 + this.tankBoostPct(tid) / 100);
     for (const fs of this.save.fishes) {
-      if (fs.progress >= 1) rate += RARITY_INCOME[speciesById(fs.sp).rarity];
+      if (fs.progress >= 1) rate += RARITY_INCOME[speciesById(fs.sp).rarity] * mult(fs.tank);
     }
     if (rate > 0) {
       const gained = (rate / 3600_000) * elapsed * OFFLINE_SPEED;
@@ -797,7 +807,7 @@ export class Game {
     this.syncSave();
     this.ui.refreshHUD();
     const d = decorById(defId);
-    return { ok: true, msg: `${d.name} yerleştirildi (+%${DECOR_BOOST[d.rarity]} büyüme)` };
+    return { ok: true, msg: `${d.name} yerleştirildi (+%${DECOR_BOOST[d.rarity]} büyüme & gelir)` };
   }
 
   removeDecor(index: number): { ok: boolean; msg: string } {
