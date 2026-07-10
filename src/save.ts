@@ -52,6 +52,7 @@ export interface SaveData {
     totalFed: number;
     eggsHatched: number;
     decorPlacedCount: number;
+    totalCleaned: number;
   };
   pityCounter: number;   // altın yumurta efsanevi garanti sayacı
   streak: number;        // ardışık gün serisi
@@ -97,7 +98,7 @@ export function defaultSave(): SaveData {
     friends: [],
     quests: { day: '', progress: {}, claimed: [] },
     achievementsClaimed: [],
-    stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0 },
+    stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0, totalCleaned: 0 },
     pityCounter: 0,
     streak: 0,
     incomePot: 0,
@@ -124,7 +125,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
     merged.friends = [];
     merged.quests = { day: '', progress: {}, claimed: [] };
     merged.achievementsClaimed = [];
-    merged.stats = { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0 };
+    merged.stats = { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0, totalCleaned: 0 };
     merged.pityCounter = 0;
     merged.streak = 0;
     merged.fishes = (merged.fishes || []).map((f) => ({ ...f, tank: f.tank ?? START_TANK }));
@@ -136,6 +137,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (!merged.decorPlaced) merged.decorPlaced = {};
   for (const t of merged.tanksOwned) if (!merged.decorPlaced[t]) merged.decorPlaced[t] = [];
   if (!merged.dirtSpots) merged.dirtSpots = {};
+  if (merged.stats.totalCleaned === undefined) merged.stats.totalCleaned = 0;
   return merged;
 }
 

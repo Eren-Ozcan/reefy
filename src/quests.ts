@@ -10,7 +10,7 @@ export interface QuestDef {
   rewardPearls: number;
 }
 
-export type QuestEvent = 'feed' | 'sell' | 'hatch' | 'buyFish' | 'placeDecor' | 'earn' | 'collect';
+export type QuestEvent = 'feed' | 'sell' | 'hatch' | 'buyFish' | 'placeDecor' | 'earn' | 'collect' | 'clean';
 
 /** Günlük görev havuzu — her gün tarihe göre 3'ü seçilir. */
 export const QUEST_POOL: QuestDef[] = [
@@ -24,6 +24,7 @@ export const QUEST_POOL: QuestDef[] = [
   { id: 'q-decor1',   name: '1 dekor yerleştir',        emoji: '🪸', target: 1,  event: 'placeDecor', rewardCoins: 180, rewardPearls: 0 },
   { id: 'q-earn2k',   name: '2.000 altın kazan',        emoji: '💰', target: 2000, event: 'earn',     rewardCoins: 300, rewardPearls: 0 },
   { id: 'q-collect1', name: 'Koleksiyona 1 tür ekle',   emoji: '📖', target: 1,  event: 'collect',    rewardCoins: 260, rewardPearls: 1 },
+  { id: 'q-clean3',   name: '3 kir lekesi temizle',     emoji: '🧹', target: 3,  event: 'clean',      rewardCoins: 200, rewardPearls: 0 },
 ];
 
 /** Tarihten deterministik günlük görev seçimi */
@@ -68,4 +69,5 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'a-tank3',    name: 'Gezgin',           emoji: '🗺️', desc: '3 akvaryuma sahip ol',               check: (s) => s.tanksOwned.length, target: 3,  rewardCoins: 1000, rewardPearls: 2 },
   { id: 'a-tank10',   name: 'Okyanus İmparatoru', emoji: '🌊', desc: '10 akvaryuma sahip ol',            check: (s) => s.tanksOwned.length, target: 10, rewardCoins: 5000, rewardPearls: 10 },
   { id: 'a-streak7',  name: 'Sadık Dost',       emoji: '🔥', desc: '7 gün üst üste oyna',                check: (s) => s.streak, target: 7, rewardCoins: 1200, rewardPearls: 3 },
+  { id: 'a-clean25',  name: 'Temizlikçi',       emoji: '🧽', desc: '25 kir lekesi temizle',              check: (s) => s.stats.totalCleaned, target: 25, rewardCoins: 900, rewardPearls: 2 },
 ];

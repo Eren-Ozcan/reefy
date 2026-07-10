@@ -1190,6 +1190,8 @@ export class Game {
       });
     }
     audio.clean();
+    this.save.stats.totalCleaned++;
+    this.questEvent('clean', 1);
     this.syncSave();
     this.ui.refreshHUD();
   }
