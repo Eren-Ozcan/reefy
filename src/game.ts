@@ -8,7 +8,7 @@ import { Services, createServices } from './services';
 import {
   EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
 } from './species';
-import { TANKS, TankDef, tankById } from './tanks';
+import { Biome, TANKS, TankDef, tankById } from './tanks';
 import type { UI } from './ui';
 
 interface Pellet { x: number; y: number; vy: number; sway: number; age: number }
@@ -35,6 +35,10 @@ export class Game {
   private sandG = new Graphics();
   private ambientG = new Graphics();
   private biomeG = new Graphics();
+  private biomeAnimG = new Graphics();
+  private moodG = new Graphics();
+  /** Biyoma özgü hareketli sahne öğeleri (kar, küre, buzdağı, kristal, saz...) */
+  private animItems: { kind: string; x: number; y: number; r: number; phase: number; s: number }[] = [];
   private decorAnimG = new Graphics();
   private rays: Graphics[] = [];
   private rayLayer = new Container();
@@ -124,8 +128,8 @@ export class Game {
     host.appendChild(this.app.canvas);
 
     this.world.addChild(
-      this.bgG, this.rayLayer, this.biomeG, this.ambientG, this.decorAnimG, this.sandG,
-      this.pelletG, this.fishLayer, this.bubbleG, this.fxG,
+      this.bgG, this.rayLayer, this.biomeG, this.biomeAnimG, this.ambientG, this.decorAnimG, this.sandG,
+      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.moodG,
     );
     this.app.stage.addChild(this.world);
 
@@ -194,29 +198,55 @@ export class Game {
 
     this.drawBiomeScenery(w, h);
 
-    // Işık huzmeleri
+    // Işık huzmeleri — biyoma göre renk, yoğunluk ve sayı
+    const RAY_CFG: Record<Biome, { color: number; alpha: number; count: number }> = {
+      tropik:    { color: 0xffffff, alpha: 0.07, count: 4 },
+      lagun:     { color: 0xfff8d0, alpha: 0.09, count: 5 },
+      derin:     { color: 0x9fc8ff, alpha: 0.025, count: 2 },
+      magara:    { color: 0xcfe8ff, alpha: 0.1, count: 1 },
+      kutup:     { color: 0xffffff, alpha: 0.11, count: 5 },
+      gunbatimi: { color: 0xffb060, alpha: 0.12, count: 4 },
+      mistik:    { color: 0xc9a0ff, alpha: 0.06, count: 3 },
+    };
+    const rc = RAY_CFG[tank.biome];
     this.rayLayer.removeChildren();
     this.rays = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < rc.count; i++) {
       const g = new Graphics();
-      const rx = w * (0.15 + i * 0.22);
+      const rx = w * ((i + 0.5) / rc.count) - 20;
       g.moveTo(rx, -20)
         .lineTo(rx + 34, -20)
         .lineTo(rx + 150, h * 0.85)
         .lineTo(rx - 60, h * 0.85)
         .closePath()
-        .fill({ color: 0xffffff, alpha: 0.06 });
+        .fill({ color: rc.color, alpha: rc.alpha });
       g.blendMode = 'add';
       this.rays.push(g);
       this.rayLayer.addChild(g);
     }
+
+    // Atmosfer tonu — tüm sahnenin üzerine biyom rengi
+    const MOOD: Record<Biome, { color: number; alpha: number }> = {
+      tropik:    { color: 0x000000, alpha: 0 },
+      lagun:     { color: 0x8affe0, alpha: 0.05 },
+      derin:     { color: 0x0a1430, alpha: 0.24 },
+      magara:    { color: 0x141024, alpha: 0.22 },
+      kutup:     { color: 0xdff2ff, alpha: 0.1 },
+      gunbatimi: { color: 0xff8a40, alpha: 0.12 },
+      mistik:    { color: 0x3a2a6e, alpha: 0.16 },
+    };
+    const mood = MOOD[tank.biome];
+    this.moodG.clear();
+    if (mood.alpha > 0) this.moodG.rect(0, 0, w, h).fill({ color: mood.color, alpha: mood.alpha });
+    this.moodG.eventMode = 'none';
   }
 
-  /** Her biyomun kendine özgü sahne öğeleri; yerleşim akvaryum kimliğinden türetilen tohumla değişir. */
+  /** Her biyomun kendine özgü, BELİRGİN sahnesi; yerleşim akvaryum kimliğinden türetilen tohumla değişir. */
   private drawBiomeScenery(w: number, h: number): void {
     const tank = this.activeTank;
     const g = this.biomeG;
     g.clear();
+    this.animItems = [];
 
     // Akvaryum kimliğinden deterministik rastgelelik
     let seed = 0;
@@ -229,127 +259,202 @@ export class Game {
 
     switch (tank.biome) {
       case 'tropik': {
-        // Arka planda soluk mercan tepeleri + dağınık kabuklar
-        for (let i = 0; i < 4; i++) {
-          const cx = w * (0.1 + rnd() * 0.8);
-          const col = [0xf4a09a, 0xe88c9d, 0xf0a35e][i % 3];
-          for (let k = 0; k < 5; k++) {
-            g.circle(cx - 22 + k * 11, floor - 8 - Math.sin(k * 2) * 7, 8 + (k % 3) * 3)
-              .fill({ color: col, alpha: 0.35 });
+        // Sağda büyük resif duvarı + önde iri mercan kümeleri
+        g.moveTo(w, h).lineTo(w, h * 0.45)
+          .quadraticCurveTo(w * 0.86, h * 0.5, w * 0.84, h * 0.68)
+          .quadraticCurveTo(w * 0.9, h * 0.85, w * 0.86, h).closePath()
+          .fill({ color: 0xd97a72, alpha: 0.5 });
+        for (let i = 0; i < 3; i++) {
+          const cx = w * (0.12 + rnd() * 0.6);
+          const col = [0xf4756a, 0xe86a92, 0xf09048][i % 3];
+          for (let k = 0; k < 7; k++) {
+            g.circle(cx - 34 + k * 12, floor - 10 - Math.sin(k * 1.9) * 12, 13 + (k % 3) * 5)
+              .fill({ color: col, alpha: 0.85 });
+          }
+          // mercan üstünde anemon püskülleri
+          for (let a = 0; a < 5; a++) {
+            g.moveTo(cx - 10 + a * 5, floor - 34)
+              .lineTo(cx - 12 + a * 6, floor - 52 - rnd() * 8)
+              .stroke({ width: 4, color: 0xffc0b0, alpha: 0.9, cap: 'round' });
           }
         }
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 6; i++) {
           const sx = w * rnd();
-          g.moveTo(sx - 6, floor + 18).quadraticCurveTo(sx, floor + 4, sx + 6, floor + 18)
-            .closePath().fill({ color: 0xffffff, alpha: 0.35 });
+          g.moveTo(sx - 8, floor + 16).quadraticCurveTo(sx, floor - 2, sx + 8, floor + 16)
+            .closePath().fill({ color: 0xfff2e0, alpha: 0.9 });
         }
         break;
       }
       case 'lagun': {
-        // Yüzeyde ışık halkaları (kostik) + geniş yapraklı bitki silüetleri
-        for (let i = 0; i < 6; i++) {
-          g.ellipse(w * rnd(), 30 + rnd() * 60, 26 + rnd() * 30, 7)
-            .stroke({ width: 2, color: 0xffffff, alpha: 0.14 });
+        // Yüzeyde büyük nilüfer yaprakları + uzun sazlar (hareketli) + iri yuvarlak kayalar
+        for (let i = 0; i < 4; i++) {
+          const lx = w * (0.1 + rnd() * 0.8);
+          g.ellipse(lx, 22, 42 + rnd() * 20, 12).fill({ color: 0x3f9764, alpha: 0.85 });
+          g.moveTo(lx, 22).lineTo(lx + 34, 14).lineTo(lx + 30, 26).closePath()
+            .fill({ color: tank.water[0], alpha: 0.9 });
+        }
+        for (let i = 0; i < 8; i++) {
+          this.animItems.push({ kind: 'reed', x: w * rnd(), y: floor, r: 60 + rnd() * 70, phase: rnd() * 6, s: 1 });
         }
         for (let i = 0; i < 3; i++) {
-          const bx = w * (0.15 + rnd() * 0.7);
-          for (let leaf = -2; leaf <= 2; leaf++) {
-            g.ellipse(bx + leaf * 9, floor - 34 - Math.abs(leaf) * -6, 8, 30)
-              .fill({ color: tank.water[2], alpha: 0.45 });
-          }
-        }
-        for (let i = 0; i < 4; i++) {
-          g.ellipse(w * rnd(), floor - 4, 12 + rnd() * 10, 7).fill({ color: tank.sandDots, alpha: 0.7 });
+          const bx = w * (0.1 + rnd() * 0.8);
+          g.ellipse(bx, floor - 12, 34 + rnd() * 18, 22).fill({ color: 0x8fa78f, alpha: 0.8 });
+          g.ellipse(bx - 10, floor - 26, 16, 9).fill({ color: 0xa8c0a0, alpha: 0.8 });
         }
         break;
       }
       case 'derin': {
-        // Yarık duvarları: iki yanda karanlık kaya kuleleri + asılı "deniz karı"
-        g.moveTo(0, h).lineTo(0, h * 0.25).lineTo(w * 0.1, h * 0.45)
-          .lineTo(w * 0.16, h * 0.7).lineTo(w * 0.08, h).closePath()
-          .fill({ color: 0x0c1626, alpha: 0.55 });
-        g.moveTo(w, h).lineTo(w, h * 0.2).lineTo(w * 0.88, h * 0.4)
-          .lineTo(w * 0.86, h * 0.75).lineTo(w * 0.94, h).closePath()
-          .fill({ color: 0x0c1626, alpha: 0.55 });
-        for (let i = 0; i < 26; i++) {
-          g.circle(w * rnd(), h * rnd(), 1 + rnd()).fill({ color: 0xdfe8f0, alpha: 0.16 });
+        // Dev yarık duvarları (koyu, opak) + hareketli deniz karı + parlayan derin canlı gözleri
+        g.moveTo(0, h).lineTo(0, h * 0.1).lineTo(w * 0.08, h * 0.3).lineTo(w * 0.05, h * 0.45)
+          .lineTo(w * 0.17, h * 0.62).lineTo(w * 0.12, h * 0.8).lineTo(w * 0.2, h).closePath()
+          .fill({ color: 0x0a1322, alpha: 0.9 });
+        g.moveTo(w, h).lineTo(w, h * 0.05).lineTo(w * 0.9, h * 0.28).lineTo(w * 0.94, h * 0.42)
+          .lineTo(w * 0.82, h * 0.6).lineTo(w * 0.88, h * 0.78).lineTo(w * 0.8, h).closePath()
+          .fill({ color: 0x0a1322, alpha: 0.9 });
+        for (let i = 0; i < 3; i++) {
+          const ex = i % 2 === 0 ? w * 0.08 : w * 0.9;
+          const ey = h * (0.3 + rnd() * 0.4);
+          g.circle(ex, ey, 3).fill({ color: 0x7fe8c9, alpha: 0.9 });
+          g.circle(ex + 10, ey + 2, 3).fill({ color: 0x7fe8c9, alpha: 0.9 });
+        }
+        for (let i = 0; i < 30; i++) {
+          this.animItems.push({ kind: 'snow', x: w * rnd(), y: h * rnd(), r: 1 + rnd() * 1.6, phase: rnd() * 6, s: 6 + rnd() * 10 });
         }
         break;
       }
       case 'magara': {
-        // Tavandan sarkıtlar, tabanda dikitler, parlayan kristaller
-        for (let i = 0; i < 6; i++) {
-          const sx = w * (0.05 + rnd() * 0.9);
-          const sl = 40 + rnd() * 70;
-          g.moveTo(sx - 14, 0).lineTo(sx, sl).lineTo(sx + 14, 0).closePath()
-            .fill({ color: 0x1a2038, alpha: 0.6 });
-        }
-        for (let i = 0; i < 3; i++) {
-          const sx = w * (0.1 + rnd() * 0.8);
-          const sl = 26 + rnd() * 34;
-          g.moveTo(sx - 12, floor).lineTo(sx, floor - sl).lineTo(sx + 12, floor).closePath()
-            .fill({ color: 0x1a2038, alpha: 0.55 });
+        // Kalın sarkıt/dikit kümeleri + nabız atan kristal kümeleri
+        for (let i = 0; i < 8; i++) {
+          const sx = w * (0.04 + rnd() * 0.92);
+          const sl = 60 + rnd() * 110;
+          g.moveTo(sx - 20 - rnd() * 8, 0).lineTo(sx, sl).lineTo(sx + 20 + rnd() * 8, 0).closePath()
+            .fill({ color: 0x131022, alpha: 0.92 });
         }
         for (let i = 0; i < 4; i++) {
-          const cx = w * rnd();
-          const cy = floor - 6 - rnd() * 20;
-          g.moveTo(cx, cy - 12).lineTo(cx + 6, cy).lineTo(cx, cy + 5).lineTo(cx - 6, cy).closePath()
-            .fill({ color: 0x9fd8ff, alpha: 0.75 });
+          const sx = w * (0.08 + rnd() * 0.84);
+          const sl = 40 + rnd() * 50;
+          g.moveTo(sx - 18, floor + 4).lineTo(sx, floor - sl).lineTo(sx + 18, floor + 4).closePath()
+            .fill({ color: 0x131022, alpha: 0.9 });
+        }
+        for (let i = 0; i < 5; i++) {
+          const cx = w * (0.06 + rnd() * 0.88);
+          const cy = floor - 4 - rnd() * 26;
+          this.animItems.push({ kind: 'crystal', x: cx, y: cy, r: 10 + rnd() * 8, phase: rnd() * 6, s: 1 });
         }
         break;
       }
       case 'kutup': {
-        // Yüzeyde buz tavanı ve yüzen buz kütleleri, tabanda buz kırıkları
-        for (let i = 0; i < 5; i++) {
-          const ix = (w / 5) * i + rnd() * 30;
-          const iw = 60 + rnd() * 80;
-          g.moveTo(ix, 0).lineTo(ix + iw, 0).lineTo(ix + iw * 0.75, 26 + rnd() * 26)
-            .lineTo(ix + iw * 0.3, 20 + rnd() * 20).closePath()
-            .fill({ color: 0xffffff, alpha: 0.5 });
+        // Kalın buz tavanı + sallanan büyük buzdağı + buz kırığı zemin
+        g.rect(0, 0, w, 34).fill({ color: 0xf4fbff, alpha: 0.85 });
+        for (let i = 0; i < 6; i++) {
+          const ix = (w / 6) * i + rnd() * 20;
+          const iw2 = 70 + rnd() * 70;
+          g.moveTo(ix, 32).lineTo(ix + iw2, 32).lineTo(ix + iw2 * 0.7, 66 + rnd() * 40)
+            .lineTo(ix + iw2 * 0.25, 56 + rnd() * 30).closePath()
+            .fill({ color: 0xe8f6ff, alpha: 0.75 });
         }
-        for (let i = 0; i < 3; i++) {
-          const bx = w * rnd();
-          const bw = 40 + rnd() * 40;
-          g.roundRect(bx, 54 + rnd() * 30, bw, 14, 5).fill({ color: 0xffffff, alpha: 0.35 });
-        }
-        for (let i = 0; i < 5; i++) {
+        this.animItems.push({ kind: 'iceberg', x: w * (0.25 + rnd() * 0.5), y: 90, r: 70 + rnd() * 40, phase: rnd() * 6, s: 1 });
+        for (let i = 0; i < 7; i++) {
           const cx = w * rnd();
-          g.moveTo(cx - 8, floor).lineTo(cx, floor - 14 - rnd() * 12).lineTo(cx + 8, floor).closePath()
-            .fill({ color: 0xffffff, alpha: 0.55 });
+          g.moveTo(cx - 14, floor + 4).lineTo(cx, floor - 22 - rnd() * 18).lineTo(cx + 14, floor + 4).closePath()
+            .fill({ color: 0xffffff, alpha: 0.85 });
         }
         break;
       }
       case 'gunbatimi': {
-        // Suyun içinden görünen güneş diski ve sıcak ışık bandı
-        const sx = w * 0.68;
-        g.circle(sx, 66, 84).fill({ color: 0xffd9a0, alpha: 0.16 });
-        g.circle(sx, 66, 52).fill({ color: 0xffcf8a, alpha: 0.22 });
-        g.circle(sx, 66, 28).fill({ color: 0xffe8c0, alpha: 0.5 });
-        g.rect(0, 96, w, 5).fill({ color: 0xffc890, alpha: 0.2 });
-        g.rect(0, 116, w, 3).fill({ color: 0xffc890, alpha: 0.12 });
-        for (let i = 0; i < 4; i++) {
-          g.ellipse(w * rnd(), floor - 6, 16, 5).fill({ color: 0x6e3a52, alpha: 0.4 });
+        // Kocaman güneş + ufuk çizgisi + siluet martılar + koyu mor bitki siluetleri
+        const sx = w * 0.65;
+        g.circle(sx, 74, 110).fill({ color: 0xffc070, alpha: 0.25 });
+        g.circle(sx, 74, 66).fill({ color: 0xffb860, alpha: 0.4 });
+        g.circle(sx, 74, 38).fill({ color: 0xfff0c8, alpha: 0.9 });
+        for (let i = 0; i < 5; i++) {
+          g.rect(0, 110 + i * 22, w, 6 - i).fill({ color: 0xff9a50, alpha: 0.22 - i * 0.03 });
+        }
+        for (let i = 0; i < 3; i++) {
+          const mx = w * (0.1 + rnd() * 0.5);
+          const my = 40 + rnd() * 40;
+          g.moveTo(mx - 10, my).quadraticCurveTo(mx - 4, my - 7, mx, my)
+            .quadraticCurveTo(mx + 4, my - 7, mx + 10, my)
+            .stroke({ width: 2.5, color: 0x6e3a52, alpha: 0.8 });
+        }
+        for (let i = 0; i < 6; i++) {
+          const px = w * rnd();
+          const ph = 40 + rnd() * 60;
+          g.moveTo(px, floor).quadraticCurveTo(px - 8, floor - ph * 0.6, px + 4, floor - ph)
+            .stroke({ width: 5, color: 0x5c2e46, alpha: 0.85, cap: 'round' });
         }
         break;
       }
       case 'mistik': {
-        // Antik kalıntı silüetleri + havada süzülen ışık küreleri
-        for (let i = 0; i < 3; i++) {
-          const cx = w * (0.15 + rnd() * 0.7);
-          const ch = 60 + rnd() * 60;
-          g.rect(cx - 8, floor - ch, 16, ch).fill({ color: 0x2a2f52, alpha: 0.5 });
-          g.rect(cx - 13, floor - ch - 8, 26, 8).fill({ color: 0x2a2f52, alpha: 0.5 });
-        }
+        // Opak antik tapınak kapısı + yıkık sütunlar + gezinen büyük ışık küreleri
         const ax = w * (0.3 + rnd() * 0.4);
-        g.moveTo(ax - 44, floor).quadraticCurveTo(ax, floor - 110, ax + 44, floor)
-          .stroke({ width: 12, color: 0x2a2f52, alpha: 0.45 });
-        for (let i = 0; i < 8; i++) {
-          const ox = w * rnd();
-          const oy = h * (0.15 + rnd() * 0.6);
-          g.circle(ox, oy, 5 + rnd() * 4).fill({ color: 0x9fe8ff, alpha: 0.1 });
-          g.circle(ox, oy, 2).fill({ color: 0xd8f6ff, alpha: 0.5 });
+        g.rect(ax - 70, floor - 130, 22, 130).fill({ color: 0x232a4e, alpha: 0.95 });
+        g.rect(ax + 48, floor - 130, 22, 130).fill({ color: 0x232a4e, alpha: 0.95 });
+        g.rect(ax - 84, floor - 148, 168, 22).fill({ color: 0x2a3258, alpha: 0.95 });
+        g.circle(ax, floor - 96, 15).fill({ color: 0x9fe8ff, alpha: 0.35 });
+        for (let i = 0; i < 3; i++) {
+          const cx = w * (0.06 + rnd() * 0.88);
+          const ch2 = 34 + rnd() * 44;
+          g.rect(cx - 9, floor - ch2, 18, ch2).fill({ color: 0x232a4e, alpha: 0.85 });
+          g.rect(cx - 13, floor - ch2 - 7, 26, 7).fill({ color: 0x2a3258, alpha: 0.85 });
+        }
+        for (let i = 0; i < 6; i++) {
+          this.animItems.push({ kind: 'orb', x: w * rnd(), y: h * (0.15 + rnd() * 0.55), r: 5 + rnd() * 6, phase: rnd() * 6, s: 10 + rnd() * 14 });
         }
         break;
+      }
+    }
+  }
+
+  /** Hareketli biyom öğeleri — her karede çizilir. */
+  private drawBiomeAnim(dt: number, w: number, h: number): void {
+    const g = this.biomeAnimG;
+    g.clear();
+    const t = this.time;
+    for (const it of this.animItems) {
+      switch (it.kind) {
+        case 'snow': {
+          it.y += it.s * dt;
+          if (it.y > h) { it.y = -4; it.x = w * Math.random(); }
+          const dx = Math.sin(t * 0.6 + it.phase) * 10;
+          g.circle(it.x + dx, it.y, it.r).fill({ color: 0xdfe8f0, alpha: 0.3 });
+          break;
+        }
+        case 'orb': {
+          const ox = it.x + Math.sin(t * 0.4 + it.phase) * it.s * 2;
+          const oy = it.y + Math.cos(t * 0.3 + it.phase) * it.s;
+          const pulse = 0.5 + 0.3 * Math.sin(t * 1.5 + it.phase);
+          g.circle(ox, oy, it.r * 2.2).fill({ color: 0x9fe8ff, alpha: 0.12 * pulse });
+          g.circle(ox, oy, it.r).fill({ color: 0xd8f6ff, alpha: 0.55 * pulse + 0.25 });
+          break;
+        }
+        case 'crystal': {
+          const pulse = 0.6 + 0.4 * Math.sin(t * 1.8 + it.phase);
+          g.circle(it.x, it.y - 4, it.r * 2).fill({ color: 0x9fd8ff, alpha: 0.14 * pulse });
+          g.moveTo(it.x, it.y - it.r * 1.6).lineTo(it.x + it.r * 0.7, it.y)
+            .lineTo(it.x, it.y + it.r * 0.5).lineTo(it.x - it.r * 0.7, it.y).closePath()
+            .fill({ color: 0xa8e0ff, alpha: 0.55 + 0.35 * pulse });
+          break;
+        }
+        case 'iceberg': {
+          const by = it.y + Math.sin(t * 0.5 + it.phase) * 6;
+          g.moveTo(it.x - it.r, by).lineTo(it.x - it.r * 0.4, by - 34)
+            .lineTo(it.x + it.r * 0.25, by - 46).lineTo(it.x + it.r, by - 8)
+            .lineTo(it.x + it.r * 0.7, by + 30).lineTo(it.x - it.r * 0.6, by + 24).closePath()
+            .fill({ color: 0xf0faff, alpha: 0.85 });
+          g.moveTo(it.x - it.r * 0.4, by - 34).lineTo(it.x + it.r * 0.25, by - 46)
+            .lineTo(it.x + it.r * 0.15, by).lineTo(it.x - it.r * 0.3, by).closePath()
+            .fill({ color: 0xcfe8f8, alpha: 0.7 });
+          break;
+        }
+        case 'reed': {
+          const sway = Math.sin(t * 0.9 + it.phase) * 10;
+          g.moveTo(it.x, it.y)
+            .quadraticCurveTo(it.x + sway * 0.4, it.y - it.r * 0.6, it.x + sway, it.y - it.r)
+            .stroke({ width: 4, color: 0x2f7a52, alpha: 0.85, cap: 'round' });
+          g.ellipse(it.x + sway, it.y - it.r, 4, 12).fill({ color: 0x3f9764, alpha: 0.9 });
+          break;
+        }
       }
     }
   }
@@ -595,6 +700,7 @@ export class Game {
     }
 
     this.drawDecor();
+    this.drawBiomeAnim(dt, w, h);
 
     // Kabarcıklar
     this.bubbleG.clear();
