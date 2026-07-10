@@ -34,6 +34,7 @@ export class Game {
   private bgG = new Graphics();
   private sandG = new Graphics();
   private ambientG = new Graphics();
+  private biomeG = new Graphics();
   private decorAnimG = new Graphics();
   private rays: Graphics[] = [];
   private rayLayer = new Container();
@@ -123,7 +124,7 @@ export class Game {
     host.appendChild(this.app.canvas);
 
     this.world.addChild(
-      this.bgG, this.rayLayer, this.ambientG, this.decorAnimG, this.sandG,
+      this.bgG, this.rayLayer, this.biomeG, this.ambientG, this.decorAnimG, this.sandG,
       this.pelletG, this.fishLayer, this.bubbleG, this.fxG,
     );
     this.app.stage.addChild(this.world);
@@ -191,6 +192,8 @@ export class Game {
         .fill({ color: tank.water[2], alpha: 0.5 });
     }
 
+    this.drawBiomeScenery(w, h);
+
     // Işık huzmeleri
     this.rayLayer.removeChildren();
     this.rays = [];
@@ -206,6 +209,148 @@ export class Game {
       g.blendMode = 'add';
       this.rays.push(g);
       this.rayLayer.addChild(g);
+    }
+  }
+
+  /** Her biyomun kendine özgü sahne öğeleri; yerleşim akvaryum kimliğinden türetilen tohumla değişir. */
+  private drawBiomeScenery(w: number, h: number): void {
+    const tank = this.activeTank;
+    const g = this.biomeG;
+    g.clear();
+
+    // Akvaryum kimliğinden deterministik rastgelelik
+    let seed = 0;
+    for (const ch of tank.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      return (seed >>> 8) / 16777216;
+    };
+    const floor = h - 60;
+
+    switch (tank.biome) {
+      case 'tropik': {
+        // Arka planda soluk mercan tepeleri + dağınık kabuklar
+        for (let i = 0; i < 4; i++) {
+          const cx = w * (0.1 + rnd() * 0.8);
+          const col = [0xf4a09a, 0xe88c9d, 0xf0a35e][i % 3];
+          for (let k = 0; k < 5; k++) {
+            g.circle(cx - 22 + k * 11, floor - 8 - Math.sin(k * 2) * 7, 8 + (k % 3) * 3)
+              .fill({ color: col, alpha: 0.35 });
+          }
+        }
+        for (let i = 0; i < 5; i++) {
+          const sx = w * rnd();
+          g.moveTo(sx - 6, floor + 18).quadraticCurveTo(sx, floor + 4, sx + 6, floor + 18)
+            .closePath().fill({ color: 0xffffff, alpha: 0.35 });
+        }
+        break;
+      }
+      case 'lagun': {
+        // Yüzeyde ışık halkaları (kostik) + geniş yapraklı bitki silüetleri
+        for (let i = 0; i < 6; i++) {
+          g.ellipse(w * rnd(), 30 + rnd() * 60, 26 + rnd() * 30, 7)
+            .stroke({ width: 2, color: 0xffffff, alpha: 0.14 });
+        }
+        for (let i = 0; i < 3; i++) {
+          const bx = w * (0.15 + rnd() * 0.7);
+          for (let leaf = -2; leaf <= 2; leaf++) {
+            g.ellipse(bx + leaf * 9, floor - 34 - Math.abs(leaf) * -6, 8, 30)
+              .fill({ color: tank.water[2], alpha: 0.45 });
+          }
+        }
+        for (let i = 0; i < 4; i++) {
+          g.ellipse(w * rnd(), floor - 4, 12 + rnd() * 10, 7).fill({ color: tank.sandDots, alpha: 0.7 });
+        }
+        break;
+      }
+      case 'derin': {
+        // Yarık duvarları: iki yanda karanlık kaya kuleleri + asılı "deniz karı"
+        g.moveTo(0, h).lineTo(0, h * 0.25).lineTo(w * 0.1, h * 0.45)
+          .lineTo(w * 0.16, h * 0.7).lineTo(w * 0.08, h).closePath()
+          .fill({ color: 0x0c1626, alpha: 0.55 });
+        g.moveTo(w, h).lineTo(w, h * 0.2).lineTo(w * 0.88, h * 0.4)
+          .lineTo(w * 0.86, h * 0.75).lineTo(w * 0.94, h).closePath()
+          .fill({ color: 0x0c1626, alpha: 0.55 });
+        for (let i = 0; i < 26; i++) {
+          g.circle(w * rnd(), h * rnd(), 1 + rnd()).fill({ color: 0xdfe8f0, alpha: 0.16 });
+        }
+        break;
+      }
+      case 'magara': {
+        // Tavandan sarkıtlar, tabanda dikitler, parlayan kristaller
+        for (let i = 0; i < 6; i++) {
+          const sx = w * (0.05 + rnd() * 0.9);
+          const sl = 40 + rnd() * 70;
+          g.moveTo(sx - 14, 0).lineTo(sx, sl).lineTo(sx + 14, 0).closePath()
+            .fill({ color: 0x1a2038, alpha: 0.6 });
+        }
+        for (let i = 0; i < 3; i++) {
+          const sx = w * (0.1 + rnd() * 0.8);
+          const sl = 26 + rnd() * 34;
+          g.moveTo(sx - 12, floor).lineTo(sx, floor - sl).lineTo(sx + 12, floor).closePath()
+            .fill({ color: 0x1a2038, alpha: 0.55 });
+        }
+        for (let i = 0; i < 4; i++) {
+          const cx = w * rnd();
+          const cy = floor - 6 - rnd() * 20;
+          g.moveTo(cx, cy - 12).lineTo(cx + 6, cy).lineTo(cx, cy + 5).lineTo(cx - 6, cy).closePath()
+            .fill({ color: 0x9fd8ff, alpha: 0.75 });
+        }
+        break;
+      }
+      case 'kutup': {
+        // Yüzeyde buz tavanı ve yüzen buz kütleleri, tabanda buz kırıkları
+        for (let i = 0; i < 5; i++) {
+          const ix = (w / 5) * i + rnd() * 30;
+          const iw = 60 + rnd() * 80;
+          g.moveTo(ix, 0).lineTo(ix + iw, 0).lineTo(ix + iw * 0.75, 26 + rnd() * 26)
+            .lineTo(ix + iw * 0.3, 20 + rnd() * 20).closePath()
+            .fill({ color: 0xffffff, alpha: 0.5 });
+        }
+        for (let i = 0; i < 3; i++) {
+          const bx = w * rnd();
+          const bw = 40 + rnd() * 40;
+          g.roundRect(bx, 54 + rnd() * 30, bw, 14, 5).fill({ color: 0xffffff, alpha: 0.35 });
+        }
+        for (let i = 0; i < 5; i++) {
+          const cx = w * rnd();
+          g.moveTo(cx - 8, floor).lineTo(cx, floor - 14 - rnd() * 12).lineTo(cx + 8, floor).closePath()
+            .fill({ color: 0xffffff, alpha: 0.55 });
+        }
+        break;
+      }
+      case 'gunbatimi': {
+        // Suyun içinden görünen güneş diski ve sıcak ışık bandı
+        const sx = w * 0.68;
+        g.circle(sx, 66, 84).fill({ color: 0xffd9a0, alpha: 0.16 });
+        g.circle(sx, 66, 52).fill({ color: 0xffcf8a, alpha: 0.22 });
+        g.circle(sx, 66, 28).fill({ color: 0xffe8c0, alpha: 0.5 });
+        g.rect(0, 96, w, 5).fill({ color: 0xffc890, alpha: 0.2 });
+        g.rect(0, 116, w, 3).fill({ color: 0xffc890, alpha: 0.12 });
+        for (let i = 0; i < 4; i++) {
+          g.ellipse(w * rnd(), floor - 6, 16, 5).fill({ color: 0x6e3a52, alpha: 0.4 });
+        }
+        break;
+      }
+      case 'mistik': {
+        // Antik kalıntı silüetleri + havada süzülen ışık küreleri
+        for (let i = 0; i < 3; i++) {
+          const cx = w * (0.15 + rnd() * 0.7);
+          const ch = 60 + rnd() * 60;
+          g.rect(cx - 8, floor - ch, 16, ch).fill({ color: 0x2a2f52, alpha: 0.5 });
+          g.rect(cx - 13, floor - ch - 8, 26, 8).fill({ color: 0x2a2f52, alpha: 0.5 });
+        }
+        const ax = w * (0.3 + rnd() * 0.4);
+        g.moveTo(ax - 44, floor).quadraticCurveTo(ax, floor - 110, ax + 44, floor)
+          .stroke({ width: 12, color: 0x2a2f52, alpha: 0.45 });
+        for (let i = 0; i < 8; i++) {
+          const ox = w * rnd();
+          const oy = h * (0.15 + rnd() * 0.6);
+          g.circle(ox, oy, 5 + rnd() * 4).fill({ color: 0x9fe8ff, alpha: 0.1 });
+          g.circle(ox, oy, 2).fill({ color: 0xd8f6ff, alpha: 0.5 });
+        }
+        break;
+      }
     }
   }
 
