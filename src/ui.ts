@@ -189,7 +189,7 @@ export class UI {
         <button data-act="social">🏆<span>Sosyal</span></button>
         <button data-act="more">☰<span>Daha</span></button>
       </div>
-      <button id="collect-btn" class="hidden">🪙 <b id="collect-amount">0</b><span id="collect-rate"></span></button>
+      <button id="collect-btn" class="empty">🪙 <b id="collect-amount">0</b><span id="collect-rate">0/sa</span></button>
       <div id="panel-host"></div>
       <div id="toasts"></div>
     `;
@@ -244,15 +244,11 @@ export class UI {
     if (!this.root) return;
     const btn = this.root.querySelector<HTMLElement>('#collect-btn');
     if (!btn) return;
-    // Üretim varsa buton her zaman görünür (birikim 0 olsa bile keşfedilebilir olsun)
-    if (pot < 1 && ratePerHour <= 0) {
-      btn.classList.add('hidden');
-      return;
-    }
+    // Buton her zaman görünür — yetişkin balık yokken de 0 gösterir
     btn.classList.remove('hidden');
     btn.classList.toggle('empty', pot < 1);
     this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
-    this.root.querySelector('#collect-rate')!.textContent = ratePerHour > 0 ? `${fmt(ratePerHour)}/sa` : '';
+    this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}/sa`;
   }
 
   toast(msg: string): void {

@@ -31,6 +31,7 @@ class AudioMan {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private musicGain!: GainNode;
+  private echo: DelayNode | null = null; // müzik yankı kanalı (su altı derinliği)
   private ambientOn = false;
   private chordTimer: number | null = null;
   private biome: Biome = 'tropik';
@@ -71,7 +72,22 @@ class AudioMan {
     osc.stop(t0 + dur + 0.05);
   }
 
-  click(): void { this.ensure(); this.tone(660, 0.07, 'triangle', 0.1); }
+  /** Kuru, kısa arayüz tık'ı — müzikten net biçimde ayrışır. */
+  click(): void {
+    this.ensure();
+    if (!this.sfx || !this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1400, t0);
+    osc.frequency.exponentialRampToValueAtTime(900, t0 + 0.03);
+    g.gain.setValueAtTime(0.055, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.035);
+    osc.connect(g); g.connect(this.master);
+    osc.start(t0);
+    osc.stop(t0 + 0.05);
+  }
   plop(): void { this.ensure(); this.tone(340, 0.12, 'sine', 0.18, 0, 120); }
   bubble(): void { this.ensure(); this.tone(500 + Math.random() * 500, 0.08, 'sine', 0.05, 0, 900); }
   coin(): void {
@@ -131,23 +147,28 @@ class AudioMan {
     osc.stop(when + dur + 0.05);
   }
 
-  /** Pizzicato tını: hızlı sönümlü tatlı vuruş. */
-  private pluck(freq: number, when: number, vol = 0.055): void {
+  /** Kalimba/su çanı tınısı: yumuşak sinüs + hafif doğuşkan, uzun sönüm, yankıya gönderilir. */
+  private bell(freq: number, when: number, vol = 0.05): void {
     if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
-    const lp = this.ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(freq * 4, when);
-    lp.frequency.exponentialRampToValueAtTime(freq * 1.5, when + 0.25);
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
     g.gain.setValueAtTime(0, when);
-    g.gain.linearRampToValueAtTime(vol, when + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.34);
-    osc.connect(lp); lp.connect(g); g.connect(this.musicGain);
-    osc.start(when);
-    osc.stop(when + 0.4);
+    g.gain.linearRampToValueAtTime(vol, when + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.9);
+    const o1 = this.ctx.createOscillator();
+    o1.type = 'sine';
+    o1.frequency.value = freq;
+    const o2 = this.ctx.createOscillator();
+    o2.type = 'sine';
+    o2.frequency.value = freq * 3.01; // hafif çan doğuşkanı
+    const g2 = this.ctx.createGain();
+    g2.gain.setValueAtTime(vol * 0.18, when);
+    g2.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
+    o1.connect(g);
+    o2.connect(g2); g2.connect(g);
+    g.connect(this.musicGain);
+    if (this.echo) g.connect(this.echo); // su altı yankısı — sadece müzikte var
+    o1.start(when); o1.stop(when + 1);
+    o2.start(when); o2.stop(when + 0.4);
   }
 
   startAmbient(): void {
@@ -171,9 +192,25 @@ class AudioMan {
     noise.connect(lp); lp.connect(ng); ng.connect(this.musicGain);
     noise.start();
 
-    // Neşeli su altı ezgisi: bas + hafif pad + pizzicato arpej, biyoma göre tonalite
+    // Su altı yankısı: müzik notaları yumuşak ekoyla derinleşir (arayüz sesleri kuru kalır)
+    this.echo = ctx.createDelay(1.0);
+    this.echo.delayTime.value = 0.32;
+    const fb = ctx.createGain();
+    fb.gain.value = 0.34;
+    const echoLp = ctx.createBiquadFilter();
+    echoLp.type = 'lowpass';
+    echoLp.frequency.value = 1600;
+    const echoOut = ctx.createGain();
+    echoOut.gain.value = 0.4;
+    this.echo.connect(echoLp);
+    echoLp.connect(fb);
+    fb.connect(this.echo);
+    echoLp.connect(echoOut);
+    echoOut.connect(this.musicGain);
+
+    // Akışkan su altı ezgisi: bas + pad + yankılı kalimba, biyoma göre tonalite
     const chords = BIOME_CHORDS[this.biome];
-    const BAR = 3.2; // saniye — bir akorluk ölçü
+    const BAR = 3.6; // saniye — bir akorluk ölçü
     let bar = 0;
     const playBar = () => {
       if (!this.ctx || !this.ambientOn) return;
@@ -182,24 +219,22 @@ class AudioMan {
       const root = chord[0];
 
       // Yumuşak bas
-      this.mnote(root / 2, BAR * 0.85, 'sine', 0.06, t0);
-      this.mnote(root / 2, BAR * 0.35, 'sine', 0.045, t0 + BAR * 0.5);
+      this.mnote(root / 2, BAR * 0.9, 'sine', 0.055, t0);
 
       // İnce pad
-      for (const f of chord) this.mnote(f, BAR, 'triangle', 0.02, t0, (Math.random() - 0.5) * 7);
+      for (const f of chord) this.mnote(f, BAR, 'triangle', 0.018, t0, (Math.random() - 0.5) * 7);
 
-      // Pizzicato arpej (8'lik, hafif aksak — su damlası hissi)
-      const seq = [0, 1, 2, 1, 3, 2, 1, 2];
-      for (let i = 0; i < 8; i++) {
-        if ((bar * 3 + i) % 11 === 10) continue; // ara sıra nefes payı
-        const when = t0 + i * (BAR / 8) + (i % 2 === 1 ? 0.055 : 0);
+      // Kalimba ezgisi: ölçüde 5 nota, akıp giden — staccato değil
+      const seq = [0, 2, 1, 3, 2];
+      for (let i = 0; i < 5; i++) {
+        if ((bar * 2 + i) % 9 === 8) continue; // ara sıra nefes payı
+        const when = t0 + i * (BAR / 5) + (i % 2 === 1 ? 0.08 : 0);
         const tone = chord[seq[i] % chord.length];
-        const oct = i >= 4 ? 2 : 1;
-        this.pluck(tone * oct, when, i % 4 === 0 ? 0.06 : 0.045);
+        this.bell(tone * (i === 3 ? 2 : 1), when, i === 0 ? 0.055 : 0.042);
       }
 
-      // Dört ölçüde bir tepede parıltı
-      if (bar % 4 === 3) this.pluck(chord[chord.length - 1] * 4, t0 + BAR * 0.5, 0.028);
+      // Dört ölçüde bir tepede yankılanan parıltı
+      if (bar % 4 === 3) this.bell(chord[chord.length - 1] * 2, t0 + BAR * 0.55, 0.035);
       bar++;
     };
     playBar();
