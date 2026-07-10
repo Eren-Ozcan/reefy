@@ -301,6 +301,8 @@ html, body {
 .hud-tank { cursor: pointer; font-size: 13.5px; }
 .hud-tank .boost { color: #2f9e8f; }
 .inv-head .boost { color: #2f9e8f; font-weight: 800; }
+.boost-neg { color: #d9534f; font-weight: 800; }
+.dirt-badge { color: #a9762f; font-weight: 800; }
 
 /* Envanter */
 .inv-head { font-size: 14px; color: var(--ink); margin: 14px 0 8px; }

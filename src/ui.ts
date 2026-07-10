@@ -244,7 +244,10 @@ export class UI {
     this.hudCap.textContent = `${this.game.fishes.length}/${this.game.capacity}`;
     const t = this.game.activeTank;
     const boost = Math.round((this.game.growthMult - 1) * 100);
-    this.hudTank.innerHTML = `${BIOME_INFO[t.biome].emoji} ${t.name}${boost > 0 ? ` <b class="boost">+%${boost}</b>` : ''}`;
+    const dirtBadge = this.game.dirtPct(s.activeTank) > 0
+      ? ` <b class="dirt-badge" title="Kirli — camı temizlemek için dokun">🧹 -%${this.game.dirtPct(s.activeTank)}</b>` : '';
+    const boostBadge = boost !== 0 ? ` <b class="${boost > 0 ? 'boost' : 'boost-neg'}">${boost > 0 ? '+' : ''}%${boost}</b>` : '';
+    this.hudTank.innerHTML = `${BIOME_INFO[t.biome].emoji} ${t.name}${boostBadge}${dirtBadge}`;
   }
 
   private toggleFeedPop(): void {
@@ -565,7 +568,7 @@ export class UI {
             }).join('')
           : '<p class="empty">Bu akvaryumda balık yok.</p>';
         return `
-          <h3 class="inv-head">${BIOME_INFO[g.tank.biome].emoji} ${g.tank.name} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}/sa` : ''}</h3>
+          <h3 class="inv-head">${BIOME_INFO[g.tank.biome].emoji} ${g.tank.name} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}/sa` : ''}${g.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -%${g.dirtPct}</span>` : ''}</h3>
           ${rows}`;
       }).join('');
     } else if (tab === 'feeds') {
@@ -779,12 +782,12 @@ export class UI {
         : '<p class="empty">Bu akvaryumda balık yok.</p>';
       return `
         <h3 class="inv-head">${BIOME_INFO[grp.tank.biome].emoji} ${grp.tank.name}
-          — 🪙 ${fmt(grp.perHour)}/sa${grp.boostPct > 0 ? ` <span class="boost">+%${grp.boostPct}</span>` : ''}</h3>
+          — 🪙 ${fmt(grp.perHour)}/sa${grp.boostPct > 0 ? ` <span class="boost">+%${grp.boostPct}</span>` : ''}${grp.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -%${grp.dirtPct}</span>` : ''}</h3>
         ${rows}`;
     }).join('');
     this.panelShell('📈 Kazanç Raporu', `
       <p class="dex-info">Toplam üretim: <b>🪙 ${fmt(total)}/saat</b> • Birikmiş: <b>${fmt(pot)}</b>${total > 0 ? ` (tavan ${fmt(cap)})` : ''}.
-      Yalnızca yetişkin balıklar üretir; akvaryum + dekor bonusu üretime ve büyümeye işler.</p>
+      Yalnızca yetişkin balıklar üretir; akvaryum + dekor bonusu üretime ve büyümeye işler. Kirlenen akvaryumlarda cam bulanıklaşır, üretim ve büyüme yavaşlar — kir lekelerine dokunarak temizle! 🧹</p>
       ${blocks}`);
   }
 

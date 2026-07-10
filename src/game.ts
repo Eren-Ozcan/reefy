@@ -1157,6 +1157,7 @@ export class Game {
       kind: Math.random() < 0.5 ? 0 : 1,
     });
     this.syncSave();
+    this.ui.refreshHUD();
   }
 
   /** Verilen noktadaki en üstteki kir lekesinin dizinini döndürür (yoksa -1). */
