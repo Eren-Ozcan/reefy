@@ -1,0 +1,19 @@
+{
+  "name": "reefy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.7"
+  }
+}
