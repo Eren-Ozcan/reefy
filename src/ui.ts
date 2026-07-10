@@ -750,6 +750,7 @@ export class UI {
         <button class="more-btn" data-go="quests">📋<span>Görevler</span></button>
         <button class="more-btn" data-go="collection">📖<span>Koleksiyon</span></button>
         <button class="more-btn" data-go="earnings">📈<span>Kazanç</span></button>
+        <button class="more-btn" data-go="profile">👤<span>Profil</span></button>
         <button class="more-btn" data-go="settings">⚙️<span>Ayarlar</span></button>
       </div>`);
     el.querySelectorAll<HTMLButtonElement>('.more-btn').forEach((btn) => {
@@ -759,9 +760,40 @@ export class UI {
         if (go === 'quests') this.renderQuests();
         else if (go === 'collection') this.renderCollection();
         else if (go === 'earnings') this.renderEarnings();
+        else if (go === 'profile') this.renderProfile();
         else this.renderSettings();
       });
     });
+  }
+
+  /** Profil: oyuncu kimliği, ilerleme özeti ve ömür boyu istatistikler. */
+  private renderProfile(): void {
+    const s = this.game.save;
+    const st = s.stats;
+    const achDone = ACHIEVEMENTS.filter((a) => a.check(s) >= a.target).length;
+    const fishCount = s.tanksOwned.reduce((n, t) => n + this.game.tankFishCount(t), 0);
+    const row = (label: string, value: string) =>
+      `<div class="set-row"><span>${label}</span><b class="stat-val">${value}</b></div>`;
+    this.panelShell('👤 Profil', `
+      <div class="profile-head">
+        <div class="profile-name">${s.playerName}</div>
+        <div class="profile-code">${s.friendCode}</div>
+      </div>
+      ${row('⭐ Seviye', `${s.level} (${fmt(s.xp)}/${fmt(this.game.xpNeed(s.level))} XP)`)}
+      ${row('🐟 Balıkların', `${fishCount}`)}
+      ${row('🏝️ Akvaryumların', `${s.tanksOwned.length}/${this.game.tankList().length}`)}
+      ${row('📖 Koleksiyon', `${s.collection.length}/${SPECIES.length} tür`)}
+      ${row('🏆 Başarımlar', `${achDone}/${ACHIEVEMENTS.length}`)}
+      ${row('🔥 Günlük seri', `${s.streak} gün`)}
+      <hr/>
+      <h3 class="inv-head">📊 Ömür boyu istatistikler</h3>
+      ${row('🤝 Satılan balık', fmt(st.totalSold))}
+      ${row('💰 Toplam kazanç', `🪙 ${fmt(st.totalEarned)}`)}
+      ${row('🍤 Yedirilen yem', fmt(st.totalFed))}
+      ${row('🥚 Açılan yumurta', fmt(st.eggsHatched))}
+      ${row('🪸 Yerleştirilen dekor', fmt(st.decorPlacedCount))}
+      ${row('🧹 Temizlenen leke', fmt(st.totalCleaned))}
+    `);
   }
 
   /** Kazanç raporu: toplam üretim, akvaryum başına alt toplam ve balık başına gelir. */
@@ -983,6 +1015,10 @@ export class UI {
       <div class="fish-info">
         <div class="card-art">${fishSVG(f.sp, 120)}</div>
         <div class="card-name">${f.sp.name} ${rarityChip(f.sp.rarity)}</div>
+        <div class="name-edit fish-rename">
+          <input id="fish-name-input" value="${f.name}" maxlength="14" autocomplete="off"/>
+          <button class="tgl" id="fish-name-save">✏️ Adlandır</button>
+        </div>
         <p class="card-desc">${f.sp.desc}</p>
         <div class="bar-row"><span>Büyüme (${f.stageName})</span>
           <div class="bar"><div id="fi-grow" style="width:${Math.min(100, f.progress * 100)}%"></div></div></div>
@@ -995,6 +1031,17 @@ export class UI {
           : `<p class="growing">Büyüyor… satmak için yetişkin olmasını bekle 🌱</p>`}
         ${moveHTML}
       </div>`);
+    el.querySelector('#fish-name-save')!.addEventListener('click', () => {
+      const input = el.querySelector<HTMLInputElement>('#fish-name-input')!;
+      const name = input.value.replace(/[<>&"']/g, '').trim();
+      if (name.length < 2) { this.toast('İsim en az 2 karakter olmalı'); return; }
+      f.name = name;
+      input.value = name;
+      el.querySelector('.panel-head h2')!.textContent = name;
+      this.game.syncSave();
+      audio.click();
+      this.toast(`İsim güncellendi: ${name} 🐟`);
+    });
     const sellBtn = el.querySelector<HTMLButtonElement>('.sell');
     if (sellBtn) {
       sellBtn.addEventListener('click', () => {

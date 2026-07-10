@@ -375,7 +375,19 @@ html, body {
 .pity { font-size: 11.5px; font-weight: 700; color: #b0894a; }
 
 /* Daha menüsü */
-.more-grid { display: flex; gap: 12px; justify-content: center; padding: 10px 0 16px; }
+.more-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 10px 0 16px; }
+
+/* Profil */
+.profile-head { text-align: center; padding: 6px 0 12px; }
+.profile-name { font-size: 20px; font-weight: 800; color: var(--ink); }
+.profile-code { font-size: 12px; font-weight: 700; color: #8ba4b0; letter-spacing: 1px; margin-top: 2px; }
+.stat-val { color: var(--ink); font-size: 14px; }
+.fish-rename input {
+  width: 140px; border: 2px solid #d6e2e8; border-radius: 999px;
+  padding: 7px 12px; font-size: 13px; font-weight: 600;
+  outline: none; color: var(--ink); background: #fff; text-align: center;
+}
+.fish-rename input:focus { border-color: #57c9a6; }
 .more-btn {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   border: none; cursor: pointer;

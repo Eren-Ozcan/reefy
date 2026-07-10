@@ -169,6 +169,15 @@ for (let i = 0; i < 5; i++) {
 }
 if (!(await page.locator('.fish-info').count())) throw new Error('Balık kartı açılamadı');
 await page.screenshot({ path: out + '/15-fish-card.png' });
+
+// Yeniden adlandır: kart üzerinden isim değiştir, kayda işlenmeli
+await page.fill('#fish-name-input', 'Poyraz');
+await page.click('#fish-name-save');
+await page.waitForTimeout(300);
+const renamed = await page.evaluate(() => window.__reefyGame.fishes.some((f) => f.name === 'Poyraz'));
+if (!renamed) throw new Error('Balık yeniden adlandırılamadı');
+await page.screenshot({ path: out + '/15b-fish-renamed.png' });
+
 await page.click('.move-btn[data-move="tank-kumsal"]');
 await page.waitForTimeout(300);
 const moved = await page.evaluate(() => {
@@ -314,6 +323,19 @@ if (spotless.count !== 0 || spotless.blurred) {
   throw new Error(`Akvaryum tam temizlenemedi: kalan ${spotless.count}, blur ${spotless.blurred}`);
 }
 await page.screenshot({ path: out + '/25-tank-spotless.png' });
+
+// Profil: istatistikler satışları/yemlemeyi yansıtmalı
+await page.click('#bottombar button[data-act="more"]');
+await page.waitForTimeout(300);
+await page.click('.more-btn[data-go="profile"]');
+await page.waitForTimeout(400);
+const profileText = await page.locator('.panel-body').textContent();
+if (!profileText.includes('Satılan balık') || !profileText.includes('Temizlenen leke')) {
+  throw new Error('Profil istatistikleri eksik görünüyor');
+}
+await page.screenshot({ path: out + '/26-profile.png' });
+await page.click('.close-btn');
+await page.waitForTimeout(200);
 
 // Kayıt doğrulaması
 await page.waitForTimeout(6500);
