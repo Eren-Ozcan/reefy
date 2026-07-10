@@ -75,7 +75,14 @@ export class Game {
     return 1 + this.tankBoostPct(this.save.activeTank) / 100;
   }
 
-  xpNeed(level: number): number { return Math.round(120 * Math.pow(level, 1.35)); }
+  /**
+   * Seviye eğrisi: erken hızlı (Sv1 = 50 XP ≈ 2 satış), geç oyunda dikleşir (üs 2.2).
+   * Satış XP'si fiyatın 0.75 kuvveti olduğundan geç seviyeler saatler alır — hedeflenen yapı.
+   */
+  xpNeed(level: number): number { return Math.round(50 * Math.pow(level, 2.2)); }
+
+  /** Satıştan gelen XP: azalan getiri — pahalı balık çok XP verir ama fiyatla doğrusal büyümez. */
+  saleXp(sellPrice: number): number { return Math.max(5, Math.round(Math.pow(sellPrice, 0.75))); }
 
   /** Tüm akvaryumlardaki yetişkin balıkların toplam saatlik üretimi (akvaryum+dekor bonuslu). */
   get incomePerHour(): number {
@@ -713,7 +720,7 @@ export class Game {
     const gain = Math.round(f.sp.sellPrice * this.sellMult);
     this.save.coins += gain;
     if (f.sp.rarity === 'legendary') this.save.pearls += 2;
-    this.addXp(Math.round(f.sp.sellPrice * 0.35));
+    this.addXp(this.saleXp(f.sp.sellPrice));
     this.save.stats.totalSold++;
     this.save.stats.totalEarned += gain;
     this.questEvent('sell', 1);

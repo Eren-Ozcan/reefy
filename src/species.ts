@@ -295,12 +295,12 @@ export interface EggTier {
 
 export const EGGS: EggTier[] = [
   {
-    id: 'bronz', name: 'Bronz Yumurta', emoji: '🥚', cost: 400, currency: 'coins',
+    id: 'bronz', name: 'Bronz Yumurta', emoji: '🥚', cost: 550, currency: 'coins',
     odds: { common: 70, uncommon: 25, rare: 5 },
     desc: 'Başlangıç sürprizi. Küçük ama umut dolu.',
   },
   {
-    id: 'gumus', name: 'Gümüş Yumurta', emoji: '🪺', cost: 1800, currency: 'coins',
+    id: 'gumus', name: 'Gümüş Yumurta', emoji: '🪺', cost: 2800, currency: 'coins',
     odds: { uncommon: 40, rare: 45, epic: 15 },
     desc: 'İçinden nadir bir dost çıkma ihtimali yüksek.',
   },

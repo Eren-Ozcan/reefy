@@ -72,8 +72,9 @@ export function defaultSave(): SaveData {
     playerName: 'Misafir-' + Math.floor(1000 + Math.random() * 9000),
     friendCode: makeFriendCode(),
     fishes: [
-      { sp: 'lepistes', progress: 0.35, hunger: 0.9, name: 'Baloncuk', seed: 11, tank: START_TANK },
-      { sp: 'neon-tetra', progress: 0.15, hunger: 0.85, name: 'Mercan', seed: 42, tank: START_TANK },
+      // İlk balık %60 büyümüş başlar: ilk satış (ilk zafer) oyunun ilk ~1 dakikasında yaşanır
+      { sp: 'lepistes', progress: 0.6, hunger: 0.9, name: 'Baloncuk', seed: 11, tank: START_TANK },
+      { sp: 'neon-tetra', progress: 0.3, hunger: 0.85, name: 'Mercan', seed: 42, tank: START_TANK },
     ],
     collection: [],
     decorOwned: {},
