@@ -1,33 +1,38 @@
 import { Application, Container, FillGradient, Graphics } from 'pixi.js';
 import { audio } from './audio';
+import { DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish } from './fish';
+import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay } from './quests';
 import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
+import { Services, createServices } from './services';
 import {
-  EGGS, EggTier, FISH_NAMES, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
+  EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
 } from './species';
+import { TANKS, TankDef, tankById } from './tanks';
 import type { UI } from './ui';
 
 interface Pellet { x: number; y: number; vy: number; sway: number; age: number }
 interface Particle { x: number; y: number; vy: number; life: number; color: number; r: number }
-interface Kelp { fx: number; h: number; phase: number; color: number }
 
 const OFFLINE_CAP_MS = 8 * 3600_000;
 const OFFLINE_SPEED = 0.5;
 const HUNGER_RATE_MS = 1 / (90 * 60_000);
 
-export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean }
+export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number }
 
 export class Game {
   app = new Application();
   ui!: UI;
   save: SaveData;
-  fishes: Fish[] = [];
+  services: Services;
+  fishes: Fish[] = [];          // aktif akvaryumdaki balıklar
+  private dormant: FishSave[] = []; // diğer akvaryumlardaki balıklar
 
   private world = new Container();
   private bgG = new Graphics();
   private sandG = new Graphics();
-  private decorG = new Graphics();
-  private kelpG = new Graphics();
+  private ambientG = new Graphics();
+  private decorAnimG = new Graphics();
   private rays: Graphics[] = [];
   private rayLayer = new Container();
   private fishLayer = new Container();
@@ -38,19 +43,29 @@ export class Game {
   private pellets: Pellet[] = [];
   private particles: Particle[] = [];
   private bubbles: { x: number; y: number; r: number; vy: number; phase: number }[] = [];
-  private kelps: Kelp[] = [];
   private time = 0;
-  offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false };
+  offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0 };
 
   constructor() {
     this.save = loadSave();
+    this.services = createServices(this.save);
   }
 
   get bounds(): Bounds {
     return { w: this.app.screen.width, h: this.app.screen.height };
   }
+  get activeTank(): TankDef { return tankById(this.save.activeTank); }
   get capacity(): number { return Math.min(6 + this.save.level, 24); }
+
   get sellMult(): number { return 1 + 0.05 * this.completedSets().length; }
+
+  /** Akvaryum + yerleştirilmiş dekor büyüme bonusu (çarpan). */
+  get growthMult(): number {
+    const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
+    let pct = this.activeTank.growthBonus;
+    for (const p of placed) pct += DECOR_BOOST[decorById(p.def).rarity];
+    return 1 + Math.min(DECOR_BOOST_CAP, pct) / 100;
+  }
 
   xpNeed(level: number): number { return Math.round(120 * Math.pow(level, 1.35)); }
 
@@ -68,24 +83,15 @@ export class Game {
     host.appendChild(this.app.canvas);
 
     this.world.addChild(
-      this.bgG, this.rayLayer, this.kelpG, this.decorG, this.sandG,
+      this.bgG, this.rayLayer, this.ambientG, this.decorAnimG, this.sandG,
       this.pelletG, this.fishLayer, this.bubbleG, this.fxG,
     );
     this.app.stage.addChild(this.world);
 
     this.applyOffline();
     this.applyDailyGift();
+    this.ensureQuestDay();
 
-    // Kelp/kabarcık yerleşimi (yüzde bazlı — resize'da korunur)
-    const kelpColors = [0x4da674, 0x66bb8a, 0x3f9764, 0x5cb07e];
-    for (let i = 0; i < 5; i++) {
-      this.kelps.push({
-        fx: [0.08, 0.2, 0.55, 0.78, 0.93][i],
-        h: 0.22 + Math.random() * 0.16,
-        phase: Math.random() * Math.PI * 2,
-        color: kelpColors[i % kelpColors.length],
-      });
-    }
     for (let i = 0; i < 22; i++) {
       this.bubbles.push({
         x: Math.random(), y: Math.random(), r: 1.5 + Math.random() * 3.5,
@@ -96,7 +102,13 @@ export class Game {
     this.buildStatic();
     this.app.renderer.on('resize', () => this.buildStatic());
 
-    for (const fs of this.save.fishes) this.spawnFish(fs);
+    // Balıkları aktif/dormant olarak ayır
+    for (const fs of this.save.fishes) {
+      if (fs.tank === this.save.activeTank) this.spawnFish(fs);
+      else this.dormant.push(fs);
+    }
+
+    audio.setBiome(this.activeTank.biome);
 
     this.app.ticker.add((t) => this.update(t.deltaMS / 1000));
 
@@ -111,39 +123,32 @@ export class Game {
 
   private buildStatic(): void {
     const { w, h } = this.bounds;
+    const tank = this.activeTank;
 
     this.bgG.clear();
     const grad = new FillGradient(0, 0, 0, h);
-    grad.addColorStop(0, 0x9fe0da);
-    grad.addColorStop(0.55, 0x58aab4);
-    grad.addColorStop(1, 0x2f7f96);
+    grad.addColorStop(0, tank.water[0]);
+    grad.addColorStop(0.55, tank.water[1]);
+    grad.addColorStop(1, tank.water[2]);
     this.bgG.rect(0, 0, w, h).fill(grad);
 
     this.sandG.clear();
-    this.sandG.rect(0, h - 64, w, 64).fill(0xe8d5a8);
-    this.sandG.ellipse(w * 0.5, h - 64, w * 0.6, 14).fill(0xe8d5a8);
+    this.sandG.rect(0, h - 64, w, 64).fill(tank.sand);
+    this.sandG.ellipse(w * 0.5, h - 64, w * 0.6, 14).fill(tank.sand);
     for (let i = 0; i < 70; i++) {
-      this.sandG.circle(Math.random() * w, h - 58 + Math.random() * 52, 1 + Math.random() * 2).fill(0xd9bf8c);
-    }
-    for (let i = 0; i < 6; i++) {
-      const px = Math.random() * w;
-      this.sandG.ellipse(px, h - 20 - Math.random() * 20, 8 + Math.random() * 10, 5 + Math.random() * 5).fill(0xc9b08a);
+      this.sandG.circle(Math.random() * w, h - 58 + Math.random() * 52, 1 + Math.random() * 2).fill(tank.sandDots);
     }
 
-    // Mercanlar
-    this.decorG.clear();
-    const coral = (cx: number, color: number) => {
-      for (let i = 0; i < 7; i++) {
-        this.decorG.circle(cx - 34 + i * 11, h - 62 - Math.abs(3 - i) * -2 - (10 + Math.sin(i * 2.1) * 8), 11 + (i % 3) * 3).fill(color);
-      }
-    };
-    coral(w * 0.3, 0xf4a09a);
-    coral(w * 0.85, 0xe88c9d);
+    // Arka plan silüet bitkileri (derinlik hissi)
+    this.ambientG.clear();
     for (let i = 0; i < 4; i++) {
-      const tx = w * 0.62 + i * 13;
-      const th = 26 + (i % 2) * 14;
-      this.decorG.roundRect(tx, h - 60 - th, 9, th, 4).fill(0xf0a35e);
-      this.decorG.circle(tx + 4.5, h - 60 - th, 5).fill(0xf7bd80);
+      const bx = w * (0.1 + i * 0.26);
+      const bh = 60 + (i % 2) * 40;
+      this.ambientG
+        .moveTo(bx, h - 60)
+        .quadraticCurveTo(bx - 14, h - 60 - bh * 0.6, bx - 4, h - 60 - bh)
+        .quadraticCurveTo(bx + 10, h - 60 - bh * 0.5, bx, h - 60)
+        .fill({ color: tank.water[2], alpha: 0.5 });
     }
 
     // Işık huzmeleri
@@ -164,27 +169,218 @@ export class Game {
     }
   }
 
-  private drawKelp(): void {
+  // ---------- dekor çizimi ----------
+
+  private drawDecor(): void {
     const { w, h } = this.bounds;
-    this.kelpG.clear();
-    for (const k of this.kelps) {
-      const baseX = k.fx * w;
-      const segs = 6;
-      const segLen = (k.h * h) / segs;
-      let px = baseX;
-      let py = h - 58;
-      for (let i = 0; i < segs; i++) {
-        const ang = Math.sin(this.time * 0.8 + k.phase + i * 0.55) * 0.14 * (i / segs + 0.4);
-        const nx = px + Math.sin(ang) * segLen;
-        const ny = py - Math.cos(ang) * segLen;
-        this.kelpG.moveTo(px, py);
-        this.kelpG.lineTo(nx, ny);
-        this.kelpG.stroke({ width: 7 - i * 0.7, color: k.color, cap: 'round' });
-        if (i > 0) {
-          const side = i % 2 === 0 ? 1 : -1;
-          this.kelpG.ellipse(px + side * 8, py, 9, 4).fill({ color: k.color, alpha: 0.85 });
+    const g = this.decorAnimG;
+    g.clear();
+    const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
+    for (const p of placed) {
+      this.drawDecorItem(g, decorById(p.def), p.fx * w, h - 58);
+    }
+  }
+
+  private drawDecorItem(g: Graphics, d: DecorDef, x: number, baseY: number): void {
+    const s = d.scale;
+    const t = this.time;
+    switch (d.kind) {
+      case 'kelp': {
+        const segs = 6;
+        const segLen = 22 * s;
+        let px = x, py = baseY;
+        for (let i = 0; i < segs; i++) {
+          const ang = Math.sin(t * 0.8 + x * 0.05 + i * 0.55) * 0.14 * (i / segs + 0.4);
+          const nx = px + Math.sin(ang) * segLen;
+          const ny = py - Math.cos(ang) * segLen;
+          g.moveTo(px, py).lineTo(nx, ny).stroke({ width: (7 - i * 0.7) * s, color: d.color, cap: 'round' });
+          if (i > 0) {
+            const side = i % 2 === 0 ? 1 : -1;
+            g.ellipse(px + side * 8 * s, py, 9 * s, 4 * s).fill({ color: d.color2, alpha: 0.85 });
+          }
+          px = nx; py = ny;
         }
-        px = nx; py = ny;
+        break;
+      }
+      case 'sword': {
+        for (let i = -2; i <= 2; i++) {
+          const lh = (55 - Math.abs(i) * 12) * s;
+          const sway = Math.sin(t * 0.9 + i) * 4;
+          g.moveTo(x, baseY)
+            .quadraticCurveTo(x + i * 10 + sway, baseY - lh * 0.6, x + i * 14 + sway, baseY - lh)
+            .quadraticCurveTo(x + i * 8 + sway, baseY - lh * 0.5, x, baseY)
+            .fill({ color: i % 2 === 0 ? d.color : d.color2, alpha: 0.95 });
+        }
+        break;
+      }
+      case 'coral-mound': {
+        for (let i = 0; i < 7; i++) {
+          g.circle(x - 34 * s + i * 11 * s, baseY - (10 + Math.sin(i * 2.1) * 8) * s, (11 + (i % 3) * 3) * s)
+            .fill(i % 2 === 0 ? d.color : d.color2);
+        }
+        break;
+      }
+      case 'tube-coral': {
+        for (let i = 0; i < 4; i++) {
+          const tx = x - 20 * s + i * 13 * s;
+          const th = (26 + (i % 2) * 14) * s;
+          g.roundRect(tx, baseY - th, 9 * s, th, 4).fill(d.color);
+          g.circle(tx + 4.5 * s, baseY - th, 5 * s).fill(d.color2);
+        }
+        break;
+      }
+      case 'fan-coral': {
+        const sway = Math.sin(t * 0.7 + x * 0.03) * 0.05;
+        for (let i = -3; i <= 3; i++) {
+          const ang = i * 0.22 + sway - Math.PI / 2;
+          const len = (44 - Math.abs(i) * 5) * s;
+          g.moveTo(x, baseY)
+            .lineTo(x + Math.cos(ang) * len, baseY + Math.sin(ang) * len)
+            .stroke({ width: 3.5 * s, color: i % 2 === 0 ? d.color : d.color2, cap: 'round' });
+        }
+        g.circle(x, baseY, 5 * s).fill(d.color);
+        break;
+      }
+      case 'anemone': {
+        for (let i = 0; i < 9; i++) {
+          const ang = -Math.PI / 2 + (i - 4) * 0.28 + Math.sin(t * 1.4 + i) * 0.08;
+          const len = (26 + (i % 3) * 6) * s;
+          g.moveTo(x, baseY - 6)
+            .lineTo(x + Math.cos(ang) * len, baseY - 6 + Math.sin(ang) * len)
+            .stroke({ width: 5 * s, color: i % 2 === 0 ? d.color : d.color2, cap: 'round' });
+        }
+        g.ellipse(x, baseY - 4, 16 * s, 8 * s).fill(d.color);
+        break;
+      }
+      case 'rock': {
+        g.ellipse(x, baseY - 10 * s, 26 * s, 16 * s).fill(d.color);
+        g.ellipse(x - 10 * s, baseY - 20 * s, 14 * s, 9 * s).fill(d.color2);
+        break;
+      }
+      case 'arch': {
+        g.moveTo(x - 30 * s, baseY)
+          .quadraticCurveTo(x, baseY - 64 * s, x + 30 * s, baseY)
+          .stroke({ width: 14 * s, color: d.color, cap: 'round' });
+        g.circle(x - 28 * s, baseY - 6 * s, 8 * s).fill(d.color2);
+        g.circle(x + 26 * s, baseY - 4 * s, 6 * s).fill(d.color2);
+        break;
+      }
+      case 'shell': {
+        g.moveTo(x - 18 * s, baseY)
+          .quadraticCurveTo(x, baseY - 34 * s, x + 18 * s, baseY)
+          .closePath()
+          .fill(d.color);
+        for (let i = -2; i <= 2; i++) {
+          g.moveTo(x, baseY - 2).lineTo(x + i * 8 * s, baseY - 26 * s)
+            .stroke({ width: 2, color: d.color2, alpha: 0.8 });
+        }
+        break;
+      }
+      case 'starfish': {
+        for (let i = 0; i < 5; i++) {
+          const ang = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+          g.moveTo(x, baseY - 8 * s)
+            .lineTo(x + Math.cos(ang) * 16 * s, baseY - 8 * s + Math.sin(ang) * 16 * s)
+            .stroke({ width: 7 * s, color: d.color, cap: 'round' });
+        }
+        g.circle(x, baseY - 8 * s, 6 * s).fill(d.color2);
+        break;
+      }
+      case 'chest': {
+        g.roundRect(x - 20 * s, baseY - 24 * s, 40 * s, 24 * s, 4).fill(d.color);
+        g.roundRect(x - 22 * s, baseY - 32 * s, 44 * s, 12 * s, 5).fill(d.color);
+        g.rect(x - 3 * s, baseY - 26 * s, 6 * s, 10 * s).fill(d.color2);
+        if (Math.sin(t * 2 + x) > 0.6) {
+          g.circle(x, baseY - 40 * s - (t % 1) * 16, 3).stroke({ width: 1.2, color: 0xffffff, alpha: 0.4 });
+        }
+        break;
+      }
+      case 'wreck': {
+        g.moveTo(x - 46 * s, baseY)
+          .quadraticCurveTo(x, baseY - 30 * s, x + 46 * s, baseY - 6 * s)
+          .lineTo(x + 40 * s, baseY)
+          .closePath()
+          .fill(d.color);
+        g.rect(x - 4 * s, baseY - 58 * s, 5 * s, 34 * s).fill(d.color2);
+        g.moveTo(x + 1 * s, baseY - 58 * s).lineTo(x + 26 * s, baseY - 40 * s).lineTo(x + 1 * s, baseY - 34 * s)
+          .closePath().fill({ color: d.color2, alpha: 0.7 });
+        break;
+      }
+      case 'column': {
+        g.rect(x - 8 * s, baseY - 60 * s, 16 * s, 60 * s).fill(d.color);
+        g.rect(x - 12 * s, baseY - 66 * s, 24 * s, 8 * s).fill(d.color2);
+        g.rect(x - 12 * s, baseY - 4 * s, 24 * s, 6 * s).fill(d.color2);
+        for (let i = -1; i <= 1; i++) {
+          g.moveTo(x + i * 5 * s, baseY - 60 * s).lineTo(x + i * 5 * s, baseY)
+            .stroke({ width: 1.5, color: d.color2, alpha: 0.5 });
+        }
+        break;
+      }
+      case 'statue': {
+        g.roundRect(x - 14 * s, baseY - 8 * s, 28 * s, 8 * s, 2).fill(d.color2);
+        g.moveTo(x - 8 * s, baseY - 8 * s)
+          .quadraticCurveTo(x - 10 * s, baseY - 40 * s, x, baseY - 46 * s)
+          .quadraticCurveTo(x + 10 * s, baseY - 40 * s, x + 8 * s, baseY - 8 * s)
+          .closePath()
+          .fill(d.color);
+        g.circle(x, baseY - 52 * s, 8 * s).fill(d.color);
+        break;
+      }
+      case 'castle': {
+        g.rect(x - 26 * s, baseY - 40 * s, 52 * s, 40 * s).fill(d.color);
+        g.rect(x - 34 * s, baseY - 56 * s, 16 * s, 56 * s).fill(d.color2);
+        g.rect(x + 18 * s, baseY - 56 * s, 16 * s, 56 * s).fill(d.color2);
+        g.moveTo(x - 34 * s, baseY - 56 * s).lineTo(x - 26 * s, baseY - 70 * s).lineTo(x - 18 * s, baseY - 56 * s).closePath().fill(d.color);
+        g.moveTo(x + 18 * s, baseY - 56 * s).lineTo(x + 26 * s, baseY - 70 * s).lineTo(x + 34 * s, baseY - 56 * s).closePath().fill(d.color);
+        g.roundRect(x - 6 * s, baseY - 22 * s, 12 * s, 22 * s, 6).fill(d.color2);
+        break;
+      }
+      case 'skull': {
+        g.ellipse(x, baseY - 22 * s, 24 * s, 20 * s).fill(d.color);
+        g.rect(x - 12 * s, baseY - 10 * s, 24 * s, 10 * s).fill(d.color);
+        g.ellipse(x - 9 * s, baseY - 24 * s, 6 * s, 7 * s).fill(0x2e3440);
+        g.ellipse(x + 9 * s, baseY - 24 * s, 6 * s, 7 * s).fill(0x2e3440);
+        g.moveTo(x - 3 * s, baseY - 16 * s).lineTo(x, baseY - 10 * s).lineTo(x + 3 * s, baseY - 16 * s)
+          .closePath().fill(0x2e3440);
+        break;
+      }
+      case 'amphora': {
+        g.moveTo(x - 4 * s, baseY - 40 * s)
+          .quadraticCurveTo(x - 20 * s, baseY - 26 * s, x - 10 * s, baseY)
+          .lineTo(x + 10 * s, baseY)
+          .quadraticCurveTo(x + 20 * s, baseY - 26 * s, x + 4 * s, baseY - 40 * s)
+          .closePath()
+          .fill(d.color);
+        g.rect(x - 6 * s, baseY - 46 * s, 12 * s, 7 * s).fill(d.color2);
+        break;
+      }
+      case 'lamp': {
+        g.rect(x - 2.5 * s, baseY - 44 * s, 5 * s, 44 * s).fill(d.color);
+        g.circle(x, baseY - 50 * s, 9 * s).fill(d.color2);
+        const pulse = 0.18 + 0.08 * Math.sin(t * 1.6 + x);
+        g.moveTo(x, baseY - 50 * s)
+          .lineTo(x - 26 * s, baseY)
+          .lineTo(x + 26 * s, baseY)
+          .closePath()
+          .fill({ color: d.color2, alpha: pulse });
+        break;
+      }
+      case 'bubbler': {
+        g.ellipse(x, baseY - 5 * s, 14 * s, 8 * s).fill(d.color);
+        const bt = (t * 0.7 + x * 0.01) % 1;
+        for (let i = 0; i < 3; i++) {
+          const by = baseY - 14 - ((bt + i * 0.33) % 1) * 70;
+          g.circle(x + Math.sin(t * 2 + i * 2) * 5, by, 2.5 + i * 0.5)
+            .stroke({ width: 1.2, color: d.color2, alpha: 0.6 });
+        }
+        break;
+      }
+      case 'sign': {
+        g.rect(x - 2 * s, baseY - 34 * s, 4 * s, 34 * s).fill(d.color);
+        g.roundRect(x - 24 * s, baseY - 48 * s, 48 * s, 18 * s, 4).fill(d.color2);
+        g.moveTo(x - 16 * s, baseY - 39 * s).lineTo(x + 16 * s, baseY - 39 * s)
+          .stroke({ width: 2, color: d.color, alpha: 0.7 });
+        break;
       }
     }
   }
@@ -200,7 +396,7 @@ export class Game {
       this.rays[i].skew.x = Math.sin(this.time * 0.22 + i) * 0.03;
     }
 
-    this.drawKelp();
+    this.drawDecor();
 
     // Kabarcıklar
     this.bubbleG.clear();
@@ -228,6 +424,7 @@ export class Game {
     }
 
     // Balıklar
+    const gm = this.growthMult;
     for (const f of this.fishes) {
       let target: { x: number; y: number } | null = null;
       let ti = -1;
@@ -240,7 +437,7 @@ export class Game {
         if (ti >= 0) target = { x: this.pellets[ti].x, y: this.pellets[ti].y };
       }
 
-      const grown = f.update(dt, this.time, this.bounds, target);
+      const grown = f.update(dt, this.time, this.bounds, target, gm);
 
       if (target && ti >= 0 && ti < this.pellets.length) {
         if (Math.hypot(this.pellets[ti].x - f.x, this.pellets[ti].y - f.y) < 16) {
@@ -248,6 +445,8 @@ export class Game {
           f.hunger = Math.min(1, f.hunger + 0.35);
           audio.plop();
           this.addXp(1);
+          this.save.stats.totalFed++;
+          this.questEvent('feed', 1);
           for (let k = 0; k < 3; k++) {
             this.particles.push({
               x: f.x + (Math.random() - 0.5) * 20, y: f.y - 14,
@@ -283,6 +482,7 @@ export class Game {
   private addToCollection(sp: Species): void {
     if (this.save.collection.includes(sp.id)) return;
     this.save.collection.push(sp.id);
+    this.questEvent('collect', 1);
     this.ui.toast(`📖 Koleksiyona eklendi: ${sp.name}`);
     const all = SPECIES.filter((s) => s.rarity === sp.rarity);
     if (all.every((s) => this.save.collection.includes(s.id))) {
@@ -292,7 +492,7 @@ export class Game {
     }
   }
 
-  // ---------- offline / günlük ----------
+  // ---------- offline / günlük / seri ----------
 
   private applyOffline(): void {
     const elapsed = Math.min(OFFLINE_CAP_MS, Date.now() - this.save.lastSeen);
@@ -315,16 +515,80 @@ export class Game {
   private applyDailyGift(): void {
     const today = new Date().toISOString().slice(0, 10);
     if (this.save.lastDaily === '') {
-      // İlk açılış: hediye modalı gösterme, sadece günü işaretle
       this.save.lastDaily = today;
+      this.save.streak = 1;
       return;
     }
     if (this.save.lastDaily !== today) {
+      const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+      this.save.streak = this.save.lastDaily === yesterday ? this.save.streak + 1 : 1;
       this.save.lastDaily = today;
-      this.save.coins += 200;
-      this.save.pearls += 1;
+      const giftCoins = 200 + 50 * Math.min(7, this.save.streak);
+      const giftPearls = this.save.streak % 7 === 0 ? 3 : 1;
+      this.save.coins += giftCoins;
+      this.save.pearls += giftPearls;
       this.offline.dailyGift = true;
+      this.offline.giftCoins = giftCoins;
+      this.offline.giftPearls = giftPearls;
     }
+  }
+
+  // ---------- görevler ----------
+
+  ensureQuestDay(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    if (this.save.quests.day !== today) {
+      this.save.quests = { day: today, progress: {}, claimed: [] };
+    }
+  }
+
+  dailyQuests(): QuestDef[] {
+    this.ensureQuestDay();
+    return questsForDay(this.save.quests.day);
+  }
+
+  questEvent(ev: QuestEvent, n: number): void {
+    this.ensureQuestDay();
+    for (const q of this.dailyQuests()) {
+      if (q.event !== ev || this.save.quests.claimed.includes(q.id)) continue;
+      const cur = this.save.quests.progress[q.id] ?? 0;
+      if (cur >= q.target) continue;
+      const next = Math.min(q.target, cur + n);
+      this.save.quests.progress[q.id] = next;
+      if (next >= q.target) {
+        audio.quest();
+        this.ui.toast(`✅ Görev tamamlandı: ${q.name} — ödülünü Görevler'den al!`);
+      }
+    }
+  }
+
+  claimQuest(q: QuestDef): { ok: boolean; msg: string } {
+    this.ensureQuestDay();
+    const cur = this.save.quests.progress[q.id] ?? 0;
+    if (cur < q.target) return { ok: false, msg: 'Görev henüz tamamlanmadı.' };
+    if (this.save.quests.claimed.includes(q.id)) return { ok: false, msg: 'Ödül zaten alındı.' };
+    this.save.quests.claimed.push(q.id);
+    const coins = Math.round(q.rewardCoins * (1 + this.save.level * 0.1));
+    this.save.coins += coins;
+    this.save.pearls += q.rewardPearls;
+    audio.coin();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `+${coins} altın${q.rewardPearls ? `, +${q.rewardPearls} inci` : ''}` };
+  }
+
+  claimAchievement(id: string): { ok: boolean; msg: string } {
+    const a = ACHIEVEMENTS.find((x) => x.id === id);
+    if (!a) return { ok: false, msg: 'Bilinmeyen başarım' };
+    if (this.save.achievementsClaimed.includes(id)) return { ok: false, msg: 'Ödül zaten alındı.' };
+    if (a.check(this.save) < a.target) return { ok: false, msg: 'Başarım henüz tamamlanmadı.' };
+    this.save.achievementsClaimed.push(id);
+    this.save.coins += a.rewardCoins;
+    this.save.pearls += a.rewardPearls;
+    audio.levelup();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${a.name}: +${a.rewardCoins} altın, +${a.rewardPearls} inci` };
   }
 
   // ---------- oyuncu eylemleri ----------
@@ -357,7 +621,7 @@ export class Game {
 
   buyFish(spId: string): { ok: boolean; msg: string } {
     const sp = speciesById(spId);
-    if (this.fishes.length >= this.capacity) return { ok: false, msg: `Akvaryum dolu (${this.capacity} balık)` };
+    if (this.fishes.length >= this.capacity) return { ok: false, msg: `Bu akvaryum dolu (${this.capacity} balık)` };
     if (sp.pearlPrice) {
       if (this.save.pearls < sp.pearlPrice) return { ok: false, msg: 'Yeterli inci yok' };
       this.save.pearls -= sp.pearlPrice;
@@ -368,6 +632,7 @@ export class Game {
     }
     const f = this.spawnFish(this.newFishSave(sp));
     audio.coin();
+    this.questEvent('buyFish', 1);
     this.syncSave();
     this.ui.refreshHUD();
     return { ok: true, msg: `${f.name} akvaryuma katıldı! 🐟` };
@@ -380,6 +645,7 @@ export class Game {
       hunger: 0.95,
       name: FISH_NAMES[Math.floor(Math.random() * FISH_NAMES.length)],
       seed: Math.floor(Math.random() * 1e9),
+      tank: this.save.activeTank,
     };
   }
 
@@ -389,6 +655,10 @@ export class Game {
     this.save.coins += gain;
     if (f.sp.rarity === 'legendary') this.save.pearls += 2;
     this.addXp(Math.round(f.sp.sellPrice * 0.35));
+    this.save.stats.totalSold++;
+    this.save.stats.totalEarned += gain;
+    this.questEvent('sell', 1);
+    this.questEvent('earn', gain);
     const idx = this.fishes.indexOf(f);
     if (idx >= 0) this.fishes.splice(idx, 1);
     f.root.destroy({ children: true });
@@ -405,7 +675,7 @@ export class Game {
   }
 
   hatchEgg(tier: EggTier): { ok: boolean; msg: string; species?: Species } {
-    if (this.fishes.length >= this.capacity) return { ok: false, msg: `Akvaryum dolu (${this.capacity} balık)` };
+    if (this.fishes.length >= this.capacity) return { ok: false, msg: `Bu akvaryum dolu (${this.capacity} balık)` };
     if (tier.currency === 'coins') {
       if (this.save.coins < tier.cost) return { ok: false, msg: 'Yeterli altın yok' };
       this.save.coins -= tier.cost;
@@ -413,22 +683,133 @@ export class Game {
       if (this.save.pearls < tier.cost) return { ok: false, msg: 'Yeterli inci yok' };
       this.save.pearls -= tier.cost;
     }
-    const roll = Math.random() * 100;
-    let acc = 0;
+
     let rarity: Rarity = 'common';
-    for (const [r, pct] of Object.entries(tier.odds) as [Rarity, number][]) {
-      acc += pct;
-      if (roll < acc) { rarity = r; break; }
-      rarity = r;
+    if (tier.id === 'altin' && this.save.pityCounter >= PITY_LIMIT - 1) {
+      rarity = 'legendary'; // garanti
+    } else {
+      const roll = Math.random() * 100;
+      let acc = 0;
+      for (const [r, pct] of Object.entries(tier.odds) as [Rarity, number][]) {
+        acc += pct;
+        if (roll < acc) { rarity = r; break; }
+        rarity = r;
+      }
     }
+    if (tier.id === 'altin') {
+      this.save.pityCounter = rarity === 'legendary' ? 0 : this.save.pityCounter + 1;
+    }
+
     const pool = SPECIES.filter((s) => s.rarity === rarity);
     const sp = pool[Math.floor(Math.random() * pool.length)];
     this.spawnFish(this.newFishSave(sp));
+    this.save.stats.eggsHatched++;
+    this.questEvent('hatch', 1);
     audio.hatch(sp.rarity);
     this.syncSave();
     this.ui.refreshHUD();
     return { ok: true, msg: '', species: sp };
   }
+
+  // ---------- dekor ----------
+
+  buyDecor(defId: string): { ok: boolean; msg: string } {
+    const d = decorById(defId);
+    if (d.currency === 'coins') {
+      if (this.save.coins < d.price) return { ok: false, msg: 'Yeterli altın yok' };
+      this.save.coins -= d.price;
+    } else {
+      if (this.save.pearls < d.price) return { ok: false, msg: 'Yeterli inci yok' };
+      this.save.pearls -= d.price;
+    }
+    this.save.decorOwned[defId] = (this.save.decorOwned[defId] ?? 0) + 1;
+    audio.coin();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${d.name} envanterine eklendi! 🎒 Envanterden yerleştir.` };
+  }
+
+  placeDecor(defId: string): { ok: boolean; msg: string } {
+    const owned = this.save.decorOwned[defId] ?? 0;
+    if (owned <= 0) return { ok: false, msg: 'Envanterinde bu dekordan yok' };
+    const placed = this.save.decorPlaced[this.save.activeTank] ?? (this.save.decorPlaced[this.save.activeTank] = []);
+    if (placed.length >= MAX_PLACED) return { ok: false, msg: `Bu akvaryumda en fazla ${MAX_PLACED} dekor olabilir` };
+    // Diğerlerinden uzak bir yatay konum seç
+    let fx = 0.1 + Math.random() * 0.8;
+    for (let tries = 0; tries < 12; tries++) {
+      const cand = 0.08 + Math.random() * 0.84;
+      if (placed.every((p) => Math.abs(p.fx - cand) > 0.07)) { fx = cand; break; }
+    }
+    placed.push({ def: defId, fx });
+    this.save.decorOwned[defId] = owned - 1;
+    this.save.stats.decorPlacedCount++;
+    this.questEvent('placeDecor', 1);
+    audio.place();
+    this.syncSave();
+    this.ui.refreshHUD();
+    const d = decorById(defId);
+    return { ok: true, msg: `${d.name} yerleştirildi (+%${DECOR_BOOST[d.rarity]} büyüme)` };
+  }
+
+  removeDecor(index: number): { ok: boolean; msg: string } {
+    const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
+    const p = placed[index];
+    if (!p) return { ok: false, msg: 'Dekor bulunamadı' };
+    placed.splice(index, 1);
+    this.save.decorOwned[p.def] = (this.save.decorOwned[p.def] ?? 0) + 1;
+    audio.click();
+    this.syncSave();
+    return { ok: true, msg: `${decorById(p.def).name} envantere geri alındı` };
+  }
+
+  // ---------- akvaryumlar ----------
+
+  buyTank(tankId: string): { ok: boolean; msg: string } {
+    const t = tankById(tankId);
+    if (this.save.tanksOwned.includes(tankId)) return { ok: false, msg: 'Bu akvaryuma zaten sahipsin' };
+    if (this.save.level < t.unlockLevel) return { ok: false, msg: `Seviye ${t.unlockLevel} gerekli` };
+    if (t.currency === 'coins') {
+      if (this.save.coins < t.price) return { ok: false, msg: 'Yeterli altın yok' };
+      this.save.coins -= t.price;
+    } else {
+      if (this.save.pearls < t.price) return { ok: false, msg: 'Yeterli inci yok' };
+      this.save.pearls -= t.price;
+    }
+    this.save.tanksOwned.push(tankId);
+    this.save.decorPlaced[tankId] = this.save.decorPlaced[tankId] ?? [];
+    audio.levelup();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${t.name} artık senin! 🏝️ Envanterden geçiş yapabilirsin.` };
+  }
+
+  switchTank(tankId: string): { ok: boolean; msg: string } {
+    if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: 'Önce bu akvaryumu satın almalısın' };
+    if (tankId === this.save.activeTank) return { ok: false, msg: 'Zaten bu akvaryumdasın' };
+    // Aktif balıkları uyut, yenilerini uyandır
+    for (const f of this.fishes) {
+      this.dormant.push(f.toSave());
+      f.root.destroy({ children: true });
+    }
+    this.fishes = [];
+    this.save.activeTank = tankId;
+    const wake = this.dormant.filter((d) => d.tank === tankId);
+    this.dormant = this.dormant.filter((d) => d.tank !== tankId);
+    for (const fs of wake) this.spawnFish(fs);
+    this.pellets = [];
+    this.buildStatic();
+    audio.setBiome(this.activeTank.biome);
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${this.activeTank.name} 🌊` };
+  }
+
+  tankFishCount(tankId: string): number {
+    if (tankId === this.save.activeTank) return this.fishes.length;
+    return this.dormant.filter((d) => d.tank === tankId).length;
+  }
+
+  // ---------- ortak ----------
 
   private addXp(n: number): void {
     this.save.xp += n;
@@ -441,13 +822,14 @@ export class Game {
     }
   }
 
-  shopList(): Species[] {
+  shopFish(): Species[] {
     return SPECIES.filter((s) => s.buyPrice > 0 || s.pearlPrice);
   }
   eggList(): EggTier[] { return EGGS; }
+  tankList(): TankDef[] { return TANKS; }
 
   syncSave(): void {
-    this.save.fishes = this.fishes.map((f) => f.toSave());
+    this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
     persist(this.save);
   }
 

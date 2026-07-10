@@ -205,6 +205,115 @@ html, body {
 .buy-btn:active { transform: scale(0.96); }
 .buy-btn:disabled { background: #b8c7cf; box-shadow: none; cursor: default; transform: none; }
 
+/* Sekmeler */
+.tabs {
+  display: flex; gap: 4px; padding: 0 16px 4px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  border: none; cursor: pointer; white-space: nowrap;
+  background: #e2ebef; color: var(--ink-soft);
+  font-weight: 700; font-size: 12.5px;
+  padding: 8px 14px; border-radius: 999px;
+  transition: background 0.15s ease;
+}
+.tab.active { background: linear-gradient(180deg, #57c9a6, #2f9e8f); color: #fff; }
+
+/* HUD akvaryum çipi */
+.hud-tank { cursor: pointer; font-size: 13.5px; }
+.hud-tank .boost { color: #2f9e8f; }
+
+/* Envanter */
+.inv-head { font-size: 14px; color: var(--ink); margin: 14px 0 8px; }
+.inv-row {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border-radius: 12px;
+  padding: 8px 12px; margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+}
+.inv-art { line-height: 0; flex-shrink: 0; }
+.inv-name { flex: 1; font-size: 13.5px; font-weight: 600; }
+.empty { font-size: 13px; color: #8ba4b0; padding: 8px 2px; }
+.tank-swatch {
+  width: 100%; height: 56px; border-radius: 10px;
+}
+.tanks-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.card.active-tank { outline: 3px solid #2f9e8f; }
+.buy-btn.owned { background: #b8ccd4; box-shadow: none; }
+
+/* Liderlik */
+.lb { display: flex; flex-direction: column; gap: 6px; }
+.lb-row {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+  font-size: 14px;
+}
+.lb-row.me { outline: 2.5px solid #2f9e8f; background: #eafaf6; }
+.lb-rank { width: 38px; font-weight: 800; color: var(--ink-soft); }
+.lb-name { flex: 1; font-weight: 600; }
+.lb-score { font-weight: 700; color: var(--ink-soft); }
+.lb-code { font-size: 11px; color: #8ba4b0; margin-left: 6px; }
+.pending { font-size: 11.5px; color: #b0894a; }
+
+.friend-code-box {
+  display: flex; align-items: center; gap: 10px;
+  background: #eaf4f8; border-radius: 12px;
+  padding: 12px 14px; font-size: 14px; margin-bottom: 10px;
+}
+.friend-code-box b { font-size: 16px; letter-spacing: 1px; color: var(--ink); flex: 1; }
+.friend-add { display: flex; gap: 8px; margin-bottom: 6px; }
+.friend-add input {
+  flex: 1; border: 2px solid #d6e2e8; border-radius: 999px;
+  padding: 9px 16px; font-size: 14px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  outline: none; color: var(--ink); background: #fff;
+}
+.friend-add input:focus { border-color: #57c9a6; }
+
+/* Görevler */
+.quest-row {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border-radius: 12px;
+  padding: 10px 12px; margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+}
+.quest-row.claimed { opacity: 0.55; }
+.q-emoji { font-size: 24px; flex-shrink: 0; }
+.q-mid { flex: 1; min-width: 0; }
+.q-name { font-size: 13px; font-weight: 700; }
+.q-desc { font-weight: 500; color: var(--ink-soft); }
+.q-meta { font-size: 11px; color: #8ba4b0; margin-top: 3px; }
+.q-done { font-size: 20px; color: #2f9e8f; font-weight: 800; }
+.quest-row .bar { height: 8px; margin-top: 5px; }
+.pity { font-size: 11.5px; font-weight: 700; color: #b0894a; }
+
+/* Daha menüsü */
+.more-grid { display: flex; gap: 12px; justify-content: center; padding: 10px 0 16px; }
+.more-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: none; cursor: pointer;
+  background: #fff; border-radius: 16px;
+  font-size: 32px; padding: 18px 26px;
+  box-shadow: 0 3px 10px rgba(20, 60, 75, 0.1);
+  color: var(--ink-soft);
+  transition: transform 0.12s ease;
+}
+.more-btn span { font-size: 12px; font-weight: 700; }
+.more-btn:hover { transform: scale(1.05); }
+
+/* Ayarlar isim düzenleme */
+.name-edit { display: flex; gap: 6px; }
+.name-edit input {
+  width: 130px; border: 2px solid #d6e2e8; border-radius: 999px;
+  padding: 7px 12px; font-size: 13px; font-weight: 600;
+  outline: none; color: var(--ink); background: #fff;
+}
+.name-edit input:focus { border-color: #57c9a6; }
+.buy-btn.iap { background: linear-gradient(180deg, #7fb2f0, #4a7fd6); box-shadow: 0 4px 12px rgba(74, 127, 214, 0.4); }
+
 /* Yumurtalar */
 .egg-emoji { font-size: 52px; animation: bob 2.6s ease-in-out infinite; }
 .odds { width: 100%; font-size: 12px; color: var(--ink-soft); }

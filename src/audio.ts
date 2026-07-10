@@ -1,5 +1,31 @@
 // Tüm sesler WebAudio ile sentezlenir — harici dosya/lisans yok.
 import type { Rarity } from './species';
+import type { Biome } from './tanks';
+
+// Her biyomun kendi akor atmosferi var
+const BIOME_CHORDS: Record<Biome, number[][]> = {
+  tropik: [
+    [261.6, 329.6, 392.0], [220.0, 277.2, 329.6], [246.9, 311.1, 370.0], [196.0, 246.9, 293.7],
+  ],
+  lagun: [
+    [293.7, 370.0, 440.0], [261.6, 329.6, 392.0], [220.0, 293.7, 370.0], [246.9, 293.7, 392.0],
+  ],
+  derin: [
+    [130.8, 155.6, 196.0], [110.0, 130.8, 164.8], [123.5, 146.8, 185.0], [98.0, 123.5, 146.8],
+  ],
+  magara: [
+    [146.8, 174.6, 220.0], [130.8, 164.8, 196.0], [110.0, 146.8, 174.6], [123.5, 155.6, 185.0],
+  ],
+  kutup: [
+    [329.6, 415.3, 493.9], [293.7, 370.0, 440.0], [349.2, 440.0, 523.3], [311.1, 392.0, 466.2],
+  ],
+  gunbatimi: [
+    [233.1, 293.7, 349.2, 415.3], [207.7, 261.6, 311.1, 370.0], [196.0, 246.9, 293.7, 349.2], [220.0, 277.2, 329.6, 392.0],
+  ],
+  mistik: [
+    [261.6, 329.6, 370.0, 493.9], [293.7, 370.0, 415.3], [246.9, 311.1, 370.0, 466.2], [220.0, 277.2, 329.6, 415.3],
+  ],
+};
 
 class AudioMan {
   private ctx: AudioContext | null = null;
@@ -7,6 +33,7 @@ class AudioMan {
   private musicGain!: GainNode;
   private ambientOn = false;
   private chordTimer: number | null = null;
+  private biome: Biome = 'tropik';
   music = true;
   sfx = true;
 
@@ -72,6 +99,21 @@ class AudioMan {
     }
   }
   error(): void { this.ensure(); this.tone(220, 0.15, 'sawtooth', 0.06); }
+  place(): void { this.ensure(); this.tone(180, 0.14, 'sine', 0.16, 0, 90); this.tone(420, 0.08, 'triangle', 0.07, 0.05); }
+  quest(): void {
+    this.ensure();
+    [659, 830, 988].forEach((f, i) => this.tone(f, 0.15, 'triangle', 0.12, i * 0.08));
+  }
+
+  /** Aktif akvaryum biyomuna göre müzik atmosferini değiştirir. */
+  setBiome(b: Biome): void {
+    if (this.biome === b) return;
+    this.biome = b;
+    if (this.ambientOn) {
+      this.stopAmbient();
+      this.startAmbient();
+    }
+  }
 
   startAmbient(): void {
     if (!this.music || this.ambientOn) return;
@@ -94,13 +136,8 @@ class AudioMan {
     noise.connect(lp); lp.connect(ng); ng.connect(this.musicGain);
     noise.start();
 
-    // Lo-fi akor pedi
-    const chords = [
-      [261.6, 329.6, 392.0],
-      [220.0, 277.2, 329.6],
-      [246.9, 311.1, 370.0],
-      [196.0, 246.9, 293.7],
-    ];
+    // Lo-fi akor pedi — biyoma göre değişir
+    const chords = BIOME_CHORDS[this.biome];
     let ci = 0;
     const playChord = () => {
       if (!this.ctx || !this.ambientOn) return;

@@ -29,6 +29,7 @@ export class Fish {
   hunger: number;
   name: string;
   seed: number;
+  tank: string;
 
   x: number; y: number;
   private tx = 0; private ty = 0;
@@ -44,6 +45,7 @@ export class Fish {
     this.hunger = fs.hunger;
     this.name = fs.name;
     this.seed = fs.seed;
+    this.tank = fs.tank;
     this.wasAdult = fs.progress >= 1;
 
     const rnd = mulberry32(fs.seed);
@@ -65,7 +67,7 @@ export class Fish {
   get scaleFactor(): number { return 0.4 + 0.6 * Math.min(1, this.progress); }
 
   toSave(): FishSave {
-    return { sp: this.sp.id, progress: this.progress, hunger: this.hunger, name: this.name, seed: this.seed };
+    return { sp: this.sp.id, progress: this.progress, hunger: this.hunger, name: this.name, seed: this.seed, tank: this.tank };
   }
 
   private buildSprite(): void {
@@ -180,13 +182,13 @@ export class Fish {
     this.wanderTimer = 3 + Math.random() * 4;
   }
 
-  /** dt: saniye. target: yem hedefi (varsa). Dönüş: bu karede yetişkin oldu mu. */
-  update(dt: number, time: number, bounds: Bounds, target: { x: number; y: number } | null): boolean {
+  /** dt: saniye. target: yem hedefi (varsa). growthMult: akvaryum+dekor bonusu. Dönüş: bu karede yetişkin oldu mu. */
+  update(dt: number, time: number, bounds: Bounds, target: { x: number; y: number } | null, growthMult = 1): boolean {
     this.hunger = Math.max(0, this.hunger - dt * HUNGER_RATE);
 
     let justGrown = false;
     if (!this.isSad && this.progress < 1) {
-      this.progress += (dt * 1000) / this.sp.growthMs;
+      this.progress += (dt * 1000 * growthMult) / this.sp.growthMs;
       if (this.progress >= 1 && !this.wasAdult) {
         this.progress = 1;
         this.wasAdult = true;
