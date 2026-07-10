@@ -2,7 +2,7 @@ import { BlurFilter, Container, Graphics } from 'pixi.js';
 import { RARITY_INFO, Species } from './species';
 import type { FishSave } from './save';
 
-const HUNGER_RATE = 1 / (90 * 60); // saniyede — 90 dk'da tok -> aç
+export const HUNGER_RATE = 1 / (90 * 60); // saniyede — 90 dk'da tok -> aç
 export const SAD_THRESHOLD = 0.25;
 
 function mulberry32(seed: number): () => number {

@@ -1,7 +1,7 @@
 import { Application, Container, FillGradient, Graphics } from 'pixi.js';
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
-import { Bounds, Fish } from './fish';
+import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD } from './fish';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay } from './quests';
 import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
 import { Services, createServices } from './services';
@@ -17,7 +17,7 @@ interface Particle { x: number; y: number; vy: number; life: number; color: numb
 
 const OFFLINE_CAP_MS = 8 * 3600_000;
 const OFFLINE_SPEED = 0.5;
-const HUNGER_RATE_MS = 1 / (90 * 60_000);
+const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsinden
 
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
@@ -887,7 +887,7 @@ export class Game {
       this.offline.income = Math.floor(this.save.incomePot - before);
     }
     for (const fs of this.save.fishes) {
-      const tillSad = Math.max(0, (fs.hunger - 0.25) / HUNGER_RATE_MS);
+      const tillSad = Math.max(0, (fs.hunger - SAD_THRESHOLD) / HUNGER_RATE_MS);
       const growMs = Math.min(elapsed, tillSad);
       const before = fs.progress;
       if (fs.progress < 1) {
