@@ -154,9 +154,11 @@ html, body {
   backdrop-filter: blur(10px);
   border-radius: var(--radius) var(--radius) 0 0;
   display: flex; flex-direction: column;
+  overflow: hidden;
   animation: slide-up 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.05);
   box-shadow: 0 -12px 40px rgba(12, 40, 52, 0.35);
 }
+.panel-head, .tabs { flex-shrink: 0; }
 @keyframes slide-up { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
 .panel-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -168,7 +170,7 @@ html, body {
   width: 32px; height: 32px; border-radius: 50%;
   font-size: 14px; cursor: pointer;
 }
-.panel-body { padding: 10px 20px 24px; overflow-y: auto; }
+.panel-body { padding: 10px 20px 24px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
 
 .grid {
   display: grid;
@@ -228,20 +230,23 @@ html, body {
   50% { box-shadow: 0 6px 26px rgba(240, 168, 46, 0.85), inset 0 2px 0 rgba(255,255,255,0.4); }
 }
 
-/* Sekmeler */
+/* Sekmeler — her zaman tamamı görünür, gerekirse alt satıra sarar */
 .tabs {
-  display: flex; gap: 4px; padding: 0 16px 4px;
-  overflow-x: auto; scrollbar-width: none;
+  display: flex; gap: 4px; padding: 0 14px 6px;
+  flex-wrap: wrap;
 }
-.tabs::-webkit-scrollbar { display: none; }
 .tab {
   border: none; cursor: pointer; white-space: nowrap;
   background: #e2ebef; color: var(--ink-soft);
-  font-weight: 700; font-size: 12.5px;
-  padding: 8px 14px; border-radius: 999px;
+  font-weight: 700; font-size: 12px;
+  padding: 7px 11px; border-radius: 999px;
   transition: background 0.15s ease;
+  flex: 1 1 auto; text-align: center;
 }
 .tab.active { background: linear-gradient(180deg, #57c9a6, #2f9e8f); color: #fff; }
+@media (max-width: 420px) {
+  .tab { font-size: 11px; padding: 6px 8px; }
+}
 
 /* HUD akvaryum çipi */
 .hud-tank { cursor: pointer; font-size: 13.5px; }
@@ -437,4 +442,6 @@ hr { border: none; border-top: 1px solid #dfe9ee; margin: 6px 0; }
   #menu h1 { font-size: 42px; }
   #bottombar button { padding: 5px 9px; font-size: 21px; }
   .grid { grid-template-columns: repeat(2, 1fr); }
+  #collect-btn { top: 104px; } /* HUD dar ekranda iki satıra sarınca çakışmasın */
+  #toasts { top: 156px; }
 }
