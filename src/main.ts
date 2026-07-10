@@ -2,8 +2,11 @@ import './style.css';
 import { audio } from './audio';
 import { Game } from './game';
 import { UI } from './ui';
+import { APP_VERSION } from './version';
 
 const menu = document.getElementById('menu')!;
+const foot = document.querySelector('.menu-foot');
+if (foot) foot.textContent = `v${APP_VERSION} • reefy.games`;
 const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
 let started = false;
 

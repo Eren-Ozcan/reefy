@@ -1,4 +1,5 @@
 import { audio } from './audio';
+import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
 import type { Game } from './game';
@@ -720,7 +721,7 @@ export class UI {
       </div>
       <hr/>
       <div class="set-row"><span>🗑️ Tüm ilerlemeyi sil</span><button class="tgl danger" data-t="reset">Sıfırla</button></div>
-      <p class="version">Reefy v0.2.0 — sevgiyle yapıldı 🐠</p>
+      <p class="version">Reefy v${APP_VERSION} — sevgiyle yapıldı 🐠</p>
     `);
     el.querySelector('#name-save')!.addEventListener('click', () => {
       const input = el.querySelector<HTMLInputElement>('#name-input')!;
