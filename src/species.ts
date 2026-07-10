@@ -313,6 +313,15 @@ export const EGGS: EggTier[] = [
 
 export const PITY_LIMIT = 8; // Altın yumurtada efsanevi garanti sayacı
 
+/** Yetişkin balığın saatlik pasif altın üretimi (nadirliğe göre). */
+export const RARITY_INCOME: Record<Rarity, number> = {
+  common: 25,
+  uncommon: 60,
+  rare: 150,
+  epic: 400,
+  legendary: 1000,
+};
+
 export const FISH_NAMES = [
   'Baloncuk', 'Mercan', 'Şanslı', 'Fıstık', 'Zeytin', 'Bulut', 'Damla',
   'Yakut', 'Sedef', 'Limon', 'Karamel', 'Pati', 'Fındık', 'Yıldız',

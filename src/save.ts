@@ -44,6 +44,7 @@ export interface SaveData {
   };
   pityCounter: number;   // altın yumurta efsanevi garanti sayacı
   streak: number;        // ardışık gün serisi
+  incomePot: number;     // biriken, henüz toplanmamış pasif gelir
   music: boolean;
   sfx: boolean;
   lastSeen: number;
@@ -85,6 +86,7 @@ export function defaultSave(): SaveData {
     stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0 },
     pityCounter: 0,
     streak: 0,
+    incomePot: 0,
     music: true,
     sfx: true,
     lastSeen: Date.now(),

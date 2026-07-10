@@ -3,7 +3,7 @@ import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
 import type { Game } from './game';
 import { ACHIEVEMENTS } from './quests';
-import { EggTier, PITY_LIMIT, RARITY_INFO, Rarity, SPECIES, Species } from './species';
+import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species } from './species';
 import { BIOME_INFO, TankDef } from './tanks';
 
 function hex(c: number): string {
@@ -188,6 +188,7 @@ export class UI {
         <button data-act="social">🏆<span>Sosyal</span></button>
         <button data-act="more">☰<span>Daha</span></button>
       </div>
+      <button id="collect-btn" class="hidden">🪙 <b id="collect-amount">0</b><span id="collect-rate"></span></button>
       <div id="panel-host"></div>
       <div id="toasts"></div>
     `;
@@ -215,6 +216,10 @@ export class UI {
       audio.click();
       this.renderInventory('tanks');
     });
+    root.querySelector('#collect-btn')!.addEventListener('click', () => {
+      const res = this.game.collectIncome();
+      this.toast(res.msg);
+    });
 
     this.refreshHUD();
     this.showWelcome();
@@ -231,6 +236,19 @@ export class UI {
     const t = this.game.activeTank;
     const boost = Math.round((this.game.growthMult - 1) * 100);
     this.hudTank.innerHTML = `${BIOME_INFO[t.biome].emoji} ${t.name}${boost > 0 ? ` <b class="boost">+%${boost}</b>` : ''}`;
+  }
+
+  /** Pasif gelir butonunu günceller (oyun döngüsünden ~saniyede 2 kez çağrılır). */
+  updateIncome(pot: number, ratePerHour: number): void {
+    const btn = this.root.querySelector<HTMLElement>('#collect-btn');
+    if (!btn) return;
+    if (pot < 1) {
+      btn.classList.add('hidden');
+      return;
+    }
+    btn.classList.remove('hidden');
+    this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
+    this.root.querySelector('#collect-rate')!.textContent = ratePerHour > 0 ? `${fmt(ratePerHour)}/sa` : '';
   }
 
   toast(msg: string): void {
@@ -770,6 +788,7 @@ export class UI {
           <div class="bar"><div id="fi-grow" style="width:${Math.min(100, f.progress * 100)}%"></div></div></div>
         <div class="bar-row"><span>Tokluk ${f.isSad ? '😢 aç!' : ''}</span>
           <div class="bar"><div id="fi-hunger" class="hunger" style="width:${f.hunger * 100}%"></div></div></div>
+        <div class="card-meta">Üretim: 🪙 ${RARITY_INCOME[f.sp.rarity]}/saat ${f.isAdult ? '(aktif)' : '(yetişkin olunca)'}</div>
         ${f.isAdult
           ? `<button class="buy-btn sell">🪙 ${fmt(gain)} karşılığında sat</button>`
           : `<p class="growing">Büyüyor… satmak için yetişkin olmasını bekle 🌱</p>`}
@@ -798,6 +817,7 @@ export class UI {
     if (o.minutes >= 3) {
       parts.push(`Sen yokken <b>${o.minutes} dakika</b> geçti — balıkların büyümeye devam etti.`);
       if (o.grown > 0) parts.push(`🎉 <b>${o.grown} balık</b> yetişkin oldu, satılmaya hazır!`);
+      if (o.income > 0) parts.push(`🪙 Balıkların senin için <b>${fmt(o.income)} altın</b> üretti — toplamayı unutma!`);
     }
     if (o.dailyGift) {
       parts.push(`🎁 Günlük hediyen: <b>+${o.giftCoins} altın, +${o.giftPearls} inci</b>`);

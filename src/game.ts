@@ -6,7 +6,7 @@ import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay } from './quests';
 import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
 import { Services, createServices } from './services';
 import {
-  EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
+  EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
 } from './species';
 import { TANKS, TankDef, tankById } from './tanks';
 import type { UI } from './ui';
@@ -18,7 +18,9 @@ const OFFLINE_CAP_MS = 8 * 3600_000;
 const OFFLINE_SPEED = 0.5;
 const HUNGER_RATE_MS = 1 / (90 * 60_000);
 
-export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number }
+export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
+
+export const INCOME_CAP_HOURS = 4; // biriken gelir en fazla bu kadar saatlik üretim olabilir
 
 export class Game {
   app = new Application();
@@ -44,7 +46,7 @@ export class Game {
   private particles: Particle[] = [];
   private bubbles: { x: number; y: number; r: number; vy: number; phase: number }[] = [];
   private time = 0;
-  offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0 };
+  offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0, income: 0 };
 
   constructor() {
     this.save = loadSave();
@@ -68,6 +70,29 @@ export class Game {
   }
 
   xpNeed(level: number): number { return Math.round(120 * Math.pow(level, 1.35)); }
+
+  /** Tüm akvaryumlardaki yetişkin balıkların toplam saatlik üretimi. */
+  get incomePerHour(): number {
+    let rate = 0;
+    for (const f of this.fishes) if (f.isAdult) rate += RARITY_INCOME[f.sp.rarity];
+    for (const d of this.dormant) if (d.progress >= 1) rate += RARITY_INCOME[speciesById(d.sp).rarity];
+    return rate;
+  }
+
+  /** Biriken geliri kasaya aktarır. */
+  collectIncome(): { ok: boolean; msg: string } {
+    const amount = Math.floor(this.save.incomePot);
+    if (amount < 1) return { ok: false, msg: 'Henüz birikmiş gelir yok' };
+    this.save.incomePot -= amount;
+    this.save.coins += amount;
+    this.save.stats.totalEarned += amount;
+    this.questEvent('earn', amount);
+    this.addXp(Math.max(1, Math.round(amount * 0.05)));
+    audio.coin();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `+${amount} altın toplandı! 🪙` };
+  }
 
   completedSets(): Rarity[] {
     const out: Rarity[] = [];
@@ -387,9 +412,22 @@ export class Game {
 
   // ---------- döngü ----------
 
+  private incomeUiTimer = 0;
+
   private update(dt: number): void {
     this.time += dt;
     const { w, h } = this.bounds;
+
+    // Pasif gelir birikimi (yetişkin balıklar, tavan: INCOME_CAP_HOURS saatlik üretim)
+    const rate = this.incomePerHour;
+    if (rate > 0) {
+      this.save.incomePot = Math.min(rate * INCOME_CAP_HOURS, this.save.incomePot + (rate / 3600) * dt);
+    }
+    this.incomeUiTimer += dt;
+    if (this.incomeUiTimer > 0.5) {
+      this.incomeUiTimer = 0;
+      this.ui.updateIncome(Math.floor(this.save.incomePot), rate);
+    }
 
     for (let i = 0; i < this.rays.length; i++) {
       this.rays[i].alpha = 0.7 + 0.3 * Math.sin(this.time * 0.5 + i * 1.7);
@@ -498,6 +536,17 @@ export class Game {
     const elapsed = Math.min(OFFLINE_CAP_MS, Date.now() - this.save.lastSeen);
     if (elapsed < 60_000) return;
     let grown = 0;
+    // Offline pasif gelir: yetişkinler yarım hızda üretir
+    let rate = 0;
+    for (const fs of this.save.fishes) {
+      if (fs.progress >= 1) rate += RARITY_INCOME[speciesById(fs.sp).rarity];
+    }
+    if (rate > 0) {
+      const gained = (rate / 3600_000) * elapsed * OFFLINE_SPEED;
+      const before = this.save.incomePot;
+      this.save.incomePot = Math.min(rate * INCOME_CAP_HOURS, this.save.incomePot + gained);
+      this.offline.income = Math.floor(this.save.incomePot - before);
+    }
     for (const fs of this.save.fishes) {
       const tillSad = Math.max(0, (fs.hunger - 0.25) / HUNGER_RATE_MS);
       const growMs = Math.min(elapsed, tillSad);
