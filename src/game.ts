@@ -874,7 +874,7 @@ export class Game {
       const growMs = Math.min(elapsed, tillSad);
       const before = fs.progress;
       if (fs.progress < 1) {
-        fs.progress = Math.min(1, fs.progress + (growMs * OFFLINE_SPEED) / speciesById(fs.sp).growthMs);
+        fs.progress = Math.min(1, fs.progress + (growMs * OFFLINE_SPEED * mult(fs.tank)) / speciesById(fs.sp).growthMs);
         if (before < 1 && fs.progress >= 1) grown++;
       }
       fs.hunger = Math.max(0.05, fs.hunger - elapsed * HUNGER_RATE_MS);
