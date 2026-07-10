@@ -157,6 +157,23 @@ export class Game {
       if (!known.has(id)) delete this.save.decorOwned[id];
     }
 
+    // Kayıttaki bilinmeyen akvaryum/tür kimliklerini ayıkla (katalog değişirse çökmeyi önler)
+    const knownTanks = new Set(TANKS.map((t) => t.id));
+    this.save.tanksOwned = this.save.tanksOwned.filter((id) => knownTanks.has(id));
+    if (!this.save.tanksOwned.length) this.save.tanksOwned = [TANKS[0].id];
+    if (!this.save.tanksOwned.includes(this.save.activeTank)) this.save.activeTank = this.save.tanksOwned[0];
+    if (!this.save.decorPlaced[this.save.activeTank]) this.save.decorPlaced[this.save.activeTank] = [];
+    for (const t of Object.keys(this.save.decorPlaced)) {
+      if (!knownTanks.has(t)) delete this.save.decorPlaced[t];
+    }
+
+    const knownSpecies = new Set(SPECIES.map((s) => s.id));
+    this.save.fishes = this.save.fishes.filter((f) => knownSpecies.has(f.sp));
+    for (const f of this.save.fishes) {
+      if (!this.save.tanksOwned.includes(f.tank)) f.tank = this.save.activeTank;
+    }
+    this.save.collection = this.save.collection.filter((id) => knownSpecies.has(id));
+
     this.applyOffline();
     this.applyDailyGift();
     this.ensureQuestDay();
