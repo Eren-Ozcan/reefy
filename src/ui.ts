@@ -868,6 +868,24 @@ export class UI {
         </div>`;
     }).join('');
 
+    const wq = this.game.weeklyQuest();
+    const wCur = Math.min(wq.target, s.weeklyQuest.progress[wq.id] ?? 0);
+    const wClaimed = s.weeklyQuest.claimed.includes(wq.id);
+    const wDone = wCur >= wq.target;
+    const wCoins = Math.round(wq.rewardCoins * (1 + s.level * 0.1));
+    const weeklyHTML = `
+        <div class="quest-row weekly ${wClaimed ? 'claimed' : ''}">
+          <span class="q-emoji">${wq.emoji}</span>
+          <div class="q-mid">
+            <div class="q-name">${wq.name}</div>
+            <div class="bar"><div style="width:${(100 * wCur) / wq.target}%"></div></div>
+            <div class="q-meta">${wCur}/${wq.target} • 🪙 ${wCoins}${wq.rewardPearls ? ` + 🦪 ${wq.rewardPearls}` : ''}</div>
+          </div>
+          ${wClaimed ? '<span class="q-done">✓</span>'
+            : wDone ? '<button class="buy-btn" id="weekly-claim">Al</button>'
+            : ''}
+        </div>`;
+
     const achHTML = ACHIEVEMENTS.map((a) => {
       const cur = Math.min(a.target, a.check(s));
       const claimed = s.achievementsClaimed.includes(a.id);
@@ -889,6 +907,8 @@ export class UI {
     const el = this.panelShell('📋 Görevler', `
       <h3 class="inv-head">Günlük görevler 🔥 Seri: ${s.streak} gün</h3>
       ${dailyHTML}
+      <h3 class="inv-head">Haftalık görev</h3>
+      ${weeklyHTML}
       <h3 class="inv-head">Başarımlar</h3>
       ${achHTML}`);
     el.querySelectorAll<HTMLButtonElement>('[data-claim]').forEach((btn) => {
@@ -898,6 +918,11 @@ export class UI {
         this.toast(res.msg);
         if (res.ok) this.renderQuests();
       });
+    });
+    el.querySelector('#weekly-claim')?.addEventListener('click', () => {
+      const res = this.game.claimWeeklyQuest();
+      this.toast(res.msg);
+      if (res.ok) this.renderQuests();
     });
     el.querySelectorAll<HTMLButtonElement>('[data-ach]').forEach((btn) => {
       btn.addEventListener('click', () => {
