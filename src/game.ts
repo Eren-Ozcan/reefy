@@ -1557,6 +1557,41 @@ export class Game {
     }
   }
 
+  /** Günün ilk 10 arkadaş ziyareti daha yüksek, sonrakiler düşük ödül verir (FishVille'deki komşu ziyareti gibi). */
+  private static readonly VISIT_REWARD_HIGH_CAP = 10;
+  private static readonly VISIT_REWARD_HIGH_COINS = 30;
+  private static readonly VISIT_REWARD_HIGH_XP = 13;
+  private static readonly VISIT_REWARD_LOW_COINS = 6;
+  private static readonly VISIT_REWARD_LOW_XP = 2;
+
+  hasVisitedFriendToday(code: string): boolean {
+    const today = new Date().toISOString().slice(0, 10);
+    if (this.save.friendVisits.day !== today) return false;
+    return this.save.friendVisits.visited.includes(code);
+  }
+
+  visitFriend(code: string): { ok: boolean; msg: string } {
+    if (!this.save.friends.some((f) => f.code === code)) return { ok: false, msg: 'Arkadaş bulunamadı' };
+    const today = new Date().toISOString().slice(0, 10);
+    if (this.save.friendVisits.day !== today) {
+      this.save.friendVisits = { day: today, visited: [], count: 0 };
+    }
+    if (this.save.friendVisits.visited.includes(code)) {
+      return { ok: false, msg: 'Bu arkadaşı bugün zaten ziyaret ettin.' };
+    }
+    this.save.friendVisits.visited.push(code);
+    this.save.friendVisits.count++;
+    const high = this.save.friendVisits.count <= Game.VISIT_REWARD_HIGH_CAP;
+    const coins = high ? Game.VISIT_REWARD_HIGH_COINS : Game.VISIT_REWARD_LOW_COINS;
+    const xp = high ? Game.VISIT_REWARD_HIGH_XP : Game.VISIT_REWARD_LOW_XP;
+    this.save.coins += coins;
+    this.addXp(xp);
+    audio.coin();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `Akvaryumu ziyaret ettin: +${coins} altın, +${xp} XP 🤝` };
+  }
+
   shopFish(): Species[] {
     return SPECIES.filter((s) => s.buyPrice > 0 || s.pearlPrice);
   }
