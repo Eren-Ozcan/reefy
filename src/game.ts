@@ -1592,6 +1592,33 @@ export class Game {
     return { ok: true, msg: `Akvaryumu ziyaret ettin: +${coins} altın, +${xp} XP 🤝` };
   }
 
+  /** Günde bir kez herhangi bir balığı okşayabilirsin: küçük XP ve satış bonusu kazandırır. */
+  private static readonly PET_REWARD_XP = 5;
+  private static readonly PET_REWARD_BONUS = 0.05;
+
+  get canPetToday(): boolean {
+    const today = new Date().toISOString().slice(0, 10);
+    return this.save.petDay !== today;
+  }
+
+  petFish(f: Fish): { ok: boolean; msg: string } {
+    if (!this.canPetToday) return { ok: false, msg: 'Bugün zaten bir balığını okşadın. Yarın tekrar gel! 💕' };
+    this.save.petDay = new Date().toISOString().slice(0, 10);
+    f.hunger = Math.min(1, f.hunger + 0.15);
+    f.bonus = Math.min(FISH_BONUS_CAP, f.bonus + Game.PET_REWARD_BONUS);
+    this.addXp(Game.PET_REWARD_XP);
+    audio.plop();
+    for (let k = 0; k < 8; k++) {
+      this.particles.push({
+        x: f.x + (Math.random() - 0.5) * 26, y: f.y - 16,
+        vy: -24 - Math.random() * 16, life: 1, color: 0xff8fc0, r: 3,
+      });
+    }
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `${f.name} mutlu oldu! +${Game.PET_REWARD_XP} XP, satış değeri arttı 💕` };
+  }
+
   shopFish(): Species[] {
     return SPECIES.filter((s) => s.buyPrice > 0 || s.pearlPrice);
   }
