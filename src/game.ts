@@ -1001,11 +1001,13 @@ export class Game {
     if (this.save.lastDaily === '') {
       this.save.lastDaily = today;
       this.save.streak = 1;
+      this.save.bestStreak = Math.max(this.save.bestStreak, 1);
       return;
     }
     if (this.save.lastDaily !== today) {
       const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
       this.save.streak = this.save.lastDaily === yesterday ? this.save.streak + 1 : 1;
+      this.save.bestStreak = Math.max(this.save.bestStreak, this.save.streak);
       this.save.lastDaily = today;
       const giftCoins = 200 + 50 * Math.min(7, this.save.streak);
       const giftPearls = this.save.streak % 7 === 0 ? 3 : 1;
@@ -1468,7 +1470,11 @@ export class Game {
     }
     placed.push({ def: defId, fx });
     this.save.decorOwned[defId] = owned - 1;
-    this.save.stats.decorPlacedCount++;
+    // En yüksek eş zamanlı yerleştirilmiş dekor sayısını takip eder — basit bir sayaç olsaydı
+    // yerleştir/kaldır döngüsüyle bedavaya sonsuz artırılabilirdi (kaldırma dekoru ücretsiz
+    // envantere geri veriyor). Tavan, gerçekten sahip olunan dekorla sınırlı kalır.
+    const totalPlacedNow = this.save.tanksOwned.reduce((sum, t) => sum + (this.save.decorPlaced[t]?.length ?? 0), 0);
+    this.save.stats.decorPlacedCount = Math.max(this.save.stats.decorPlacedCount, totalPlacedNow);
     this.questEvent('placeDecor', 1);
     audio.place();
     this.syncSave();
