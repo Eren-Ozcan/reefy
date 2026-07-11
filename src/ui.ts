@@ -702,11 +702,14 @@ export class UI {
           </div>`).join('')}</div>`;
     } else {
       const friendRows = s.friends.length
-        ? s.friends.map((f) => `
+        ? s.friends.map((f) => {
+            const visited = this.game.hasVisitedFriendToday(f.code);
+            return `
             <div class="inv-row">
               <span class="inv-name">👤 ${f.name} <span class="lb-code">${f.code}</span></span>
-              <span class="pending">eşleşme bekliyor ⏳</span>
-            </div>`).join('')
+              <button class="tgl" data-visit="${f.code}" ${visited ? 'disabled' : ''}>${visited ? 'Ziyaret edildi ✓' : 'Ziyaret Et'}</button>
+            </div>`;
+          }).join('')
         : '<p class="empty">Henüz arkadaş eklemedin.</p>';
       body = `
         <div class="friend-code-box">
@@ -719,7 +722,7 @@ export class UI {
         </div>
         <h3 class="inv-head">Arkadaşların</h3>
         ${friendRows}
-        <p class="dex-info">Arkadaş kodları kaydedilir; çevrimiçi sürüm bağlandığında otomatik eşleşir ve birbirinizin akvaryumlarını ziyaret edebilirsiniz. 🤝</p>`;
+        <p class="dex-info">Her arkadaşı günde bir kez ziyaret ederek altın ve XP kazan. Çevrimiçi sürüm bağlandığında gerçek akvaryumlarını görebileceksin. 🤝</p>`;
     }
 
     const el = this.panelShell('🏆 Sosyal', body, tabs);
@@ -739,6 +742,14 @@ export class UI {
       if (!res.ok) audio.error(); else { audio.click(); this.game.syncSave(); }
       this.toast(res.msg);
       if (res.ok) this.renderSocial('friends');
+    });
+    el.querySelectorAll<HTMLButtonElement>('[data-visit]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const res = this.game.visitFriend(btn.dataset.visit!);
+        if (!res.ok) audio.error();
+        this.toast(res.msg);
+        if (res.ok) this.renderSocial('friends');
+      });
     });
   }
 

@@ -340,7 +340,6 @@ html, body {
 .lb-name { flex: 1; font-weight: 600; }
 .lb-score { font-weight: 700; color: var(--ink-soft); }
 .lb-code { font-size: 11px; color: #8ba4b0; margin-left: 6px; }
-.pending { font-size: 11.5px; color: #b0894a; }
 
 .friend-code-box {
   display: flex; align-items: center; gap: 10px;
