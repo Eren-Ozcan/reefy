@@ -2,7 +2,7 @@ import { Application, BlurFilter, Container, FillGradient, Graphics } from 'pixi
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
-import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay } from './quests';
+import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
 import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
 import { Services, createServices } from './services';
 import {
@@ -1031,6 +1031,18 @@ export class Game {
     return questsForDay(this.save.quests.day);
   }
 
+  ensureQuestWeek(): void {
+    const week = weekKeyFor(new Date());
+    if (this.save.weeklyQuest.day !== week) {
+      this.save.weeklyQuest = { day: week, progress: {}, claimed: [] };
+    }
+  }
+
+  weeklyQuest(): QuestDef {
+    this.ensureQuestWeek();
+    return weeklyQuestForWeek(this.save.weeklyQuest.day);
+  }
+
   questEvent(ev: QuestEvent, n: number): void {
     this.ensureQuestDay();
     for (const q of this.dailyQuests()) {
@@ -1042,6 +1054,20 @@ export class Game {
       if (next >= q.target) {
         audio.quest();
         this.ui.toast(`✅ Görev tamamlandı: ${q.name} — ödülünü Görevler'den al!`);
+      }
+    }
+
+    this.ensureQuestWeek();
+    const wq = this.weeklyQuest();
+    if (wq.event === ev && !this.save.weeklyQuest.claimed.includes(wq.id)) {
+      const cur = this.save.weeklyQuest.progress[wq.id] ?? 0;
+      if (cur < wq.target) {
+        const next = Math.min(wq.target, cur + n);
+        this.save.weeklyQuest.progress[wq.id] = next;
+        if (next >= wq.target) {
+          audio.quest();
+          this.ui.toast(`🏅 Haftalık görev tamamlandı: ${wq.name} — ödülünü Görevler'den al!`);
+        }
       }
     }
   }
@@ -1059,6 +1085,22 @@ export class Game {
     this.syncSave();
     this.ui.refreshHUD();
     return { ok: true, msg: `+${coins} altın${q.rewardPearls ? `, +${q.rewardPearls} inci` : ''}` };
+  }
+
+  claimWeeklyQuest(): { ok: boolean; msg: string } {
+    this.ensureQuestWeek();
+    const q = this.weeklyQuest();
+    const cur = this.save.weeklyQuest.progress[q.id] ?? 0;
+    if (cur < q.target) return { ok: false, msg: 'Haftalık görev henüz tamamlanmadı.' };
+    if (this.save.weeklyQuest.claimed.includes(q.id)) return { ok: false, msg: 'Ödül zaten alındı.' };
+    this.save.weeklyQuest.claimed.push(q.id);
+    const coins = Math.round(q.rewardCoins * (1 + this.save.level * 0.1));
+    this.save.coins += coins;
+    this.save.pearls += q.rewardPearls;
+    audio.levelup();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: `Haftalık ödül: +${coins} altın${q.rewardPearls ? `, +${q.rewardPearls} inci` : ''}` };
   }
 
   claimAchievement(id: string): { ok: boolean; msg: string } {
