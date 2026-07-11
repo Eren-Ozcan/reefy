@@ -58,7 +58,8 @@ export interface SaveData {
     totalCleaned: number;
   };
   pityCounter: number;   // altın yumurta efsanevi garanti sayacı
-  streak: number;        // ardışık gün serisi
+  streak: number;        // ardışık gün serisi (gün kaçırılırsa sıfırlanır)
+  bestStreak: number;    // şimdiye dek ulaşılan en yüksek seri — başarımlar bunu kullanır, sıfırlanmaz
   incomePot: number;     // biriken, henüz toplanmamış pasif gelir
   cleanRewardDay: string;   // günün ilk birkaç temizliği ödüllü — bu alan günü takip eder
   cleanRewardCount: number; // bugün ödüllü temizlenen leke sayısı
@@ -110,6 +111,7 @@ export function defaultSave(): SaveData {
     stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0, totalCleaned: 0 },
     pityCounter: 0,
     streak: 0,
+    bestStreak: 0,
     incomePot: 0,
     cleanRewardDay: '',
     cleanRewardCount: 0,
@@ -156,6 +158,12 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (merged.petDay === undefined) merged.petDay = '';
   if (!merged.friendGifts) merged.friendGifts = { day: '', gifted: [] };
   if (!merged.weeklyQuest) merged.weeklyQuest = { day: '', progress: {}, claimed: [] };
+  // Kaydedilmiş serbest metin alanları (localStorage doğrudan düzenlenebilir; UI'daki
+  // giriş temizliğine güvenmeyip burada da temizle — HTML injection'a karşı savunma).
+  const stripHtml = (v: string) => v.replace(/[<>&"']/g, '').trim();
+  merged.playerName = stripHtml(merged.playerName) || base.playerName;
+  merged.fishes = merged.fishes.map((f) => ({ ...f, name: stripHtml(f.name) || 'Balık' }));
+  if (merged.bestStreak === undefined) merged.bestStreak = merged.streak ?? 0;
   return merged;
 }
 
