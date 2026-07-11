@@ -1030,6 +1030,7 @@ export class UI {
           <input id="fish-name-input" value="${f.name}" maxlength="14" autocomplete="off"/>
           <button class="tgl" id="fish-name-save">✏️ Adlandır</button>
         </div>
+        <button class="tgl" id="fish-pet-btn" ${this.game.canPetToday ? '' : 'disabled'}>${this.game.canPetToday ? '🤗 Okşa' : '🤗 Bugün okşadın'}</button>
         <p class="card-desc">${f.sp.desc}</p>
         <div class="bar-row"><span>Büyüme (${f.stageName})</span>
           <div class="bar"><div id="fi-grow" style="width:${Math.min(100, f.progress * 100)}%"></div></div></div>
@@ -1052,6 +1053,12 @@ export class UI {
       this.game.syncSave();
       audio.click();
       this.toast(`İsim güncellendi: ${name} 🐟`);
+    });
+    el.querySelector('#fish-pet-btn')?.addEventListener('click', () => {
+      const res = this.game.petFish(f);
+      if (!res.ok) audio.error();
+      this.toast(res.msg);
+      if (res.ok) this.closePanel();
     });
     const sellBtn = el.querySelector<HTMLButtonElement>('.sell');
     if (sellBtn) {
