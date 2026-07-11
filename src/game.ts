@@ -1173,6 +1173,11 @@ export class Game {
     return -1;
   }
 
+  /** Günün ilk birkaç temizliğine ödül verilir (FishVille'deki günlük ilk 5 leke kuralı gibi). */
+  private static readonly CLEAN_REWARD_DAILY_CAP = 5;
+  private static readonly CLEAN_REWARD_COINS = 5;
+  private static readonly CLEAN_REWARD_XP = 1;
+
   /** Dokunulan noktadaki kir lekesini temizler (varsa); parçacık efekti ve ses çalar. */
   private cleanDirtAt(x: number, y: number): void {
     const idx = this.dirtAt(x, y);
@@ -1192,6 +1197,19 @@ export class Game {
     audio.clean();
     this.save.stats.totalCleaned++;
     this.questEvent('clean', 1);
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (this.save.cleanRewardDay !== today) {
+      this.save.cleanRewardDay = today;
+      this.save.cleanRewardCount = 0;
+    }
+    if (this.save.cleanRewardCount < Game.CLEAN_REWARD_DAILY_CAP) {
+      this.save.cleanRewardCount++;
+      this.save.coins += Game.CLEAN_REWARD_COINS;
+      this.addXp(Game.CLEAN_REWARD_XP);
+      this.ui.toast(`🧹 Leke temizlendi! +${Game.CLEAN_REWARD_COINS} altın`);
+    }
+
     this.syncSave();
     this.ui.refreshHUD();
   }
