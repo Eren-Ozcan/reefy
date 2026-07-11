@@ -82,6 +82,19 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'a-sold10',   name: 'Esnaf',            emoji: '🏪', desc: '10 balık sat',                       check: (s) => s.stats.totalSold, target: 10,  rewardCoins: 400,  rewardPearls: 1 },
   { id: 'a-sold50',   name: 'Balık Tüccarı',    emoji: '⚖️', desc: '50 balık sat',                       check: (s) => s.stats.totalSold, target: 50,  rewardCoins: 1500, rewardPearls: 3 },
   { id: 'a-sold200',  name: 'Resif Baronu',     emoji: '👑', desc: '200 balık sat',                      check: (s) => s.stats.totalSold, target: 200, rewardCoins: 6000, rewardPearls: 10 },
+  // Toplam kazanç kilometre taşları: erken oyundan geç oyuna kadar dengeli aralıklarla uzanır.
+  // Ödül/hedef oranı büyüdükçe düşer (~%3 -> ~%0.75) ki geç oyunda ekonomiyi bozmasın;
+  // claimAchievement() bu ödülleri totalEarned'a geri saymaz, bu yüzden kendi kendini beslemez.
+  { id: 'a-earn1k',   name: 'İlk Kazanç',         emoji: '🪙', desc: 'Toplamda 1.000 altın kazan',         check: (s) => s.stats.totalEarned, target: 1000,     rewardCoins: 30,     rewardPearls: 0 },
+  { id: 'a-earn5k',   name: 'İlk Birikim',        emoji: '💵', desc: 'Toplamda 5.000 altın kazan',         check: (s) => s.stats.totalEarned, target: 5000,     rewardCoins: 150,    rewardPearls: 0 },
+  { id: 'a-earn20k',  name: 'Küçük Servet',       emoji: '🏦', desc: 'Toplamda 20.000 altın kazan',        check: (s) => s.stats.totalEarned, target: 20000,    rewardCoins: 500,    rewardPearls: 1 },
+  { id: 'a-earn75k',  name: 'Zengin Sular',       emoji: '💰', desc: 'Toplamda 75.000 altın kazan',        check: (s) => s.stats.totalEarned, target: 75000,    rewardCoins: 1800,   rewardPearls: 2 },
+  { id: 'a-earn250k', name: 'Mercan Hazinesi',    emoji: '💎', desc: 'Toplamda 250.000 altın kazan',       check: (s) => s.stats.totalEarned, target: 250000,   rewardCoins: 5000,   rewardPearls: 4 },
+  { id: 'a-earn750k', name: 'Resif Zengini',      emoji: '🏆', desc: 'Toplamda 750.000 altın kazan',       check: (s) => s.stats.totalEarned, target: 750000,   rewardCoins: 12000,  rewardPearls: 6 },
+  { id: 'a-earn2m',   name: 'Derin Cüzdan',       emoji: '🌌', desc: 'Toplamda 2.000.000 altın kazan',     check: (s) => s.stats.totalEarned, target: 2000000,  rewardCoins: 30000,  rewardPearls: 10 },
+  { id: 'a-earn6m',   name: 'Okyanus Hazinesi',   emoji: '🐋', desc: 'Toplamda 6.000.000 altın kazan',     check: (s) => s.stats.totalEarned, target: 6000000,  rewardCoins: 70000,  rewardPearls: 14 },
+  { id: 'a-earn20m',  name: 'Efsanevi Servet',    emoji: '🌠', desc: 'Toplamda 20.000.000 altın kazan',    check: (s) => s.stats.totalEarned, target: 20000000, rewardCoins: 180000, rewardPearls: 20 },
+  { id: 'a-earn60m',  name: 'Sonsuzluk Hazinesi', emoji: '🔱', desc: 'Toplamda 60.000.000 altın kazan',    check: (s) => s.stats.totalEarned, target: 60000000, rewardCoins: 450000, rewardPearls: 28 },
   { id: 'a-lvl5',     name: 'Çırak Bakıcı',     emoji: '⭐', desc: 'Seviye 5\'e ulaş',                   check: (s) => s.level, target: 5,   rewardCoins: 300,  rewardPearls: 1 },
   { id: 'a-lvl10',    name: 'Usta Bakıcı',      emoji: '🌟', desc: 'Seviye 10\'a ulaş',                  check: (s) => s.level, target: 10,  rewardCoins: 1000, rewardPearls: 3 },
   { id: 'a-lvl20',    name: 'Resif Efsanesi',   emoji: '💫', desc: 'Seviye 20\'ye ulaş',                 check: (s) => s.level, target: 20,  rewardCoins: 5000, rewardPearls: 8 },
