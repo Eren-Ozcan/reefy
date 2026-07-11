@@ -95,6 +95,10 @@ export interface SocialProvider {
  * botlarıyla kıyaslar (çevrimiçi sürümde gerçek oyuncularla değişir).
  * Arkadaş kodları kaydedilir ve backend bağlandığında eşleşir.
  */
+/** Ziyaret/hediye ödülleri arkadaş başına günlük verildiği için kod kodu spam'iyle
+ * sınırsız altın/yem çiftliğini önlemek amacıyla listeye üst sınır konur. */
+const MAX_FRIENDS = 20;
+
 export class LocalSocial implements SocialProvider {
   readonly label = 'Yerel mod — çevrimiçi liderlik mobil sürümde';
 
@@ -129,6 +133,7 @@ export class LocalSocial implements SocialProvider {
     if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { ok: false, msg: 'Geçersiz kod. Örnek biçim: REEF-AB12C' };
     if (c === save.friendCode) return { ok: false, msg: 'Bu senin kendi kodun! 😄' };
     if (save.friends.some((f) => f.code === c)) return { ok: false, msg: 'Bu arkadaş zaten listende.' };
+    if (save.friends.length >= MAX_FRIENDS) return { ok: false, msg: `En fazla ${MAX_FRIENDS} arkadaş ekleyebilirsin.` };
     save.friends.push({ code: c, name: 'Dost ' + c.slice(5) });
     return {
       ok: true,
