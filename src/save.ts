@@ -47,6 +47,7 @@ export interface SaveData {
   friendVisits: { day: string; visited: string[]; count: number }; // gün içinde ziyaret edilen arkadaş kodları
   friendGifts: { day: string; gifted: string[] };                  // gün içinde hediye gönderilen arkadaş kodları
   quests: QuestState;
+  weeklyQuest: QuestState; // "day" alanı burada haftanın pazartesi tarihini (hafta anahtarı) tutar
   achievementsClaimed: string[];
   stats: {
     totalSold: number;
@@ -104,6 +105,7 @@ export function defaultSave(): SaveData {
     friendVisits: { day: '', visited: [], count: 0 },
     friendGifts: { day: '', gifted: [] },
     quests: { day: '', progress: {}, claimed: [] },
+    weeklyQuest: { day: '', progress: {}, claimed: [] },
     achievementsClaimed: [],
     stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0, totalCleaned: 0 },
     pityCounter: 0,
@@ -153,6 +155,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (!merged.friendVisits) merged.friendVisits = { day: '', visited: [], count: 0 };
   if (merged.petDay === undefined) merged.petDay = '';
   if (!merged.friendGifts) merged.friendGifts = { day: '', gifted: [] };
+  if (!merged.weeklyQuest) merged.weeklyQuest = { day: '', progress: {}, claimed: [] };
   return merged;
 }
 
