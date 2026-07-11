@@ -57,6 +57,8 @@ export interface SaveData {
   pityCounter: number;   // altın yumurta efsanevi garanti sayacı
   streak: number;        // ardışık gün serisi
   incomePot: number;     // biriken, henüz toplanmamış pasif gelir
+  cleanRewardDay: string;   // günün ilk birkaç temizliği ödüllü — bu alan günü takip eder
+  cleanRewardCount: number; // bugün ödüllü temizlenen leke sayısı
   music: boolean;
   sfx: boolean;
   lastSeen: number;
@@ -102,6 +104,8 @@ export function defaultSave(): SaveData {
     pityCounter: 0,
     streak: 0,
     incomePot: 0,
+    cleanRewardDay: '',
+    cleanRewardCount: 0,
     music: true,
     sfx: true,
     lastSeen: Date.now(),
@@ -138,6 +142,8 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   for (const t of merged.tanksOwned) if (!merged.decorPlaced[t]) merged.decorPlaced[t] = [];
   if (!merged.dirtSpots) merged.dirtSpots = {};
   if (merged.stats.totalCleaned === undefined) merged.stats.totalCleaned = 0;
+  if (merged.cleanRewardDay === undefined) merged.cleanRewardDay = '';
+  if (merged.cleanRewardCount === undefined) merged.cleanRewardCount = 0;
   return merged;
 }
 
