@@ -987,9 +987,10 @@ export class UI {
     `);
     el.querySelector('#name-save')!.addEventListener('click', () => {
       const input = el.querySelector<HTMLInputElement>('#name-input')!;
-      const name = input.value.trim();
+      const name = input.value.replace(/[<>&"']/g, '').trim();
       if (name.length < 3) { this.toast('İsim en az 3 karakter olmalı'); return; }
       s.playerName = name;
+      input.value = name;
       this.game.syncSave();
       audio.click();
       this.toast('İsim güncellendi: ' + name);
