@@ -107,6 +107,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'a-decor20',  name: 'İç Mimar',         emoji: '🏛️', desc: '20 dekor yerleştir',                 check: (s) => s.stats.decorPlacedCount, target: 20, rewardCoins: 1800, rewardPearls: 4 },
   { id: 'a-tank3',    name: 'Gezgin',           emoji: '🗺️', desc: '3 akvaryuma sahip ol',               check: (s) => s.tanksOwned.length, target: 3,  rewardCoins: 1000, rewardPearls: 2 },
   { id: 'a-tank10',   name: 'Okyanus İmparatoru', emoji: '🌊', desc: '10 akvaryuma sahip ol',            check: (s) => s.tanksOwned.length, target: 10, rewardCoins: 5000, rewardPearls: 10 },
-  { id: 'a-streak7',  name: 'Sadık Dost',       emoji: '🔥', desc: '7 gün üst üste oyna',                check: (s) => s.streak, target: 7, rewardCoins: 1200, rewardPearls: 3 },
+  // bestStreak kullanılıyor (streak değil): streak gün kaçırılınca sıfırlanıyor, oyuncu 7 güne
+  // ulaşıp ödülü almadan bir gün kaçırırsa bestStreak olmasa başarım kalıcı olarak kilitli kalırdı.
+  { id: 'a-streak7',  name: 'Sadık Dost',       emoji: '🔥', desc: '7 gün üst üste oyna',                check: (s) => s.bestStreak, target: 7, rewardCoins: 1200, rewardPearls: 3 },
   { id: 'a-clean25',  name: 'Temizlikçi',       emoji: '🧽', desc: '25 kir lekesi temizle',              check: (s) => s.stats.totalCleaned, target: 25, rewardCoins: 900, rewardPearls: 2 },
 ];
