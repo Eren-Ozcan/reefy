@@ -340,6 +340,8 @@ html, body {
 .lb-name { flex: 1; font-weight: 600; }
 .lb-score { font-weight: 700; color: var(--ink-soft); }
 .lb-code { font-size: 11px; color: #8ba4b0; margin-left: 6px; }
+.friend-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.friend-actions .tgl { white-space: nowrap; }
 
 .friend-code-box {
   display: flex; align-items: center; gap: 10px;

@@ -704,10 +704,14 @@ export class UI {
       const friendRows = s.friends.length
         ? s.friends.map((f) => {
             const visited = this.game.hasVisitedFriendToday(f.code);
+            const gifted = this.game.hasGiftedFriendToday(f.code);
             return `
             <div class="inv-row">
               <span class="inv-name">👤 ${f.name} <span class="lb-code">${f.code}</span></span>
-              <button class="tgl" data-visit="${f.code}" ${visited ? 'disabled' : ''}>${visited ? 'Ziyaret edildi ✓' : 'Ziyaret Et'}</button>
+              <div class="friend-actions">
+                <button class="tgl" data-visit="${f.code}" ${visited ? 'disabled' : ''}>${visited ? 'Ziyaret edildi ✓' : 'Ziyaret Et'}</button>
+                <button class="tgl" data-gift="${f.code}" ${gifted ? 'disabled' : ''}>${gifted ? 'Hediye gönderildi ✓' : '🎁 Hediye Gönder'}</button>
+              </div>
             </div>`;
           }).join('')
         : '<p class="empty">Henüz arkadaş eklemedin.</p>';
@@ -746,6 +750,14 @@ export class UI {
     el.querySelectorAll<HTMLButtonElement>('[data-visit]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const res = this.game.visitFriend(btn.dataset.visit!);
+        if (!res.ok) audio.error();
+        this.toast(res.msg);
+        if (res.ok) this.renderSocial('friends');
+      });
+    });
+    el.querySelectorAll<HTMLButtonElement>('[data-gift]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const res = this.game.giftFriend(btn.dataset.gift!);
         if (!res.ok) audio.error();
         this.toast(res.msg);
         if (res.ok) this.renderSocial('friends');
