@@ -60,6 +60,7 @@ export interface SaveData {
   incomePot: number;     // biriken, henüz toplanmamış pasif gelir
   cleanRewardDay: string;   // günün ilk birkaç temizliği ödüllü — bu alan günü takip eder
   cleanRewardCount: number; // bugün ödüllü temizlenen leke sayısı
+  petDay: string;           // günde bir kez bir balığı okşayabilirsin — son okşama günü
   music: boolean;
   sfx: boolean;
   lastSeen: number;
@@ -108,6 +109,7 @@ export function defaultSave(): SaveData {
     incomePot: 0,
     cleanRewardDay: '',
     cleanRewardCount: 0,
+    petDay: '',
     music: true,
     sfx: true,
     lastSeen: Date.now(),
@@ -147,6 +149,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (merged.cleanRewardDay === undefined) merged.cleanRewardDay = '';
   if (merged.cleanRewardCount === undefined) merged.cleanRewardCount = 0;
   if (!merged.friendVisits) merged.friendVisits = { day: '', visited: [], count: 0 };
+  if (merged.petDay === undefined) merged.petDay = '';
   return merged;
 }
 
