@@ -40,6 +40,32 @@ export function questsForDay(day: string): QuestDef[] {
   return picked;
 }
 
+/** Haftalık görev havuzu — günlüklerden çok daha büyük hedef ve ödül. */
+export const WEEKLY_QUEST_POOL: QuestDef[] = [
+  { id: 'w-feed200',  name: 'Bu hafta 200 yem yedir',        emoji: '🍤', target: 200,   event: 'feed',    rewardCoins: 1500, rewardPearls: 4 },
+  { id: 'w-sell20',   name: 'Bu hafta 20 balık sat',          emoji: '🪙', target: 20,    event: 'sell',    rewardCoins: 2500, rewardPearls: 5 },
+  { id: 'w-earn20k',  name: 'Bu hafta 20.000 altın kazan',    emoji: '💰', target: 20000, event: 'earn',    rewardCoins: 2000, rewardPearls: 4 },
+  { id: 'w-hatch10',  name: 'Bu hafta 10 yumurta aç',         emoji: '🥚', target: 10,    event: 'hatch',   rewardCoins: 1800, rewardPearls: 4 },
+  { id: 'w-clean15',  name: 'Bu hafta 15 kir lekesi temizle', emoji: '🧹', target: 15,    event: 'clean',   rewardCoins: 1200, rewardPearls: 3 },
+  { id: 'w-collect5', name: 'Bu hafta koleksiyona 5 tür ekle', emoji: '📖', target: 5,    event: 'collect', rewardCoins: 2200, rewardPearls: 6 },
+];
+
+/** Verilen tarihin içinde bulunduğu haftanın pazartesi gününü YYYY-MM-DD biçiminde döndürür. */
+export function weekKeyFor(d: Date): string {
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = dt.getUTCDay() || 7; // Pazartesi=1 .. Pazar=7
+  dt.setUTCDate(dt.getUTCDate() - day + 1);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Hafta anahtarından deterministik haftalık görev seçimi */
+export function weeklyQuestForWeek(week: string): QuestDef {
+  let h = 0;
+  for (const ch of week) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  h = (h * 1103515245 + 12345) >>> 0;
+  return WEEKLY_QUEST_POOL[h % WEEKLY_QUEST_POOL.length];
+}
+
 export interface AchievementDef {
   id: string;
   name: string;
