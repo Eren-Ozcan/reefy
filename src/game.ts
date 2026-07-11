@@ -1619,6 +1619,38 @@ export class Game {
     return { ok: true, msg: `${f.name} mutlu oldu! +${Game.PET_REWARD_XP} XP, satış değeri arttı 💕` };
   }
 
+  /** Arkadaşa günde bir kez küçük bir yem hediyesi gönderilebilir; karşılığında sen de birkaç yem kazanırsın. */
+  private static readonly GIFT_FEED_ID = 'lezzet';
+  private static readonly GIFT_FEED_QTY = 3;
+  private static readonly GIFT_REWARD_XP = 2;
+
+  hasGiftedFriendToday(code: string): boolean {
+    const today = new Date().toISOString().slice(0, 10);
+    if (this.save.friendGifts.day !== today) return false;
+    return this.save.friendGifts.gifted.includes(code);
+  }
+
+  giftFriend(code: string): { ok: boolean; msg: string } {
+    if (!this.save.friends.some((f) => f.code === code)) return { ok: false, msg: 'Arkadaş bulunamadı' };
+    const today = new Date().toISOString().slice(0, 10);
+    if (this.save.friendGifts.day !== today) {
+      this.save.friendGifts = { day: today, gifted: [] };
+    }
+    if (this.save.friendGifts.gifted.includes(code)) {
+      return { ok: false, msg: 'Bu arkadaşına bugün zaten hediye gönderdin.' };
+    }
+    this.save.friendGifts.gifted.push(code);
+    this.save.feedOwned[Game.GIFT_FEED_ID] = (this.save.feedOwned[Game.GIFT_FEED_ID] ?? 0) + Game.GIFT_FEED_QTY;
+    this.addXp(Game.GIFT_REWARD_XP);
+    audio.coin();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return {
+      ok: true,
+      msg: `Hediye gönderildi! Karşılığında +${Game.GIFT_FEED_QTY} ${feedById(Game.GIFT_FEED_ID).name} kazandın 🎁`,
+    };
+  }
+
   shopFish(): Species[] {
     return SPECIES.filter((s) => s.buyPrice > 0 || s.pearlPrice);
   }
