@@ -44,6 +44,7 @@ export interface SaveData {
   tanksOwned: string[];
   activeTank: string;
   friends: { code: string; name: string }[];
+  friendVisits: { day: string; visited: string[]; count: number }; // gün içinde ziyaret edilen arkadaş kodları
   quests: QuestState;
   achievementsClaimed: string[];
   stats: {
@@ -98,6 +99,7 @@ export function defaultSave(): SaveData {
     tanksOwned: [START_TANK],
     activeTank: START_TANK,
     friends: [],
+    friendVisits: { day: '', visited: [], count: 0 },
     quests: { day: '', progress: {}, claimed: [] },
     achievementsClaimed: [],
     stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0, totalCleaned: 0 },
@@ -144,6 +146,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (merged.stats.totalCleaned === undefined) merged.stats.totalCleaned = 0;
   if (merged.cleanRewardDay === undefined) merged.cleanRewardDay = '';
   if (merged.cleanRewardCount === undefined) merged.cleanRewardCount = 0;
+  if (!merged.friendVisits) merged.friendVisits = { day: '', visited: [], count: 0 };
   return merged;
 }
 
