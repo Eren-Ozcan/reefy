@@ -395,7 +395,32 @@ const REAL_SPECIES: Record<Rarity, SpeciesSeed[]> = {
       colors: { body: 0x1a1a1a, belly: 0x3a3a3a, fin: 0xf2703c, accent: 0xffffff },
       desc: 'Kuyruğundaki alev turuncusu lekesiyle resifin en değerli cerrahlarından.' },
   ],
-  legendary: [],
+  legendary: [
+    { name: 'Platin Arowana', pattern: 'none', size: 82, finScale: 1.1, tailShape: 'round', dorsalStyle: 'flowing',
+      colors: { body: 0xf0f4f8, belly: 0xffffff, fin: 0xe0e8ee, accent: 0xcfd8e0 },
+      desc: 'Pürüzsüz gümüş-beyaz pullarıyla koleksiyonerlerin rüyası.' },
+    { name: 'Kırmızı Arowana', pattern: 'none', size: 80, finScale: 1.1, tailShape: 'round', dorsalStyle: 'flowing',
+      colors: { body: 0xc9302a, belly: 0xe87a5c, fin: 0xa8241f, accent: 0xf2a13c },
+      desc: "Metalik kızıl pullarıyla Asya'da servet değerinde sayılır." },
+    { name: 'Gümüş Arowana', pattern: 'none', size: 84, finScale: 1.2, tailShape: 'round', dorsalStyle: 'flowing',
+      colors: { body: 0xcfd8e0, belly: 0xf0f4f8, fin: 0xb8c3cc, accent: 0x8fa0ac },
+      desc: 'Geniş kürek yüzgeçleriyle suda süzülen bir efsane.' },
+    { name: 'Napolyon Dudak Balığı', pattern: 'gradient', size: 90, bodyH: 0.6, tailShape: 'round', snout: 'hump',
+      colors: { body: 0x1f7a9a, belly: 0x5cb0cc, fin: 0x155c75, accent: 0xf2d049 },
+      desc: 'Devasa boyutu ve alnındaki hörgücüyle resiflerin kralı.' },
+    { name: 'Nane Melek Balığı', pattern: 'stripes', size: 40, bodyH: 0.7, tailShape: 'round',
+      colors: { body: 0xd6405c, belly: 0xf2a0b0, fin: 0xb8304a, accent: 0xffffff },
+      desc: "Derin sularda yaşayan, dünyanın en nadir melek balıklarından biri." },
+    { name: 'Maskeli Melek Balığı', pattern: 'gradient', size: 44, bodyH: 0.72, tailShape: 'round',
+      colors: { body: 0xf2e9d0, belly: 0xffffff, fin: 0x1a1a1a, accent: 0xd8dee2 },
+      desc: 'Sadece Hawaii sularında bulunan, siyah maskeli beyaz bir efsane.' },
+    { name: 'Altın Bas Balığı', pattern: 'gradient', size: 20, tailShape: 'forked',
+      colors: { body: 0xf2a13c, belly: 0xffd9a0, fin: 0xd97f24, accent: 0xffe27a },
+      desc: 'Derin resif mağaralarında yaşayan parlak altın rengiyle nadir bir tür.' },
+    { name: 'Bıçak Yüzgeçli Bas Balığı', pattern: 'gradient', size: 18, tailShape: 'forked', dorsalStyle: 'flowing',
+      colors: { body: 0x8a2a3a, belly: 0xc76a7a, fin: 0x5c1a26, accent: 0xf2a13c },
+      desc: "Dünyanın en pahalı akvaryum balıklarından biri olarak bilinir." },
+  ],
 };
 
 const RARITY_PLAN: { r: Rarity; count: number; buy: [number, number]; grow: [number, number]; lvl: [number, number] }[] = [
@@ -403,7 +428,7 @@ const RARITY_PLAN: { r: Rarity; count: number; buy: [number, number]; grow: [num
   { r: 'uncommon',  count: 22, buy: [280, 2200],    grow: [5, 11],  lvl: [2, 8] },
   { r: 'rare',      count: 17, buy: [1100, 6500],   grow: [12, 20], lvl: [5, 12] },
   { r: 'epic',      count: 12, buy: [4200, 12500],  grow: [22, 38], lvl: [8, 16] },
-  { r: 'legendary', count: 0,  buy: [15000, 42000], grow: [45, 75], lvl: [12, 20] },
+  { r: 'legendary', count: 8,  buy: [15000, 42000], grow: [45, 75], lvl: [12, 20] },
 ];
 
 function mulberry(seed: number): () => number {
