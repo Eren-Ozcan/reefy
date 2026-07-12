@@ -136,74 +136,68 @@ const HANDMADE: Species[] = [
   },
 ];
 
-// ---- Üretilmiş 86 tür (deterministik — id'ler ve isimler her derlemede aynı) ----
+// ---- Gerçek türlerden 86 balık (deterministik — id'ler ve isimler her derlemede aynı) ----
 
-interface Palette { adj: string; body: number; belly: number; fin: number; accent: number }
-
-const PALETTES: Palette[] = [
-  { adj: 'Mercan',    body: 0xff7e67, belly: 0xffc3b5, fin: 0xff9a85, accent: 0xfff1e8 },
-  { adj: 'Safir',     body: 0x3f6fd6, belly: 0x9ab8f0, fin: 0x2f57b0, accent: 0xcfe0ff },
-  { adj: 'Zümrüt',    body: 0x2fae7d, belly: 0x8fdcbc, fin: 0x22855f, accent: 0xd8f7e8 },
-  { adj: 'Amber',     body: 0xe8a93c, belly: 0xf7d78f, fin: 0xc98a1f, accent: 0x8a5a1a },
-  { adj: 'Lavanta',   body: 0xa98fd8, belly: 0xd6c8ef, fin: 0x8a6cc0, accent: 0xf0e8ff },
-  { adj: 'Gülkurusu', body: 0xd88fa4, belly: 0xf0ccd7, fin: 0xc06f88, accent: 0xffffff },
-  { adj: 'Turkuaz',   body: 0x36c3c9, belly: 0x9fe6e9, fin: 0x1f9aa0, accent: 0x0f6a6e },
-  { adj: 'Gece',      body: 0x3c4670, belly: 0x6f7aa8, fin: 0x2a3252, accent: 0x9fb0e8 },
-  { adj: 'Şafak',     body: 0xff9d6f, belly: 0xffd9c2, fin: 0xe87a4a, accent: 0xa84a8f },
-  { adj: 'Nar',       body: 0xd6455c, belly: 0xef9dab, fin: 0xb03248, accent: 0xffdfe5 },
-  { adj: 'Buz',       body: 0xa8dcef, belly: 0xe4f6fc, fin: 0x7fc3e0, accent: 0x4a90b8 },
-  { adj: 'Bakır',     body: 0xc47a4a, belly: 0xe8b48c, fin: 0xa05c30, accent: 0x6f3d1c },
-  { adj: 'Yosun',     body: 0x7da84a, belly: 0xbcd898, fin: 0x5c8530, accent: 0x3a5c1c },
-  { adj: 'Sis',       body: 0xb0bcc4, belly: 0xdfe6ea, fin: 0x8f9ea8, accent: 0x5c6a74 },
-  { adj: 'Alev',      body: 0xf25c30, belly: 0xffb090, fin: 0xd0431c, accent: 0xffe27a },
-  { adj: 'Orkide',    body: 0xc45cc9, belly: 0xe6aae9, fin: 0xa03fa5, accent: 0xffffff },
-  { adj: 'Kehribar',  body: 0xd9963c, belly: 0xf2cf9a, fin: 0xb87a26, accent: 0x7a4d12 },
-  { adj: 'Okyanus',   body: 0x2f7fb8, belly: 0x8fc0e0, fin: 0x1f5f8f, accent: 0xdff2ff },
-  { adj: 'Fulya',     body: 0xf2d049, belly: 0xfae9a8, fin: 0xd9b52e, accent: 0x8f7615 },
-  { adj: 'Vişne',     body: 0x9e3548, belly: 0xd07d8d, fin: 0x7c2536, accent: 0xf2c3cc },
-  { adj: 'Menekşe',   body: 0x6a5cc9, belly: 0xb0a8e8, fin: 0x4f43a5, accent: 0xe8e4ff },
-  { adj: 'Çağla',     body: 0x9fd86f, belly: 0xd4f0b8, fin: 0x7fb84f, accent: 0x4f7a2a },
-];
-
-interface Archetype {
-  noun: string;
+interface SpeciesSeed {
+  name: string;
+  colors: { body: number; belly: number; fin: number; accent: number };
   pattern: Species['pattern'];
+  size: number;
   bodyH?: number;
   finScale?: number;
   spiky?: boolean;
-  size: number;
+  tailShape?: Species['tailShape'];
+  dorsalStyle?: Species['dorsalStyle'];
+  snout?: Species['snout'];
+  desc: string;
 }
 
-const ARCHETYPES: Archetype[] = [
-  { noun: 'Tetra',     pattern: 'hstripe',  size: 40 },
-  { noun: 'Çiklit',    pattern: 'stripes',  size: 52 },
-  { noun: 'Gurami',    pattern: 'none',     size: 50, finScale: 1.3 },
-  { noun: 'Kelebek',   pattern: 'gradient', size: 48, bodyH: 0.72, finScale: 1.4 },
-  { noun: 'Cerrah',    pattern: 'none',     size: 54, bodyH: 0.62 },
-  { noun: 'Kaplan',    pattern: 'stripes',  size: 46 },
-  { noun: 'Yüzgeçli',  pattern: 'gradient', size: 50, finScale: 1.8 },
-  { noun: 'Benekli',   pattern: 'spots',    size: 48 },
-  { noun: 'Diken',     pattern: 'stripes',  size: 56, spiky: true, finScale: 1.3 },
-  { noun: 'Ay',        pattern: 'none',     size: 58, bodyH: 0.9, finScale: 1.2 },
-  { noun: 'Yelken',    pattern: 'hstripe',  size: 52, finScale: 1.6 },
-  { noun: 'İmparator', pattern: 'spots',    size: 60, bodyH: 0.7 },
-];
+const REAL_SPECIES: Record<Rarity, SpeciesSeed[]> = {
+  common: [
+    { name: 'Zebra Danio', pattern: 'stripes', size: 36, tailShape: 'forked',
+      colors: { body: 0xc9d3da, belly: 0xeef2f5, fin: 0x3a5f8a, accent: 0x1f3a5c },
+      desc: 'Yatay çizgileriyle tanınan hareketli ve dayanıklı bir tatlı su balığı.' },
+    { name: 'Platy', pattern: 'none', size: 38, tailShape: 'round',
+      colors: { body: 0xff7a4a, belly: 0xffd2b8, fin: 0xff9d6a, accent: 0xc94a1f },
+      desc: 'Bakımı kolay, canlı doğuran neşeli bir tatlı su balığı.' },
+    { name: 'Kılıçkuyruk', pattern: 'none', size: 44, finScale: 1.2, tailShape: 'lyre',
+      colors: { body: 0x7ab86a, belly: 0xd6f0c8, fin: 0x4a8f4a, accent: 0xff6b3d },
+      desc: 'Erkeklerindeki kılıç biçimli kuyruğuyla tanınır.' },
+    { name: 'Kiraz Barbusu', pattern: 'none', size: 36, tailShape: 'forked',
+      colors: { body: 0xd6403f, belly: 0xf2a8a0, fin: 0xb8302f, accent: 0xffffff },
+      desc: 'Küçük sürüler halinde yüzmeyi seven kiraz kırmızısı bir barbus.' },
+    { name: 'Kaplan Barbusu', pattern: 'stripes', size: 38, tailShape: 'forked',
+      colors: { body: 0xf2a13c, belly: 0xffd9a0, fin: 0xd9401f, accent: 0x2a2a2a },
+      desc: 'Kaplan çizgileriyle akvaryuma enerji katan hareketli bir tür.' },
+    { name: 'Beyaz Bulut Dağ Balığı', pattern: 'hstripe', size: 32, tailShape: 'forked',
+      colors: { body: 0xb8c9a0, belly: 0xe8f0d8, fin: 0xd6403f, accent: 0xf2d049 },
+      desc: 'Soğuk suya bile dayanabilen dağ derelerinin küçük sakini.' },
+    { name: 'Arlekin Rasbora', pattern: 'spots', size: 34, tailShape: 'forked',
+      colors: { body: 0xe89a5c, belly: 0xf5cfa0, fin: 0xd97f3f, accent: 0x2a2a2a },
+      desc: 'Bakır rengi gövdesi ve siyah üçgen lekesiyle tanınır.' },
+    { name: 'Kori Balığı', pattern: 'spots', size: 34, bodyH: 0.55, tailShape: 'round',
+      colors: { body: 0x8a7a5c, belly: 0xd8cfa8, fin: 0x6f6047, accent: 0xb0a37a },
+      desc: 'Akvaryum tabanını temizleyen sevimli bıyıklı bir yayın balığı.' },
+    { name: 'Fırça Burunlu Yayın', pattern: 'spots', size: 46, bodyH: 0.5, spiky: true, tailShape: 'round',
+      colors: { body: 0x4a3f30, belly: 0x7a6c52, fin: 0x2f2a20, accent: 0x8a7a5c },
+      desc: 'Yosunları temizleyen dikensi çıkıntılı bir tabanci balığı.' },
+    { name: 'Endler Guppisi', pattern: 'spots', size: 30, tailShape: 'lyre',
+      colors: { body: 0xff9d2e, belly: 0xffe0a0, fin: 0x2fae7d, accent: 0x1f1f1f },
+      desc: 'Guppinin küçük ve rengarenk akrabası.' },
+  ],
+  uncommon: [],
+  rare: [],
+  epic: [],
+  legendary: [],
+};
 
 const RARITY_PLAN: { r: Rarity; count: number; buy: [number, number]; grow: [number, number]; lvl: [number, number] }[] = [
-  { r: 'common',    count: 27, buy: [50, 650],      grow: [2, 6],   lvl: [1, 4] },
-  { r: 'uncommon',  count: 22, buy: [280, 2200],    grow: [5, 11],  lvl: [2, 8] },
-  { r: 'rare',      count: 17, buy: [1100, 6500],   grow: [12, 20], lvl: [5, 12] },
-  { r: 'epic',      count: 12, buy: [4200, 12500],  grow: [22, 38], lvl: [8, 16] },
-  { r: 'legendary', count: 8,  buy: [15000, 42000], grow: [45, 75], lvl: [12, 20] },
+  { r: 'common',    count: 10, buy: [50, 650],      grow: [2, 6],   lvl: [1, 4] },
+  { r: 'uncommon',  count: 0,  buy: [280, 2200],    grow: [5, 11],  lvl: [2, 8] },
+  { r: 'rare',      count: 0,  buy: [1100, 6500],   grow: [12, 20], lvl: [5, 12] },
+  { r: 'epic',      count: 0,  buy: [4200, 12500],  grow: [22, 38], lvl: [8, 16] },
+  { r: 'legendary', count: 0,  buy: [15000, 42000], grow: [45, 75], lvl: [12, 20] },
 ];
-
-const DESC_BY_RARITY: Record<Rarity, string[]> = {
-  common: ['Resifin çalışkan sakini.', 'Sade ama sevimli bir dost.', 'Her akvaryuma yakışır.'],
-  uncommon: ['Dikkatli gözlerin fark ettiği bir güzellik.', 'Renkleriyle suya neşe katar.', 'Az bulunur, çok sevilir.'],
-  rare: ['Koleksiyoncuların gözdesi.', 'Suda süzülen bir mücevher.', 'Onu görmek şans işaretidir.'],
-  epic: ['Derinliklerden gelen bir efsane adayı.', 'Renkleri gerçeküstü, huyu asil.', 'Akvaryumun yıldızı olmaya doğdu.'],
-  legendary: ['Sadece en sabırlı bakıcılara görünür.', 'Hakkında şarkılar yazılan balık.', 'Okyanusun yaşayan efsanesi.'],
-};
 
 function mulberry(seed: number): () => number {
   let a = seed >>> 0;
@@ -224,54 +218,46 @@ function lighten(c: number, f: number): number {
 
 function generate(): Species[] {
   const out: Species[] = [];
-  const usedNames = new Set(HANDMADE.map((s) => s.name));
   const rnd = mulberry(20260710);
   let gi = 0;
   for (const plan of RARITY_PLAN) {
+    const seeds = REAL_SPECIES[plan.r];
     for (let i = 0; i < plan.count; i++) {
       gi++;
-      let pal: Palette = PALETTES[0];
-      let arch: Archetype = ARCHETYPES[0];
-      let name = '';
-      let guard = 0;
-      do {
-        pal = PALETTES[Math.floor(rnd() * PALETTES.length)];
-        arch = ARCHETYPES[Math.floor(rnd() * ARCHETYPES.length)];
-        name = `${pal.adj} ${arch.noun}`;
-        guard++;
-      } while (usedNames.has(name) && guard < 80);
-      usedNames.add(name);
+      const seed = seeds[i];
 
       const t = plan.count === 1 ? 0 : i / (plan.count - 1);
       const buy = Math.round((plan.buy[0] + (plan.buy[1] - plan.buy[0]) * t) / 10) * 10;
       const growMin = Math.round(plan.grow[0] + (plan.grow[1] - plan.grow[0]) * t);
       const lvl = Math.round(plan.lvl[0] + (plan.lvl[1] - plan.lvl[0]) * t);
-      const descs = DESC_BY_RARITY[plan.r];
 
       // Efsanevilerin üçte biri yalnızca inciyle alınır
       const pearlOnly = plan.r === 'legendary' && i % 3 === 2;
 
       out.push({
         id: `gen-${plan.r}-${gi}`,
-        name,
+        name: seed.name,
         rarity: plan.r,
         colors: {
-          body: pal.body,
-          belly: pal.belly,
-          fin: pal.fin,
-          accent: i % 4 === 3 ? lighten(pal.accent, 0.1) : pal.accent,
+          body: seed.colors.body,
+          belly: seed.colors.belly,
+          fin: seed.colors.fin,
+          accent: i % 4 === 3 ? lighten(seed.colors.accent, 0.1) : seed.colors.accent,
         },
-        pattern: arch.pattern,
+        pattern: seed.pattern,
         buyPrice: pearlOnly ? 0 : buy,
         pearlPrice: pearlOnly ? 50 + i * 10 : undefined,
         sellPrice: pearlOnly ? 48000 + i * 4000 : Math.round(buy * (2.2 + rnd() * 0.3)),
         growthMs: growMin * MIN,
         unlockLevel: lvl,
-        size: arch.size + Math.round((rnd() - 0.5) * 8),
-        bodyH: arch.bodyH,
-        finScale: arch.finScale,
-        spiky: arch.spiky,
-        desc: descs[gi % descs.length],
+        size: seed.size,
+        bodyH: seed.bodyH,
+        finScale: seed.finScale,
+        spiky: seed.spiky,
+        tailShape: seed.tailShape,
+        dorsalStyle: seed.dorsalStyle,
+        snout: seed.snout,
+        desc: seed.desc,
       });
     }
   }
