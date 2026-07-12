@@ -388,6 +388,12 @@ const REAL_SPECIES: Record<Rarity, SpeciesSeed[]> = {
     { name: 'Bakır Bantlı Kelebek Balığı', pattern: 'stripes', size: 44, bodyH: 0.7, tailShape: 'round', snout: 'long',
       colors: { body: 0xf2e9d0, belly: 0xffffff, fin: 0xd97f24, accent: 0x1a1a1a },
       desc: 'Uzun burnu ve bakır bantlarıyla zarif bir kelebek balığı.' },
+    { name: 'İki Renkli Melek Balığı', pattern: 'gradient', size: 40, bodyH: 0.7, tailShape: 'round',
+      colors: { body: 0xf2c916, belly: 0xfff2a0, fin: 0x1f5c9a, accent: 0x1a1a1a },
+      desc: 'Yarısı sarı yarısı mavi keskin renk ayrımıyla dikkat çeker.' },
+    { name: 'Akhilleus Cerrahı', pattern: 'spots', size: 48, bodyH: 0.68, tailShape: 'lunate',
+      colors: { body: 0x1a1a1a, belly: 0x3a3a3a, fin: 0xf2703c, accent: 0xffffff },
+      desc: 'Kuyruğundaki alev turuncusu lekesiyle resifin en değerli cerrahlarından.' },
   ],
   legendary: [],
 };
@@ -396,7 +402,7 @@ const RARITY_PLAN: { r: Rarity; count: number; buy: [number, number]; grow: [num
   { r: 'common',    count: 27, buy: [50, 650],      grow: [2, 6],   lvl: [1, 4] },
   { r: 'uncommon',  count: 22, buy: [280, 2200],    grow: [5, 11],  lvl: [2, 8] },
   { r: 'rare',      count: 17, buy: [1100, 6500],   grow: [12, 20], lvl: [5, 12] },
-  { r: 'epic',      count: 10, buy: [4200, 12500],  grow: [22, 38], lvl: [8, 16] },
+  { r: 'epic',      count: 12, buy: [4200, 12500],  grow: [22, 38], lvl: [8, 16] },
   { r: 'legendary', count: 0,  buy: [15000, 42000], grow: [45, 75], lvl: [12, 20] },
 ];
 
