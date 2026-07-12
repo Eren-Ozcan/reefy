@@ -15,6 +15,9 @@ export interface Species {
   bodyH?: number;          // gövde yükseklik oranı (varsayılan 0.48)
   finScale?: number;       // yüzgeç büyüklük çarpanı
   spiky?: boolean;         // sırt dikenleri
+  tailShape?: 'lens' | 'forked' | 'round' | 'lyre' | 'ribbon' | 'lunate'; // kuyruk biçimi (varsayılan 'lens')
+  dorsalStyle?: 'triangle' | 'flowing' | 'sail'; // sırt yüzgeci biçimi (varsayılan 'triangle')
+  snout?: 'long' | 'hump' | 'blunt'; // burun/alın çıkıntısı (varsayılan yok)
   desc: string;
 }
 

@@ -18,6 +18,56 @@ export function fmt(n: number): string {
   return String(n);
 }
 
+const TAIL_PIVOT_X = -48;
+
+/** Kuyruk şeklinin SVG path 'd' verisi (fish.ts'teki drawTail ile eşleşir). */
+function tailPathD(H: number, FS: number, shape: Species['tailShape']): string {
+  const ext = 34 * FS;
+  const px = TAIL_PIVOT_X;
+  switch (shape) {
+    case 'forked': {
+      const notch = ext * 0.35;
+      return `M ${px} 0 L ${px - ext} ${-H * 0.55 * FS} L ${px - ext + notch} ${-H * 0.1 * FS} L ${px - ext} 0 L ${px - ext + notch} ${H * 0.1 * FS} L ${px - ext} ${H * 0.55 * FS} Z`;
+    }
+    case 'lunate':
+      return `M ${px} 0 Q ${px - ext * 0.55} ${-H * 0.3 * FS} ${px - ext * 1.15} ${-H * 0.62 * FS} Q ${px - ext * 0.62} ${-H * 0.14 * FS} ${px - ext * 0.5} 0 Q ${px - ext * 0.62} ${H * 0.14 * FS} ${px - ext * 1.15} ${H * 0.62 * FS} Q ${px - ext * 0.55} ${H * 0.3 * FS} ${px} 0 Z`;
+    case 'round':
+      return `M ${px} ${-H * 0.03} Q ${px - ext * 1.1} ${-H * 0.55 * FS} ${px - ext * 0.6} 0 Q ${px - ext * 1.1} ${H * 0.55 * FS} ${px} ${H * 0.03} Z`;
+    case 'lyre':
+      return `M ${px} 0 Q ${px - ext * 0.5} ${-H * 0.2 * FS} ${px - ext * 1.5} ${-H * 0.7 * FS} Q ${px - ext * 0.85} ${-H * 0.12 * FS} ${px - ext * 0.3} 0 Q ${px - ext * 0.85} ${H * 0.12 * FS} ${px - ext * 1.5} ${H * 0.7 * FS} Q ${px - ext * 0.5} ${H * 0.2 * FS} ${px} 0 Z`;
+    case 'ribbon':
+      return `M ${px} ${-H * 0.08} L ${px - ext * 1.8} ${-H * 0.09} L ${px - ext * 1.95} 0 L ${px - ext * 1.8} ${H * 0.09} L ${px} ${H * 0.08} Z`;
+    default: // 'lens'
+      return `M ${px} 0 L ${px - ext} ${-H * 0.45 * FS} Q ${px - ext * 0.6} 0 ${px - ext} ${H * 0.45 * FS} Z`;
+  }
+}
+
+/** Sırt yüzgeci şeklinin SVG path 'd' verisi (fish.ts'teki dorsalStyle ile eşleşir). */
+function dorsalPathD(H: number, FS: number, style: Species['dorsalStyle']): string {
+  switch (style) {
+    case 'flowing':
+      return `M -22 ${-H / 2 + 2} Q -2 ${-H / 2 - H * 0.55 * FS} 18 ${-H / 2 - H * 0.78 * FS} Q 30 ${-H / 2 - H * 0.3 * FS} 26 ${-H / 2 + 2} Z`;
+    case 'sail':
+      return `M -26 ${-H / 2 + 2} L 0 ${-H / 2 - H * 0.85 * FS} L 30 ${-H / 2 + 2} Z`;
+    default: // 'triangle'
+      return `M -15 ${-H / 2 + 2} L 5 ${-H / 2 - H * 0.45 * FS} L 22 ${-H / 2 + 2} Z`;
+  }
+}
+
+/** Burun/alın çıkıntısının SVG öğesi (fish.ts'teki snout ile eşleşir). */
+function snoutSVG(H: number, snout: Species['snout'], color: string): string {
+  switch (snout) {
+    case 'long':
+      return `<path d="M 42 ${-H * 0.05} L 66 ${-H * 0.02} L 42 ${H * 0.09} Z" fill="${color}"/>`;
+    case 'hump':
+      return `<circle cx="20" cy="${-H * 0.44}" r="10" fill="${color}"/>`;
+    case 'blunt':
+      return `<rect x="40" y="${-H * 0.14}" width="10" height="${H * 0.28}" rx="3" fill="${color}"/>`;
+    default:
+      return '';
+  }
+}
+
 /** Tür için mini SVG önizlemesi (mağaza/koleksiyon kartları). */
 export function fishSVG(sp: Species, size = 84, silhouette = false): string {
   const c = silhouette
@@ -47,12 +97,14 @@ export function fishSVG(sp: Species, size = 84, silhouette = false): string {
     ? `<circle cx="0" cy="0" r="66" fill="${hex(RARITY_INFO[sp.rarity].glow)}" opacity="0.35"/>`
     : '';
   const uid = sp.id + (silhouette ? '-s' : '') + '-' + size;
+  const snout = silhouette ? '' : snoutSVG(H, sp.snout, c.body);
   return `<svg viewBox="-105 -70 210 140" width="${size}" height="${(size * 140) / 210}" xmlns="http://www.w3.org/2000/svg">
     ${glow}
-    <path d="M -48 0 L ${-48 - 34 * FS} ${-H * 0.45 * FS} Q ${-48 - 20 * FS} 0 ${-48 - 34 * FS} ${H * 0.45 * FS} Z" fill="${c.fin}"/>
-    <path d="M -15 ${-H / 2 + 2} L 5 ${-H / 2 - H * 0.45 * FS} L 22 ${-H / 2 + 2} Z" fill="${c.fin}" opacity="0.95"/>
+    <path d="${tailPathD(H, FS, sp.tailShape)}" fill="${c.fin}"/>
+    <path d="${dorsalPathD(H, FS, sp.dorsalStyle)}" fill="${c.fin}" opacity="0.95"/>
     <clipPath id="b-${uid}"><ellipse cx="0" cy="0" rx="50" ry="${H / 2}"/></clipPath>
     <ellipse cx="0" cy="0" rx="50" ry="${H / 2}" fill="${c.body}"/>
+    ${snout}
     <g clip-path="url(#b-${uid})">
       <ellipse cx="2" cy="${H * 0.16}" rx="40" ry="${H * 0.32}" fill="${c.belly}"/>
       ${pattern}

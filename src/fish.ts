@@ -82,6 +82,69 @@ export class Fish {
     };
   }
 
+  private drawTail(L: number, H: number, FS: number, color: number, shape: Species['tailShape']): void {
+    const ext = L * 0.34 * FS;
+    const t = this.tail;
+    switch (shape) {
+      case 'forked': {
+        const notch = ext * 0.35;
+        t.moveTo(0, 0)
+          .lineTo(-ext, -H * 0.55 * FS)
+          .lineTo(-ext + notch, -H * 0.1 * FS)
+          .lineTo(-ext, 0)
+          .lineTo(-ext + notch, H * 0.1 * FS)
+          .lineTo(-ext, H * 0.55 * FS)
+          .closePath()
+          .fill(color);
+        break;
+      }
+      case 'lunate': {
+        t.moveTo(0, 0)
+          .quadraticCurveTo(-ext * 0.55, -H * 0.3 * FS, -ext * 1.15, -H * 0.62 * FS)
+          .quadraticCurveTo(-ext * 0.62, -H * 0.14 * FS, -ext * 0.5, 0)
+          .quadraticCurveTo(-ext * 0.62, H * 0.14 * FS, -ext * 1.15, H * 0.62 * FS)
+          .quadraticCurveTo(-ext * 0.55, H * 0.3 * FS, 0, 0)
+          .closePath()
+          .fill(color);
+        break;
+      }
+      case 'round': {
+        t.moveTo(0, -H * 0.03)
+          .quadraticCurveTo(-ext * 1.1, -H * 0.55 * FS, -ext * 0.6, 0)
+          .quadraticCurveTo(-ext * 1.1, H * 0.55 * FS, 0, H * 0.03)
+          .closePath()
+          .fill(color);
+        break;
+      }
+      case 'lyre': {
+        t.moveTo(0, 0)
+          .quadraticCurveTo(-ext * 0.5, -H * 0.2 * FS, -ext * 1.5, -H * 0.7 * FS)
+          .quadraticCurveTo(-ext * 0.85, -H * 0.12 * FS, -ext * 0.3, 0)
+          .quadraticCurveTo(-ext * 0.85, H * 0.12 * FS, -ext * 1.5, H * 0.7 * FS)
+          .quadraticCurveTo(-ext * 0.5, H * 0.2 * FS, 0, 0)
+          .closePath()
+          .fill(color);
+        break;
+      }
+      case 'ribbon': {
+        t.moveTo(0, -H * 0.08)
+          .lineTo(-ext * 1.8, -H * 0.09)
+          .lineTo(-ext * 1.95, 0)
+          .lineTo(-ext * 1.8, H * 0.09)
+          .lineTo(0, H * 0.08)
+          .closePath()
+          .fill(color);
+        break;
+      }
+      default: // 'lens'
+        t.moveTo(0, 0)
+          .lineTo(-ext, -H * 0.45 * FS)
+          .quadraticCurveTo(-ext * 0.6, 0, -ext, H * 0.45 * FS)
+          .closePath()
+          .fill(color);
+    }
+  }
+
   private buildSprite(): void {
     const sp = this.sp;
     const L = sp.size;
@@ -103,17 +166,23 @@ export class Fish {
 
     // Kuyruk (rotasyon merkezi gövdeye bağlantı noktası)
     this.tail.position.set(-L / 2 + 2, 0);
-    this.tail
-      .moveTo(0, 0)
-      .lineTo(-L * 0.34 * FS, -H * 0.45 * FS)
-      .quadraticCurveTo(-L * 0.2 * FS, 0, -L * 0.34 * FS, H * 0.45 * FS)
-      .closePath()
-      .fill(c.fin);
+    this.drawTail(L, H, FS, c.fin, sp.tailShape);
     this.root.addChild(this.tail);
 
     // Gövde
     const bodyG = new Graphics();
     bodyG.ellipse(0, 0, L / 2, H / 2).fill(c.body);
+    switch (sp.snout) {
+      case 'long':
+        bodyG.moveTo(L * 0.42, -H * 0.05).lineTo(L * 0.66, -H * 0.02).lineTo(L * 0.42, H * 0.09).closePath().fill(c.body);
+        break;
+      case 'hump':
+        bodyG.circle(L * 0.2, -H * 0.44, L * 0.1).fill(c.body);
+        break;
+      case 'blunt':
+        bodyG.roundRect(L * 0.4, -H * 0.14, L * 0.1, H * 0.28, L * 0.03).fill(c.body);
+        break;
+    }
     this.body.addChild(bodyG);
 
     // Desen katmanı (gövde elipsi ile maskelenir)
@@ -146,12 +215,31 @@ export class Fish {
 
     // Yüzgeçler
     const finsG = new Graphics();
-    finsG
-      .moveTo(-L * 0.15, -H / 2 + 2)
-      .lineTo(L * 0.05, -H / 2 - H * 0.45 * FS)
-      .lineTo(L * 0.22, -H / 2 + 2)
-      .closePath()
-      .fill({ color: c.fin, alpha: 0.95 });
+    switch (sp.dorsalStyle) {
+      case 'flowing':
+        finsG
+          .moveTo(-L * 0.22, -H / 2 + 2)
+          .quadraticCurveTo(-L * 0.02, -H / 2 - H * 0.55 * FS, L * 0.18, -H / 2 - H * 0.78 * FS)
+          .quadraticCurveTo(L * 0.3, -H / 2 - H * 0.3 * FS, L * 0.26, -H / 2 + 2)
+          .closePath()
+          .fill({ color: c.fin, alpha: 0.9 });
+        break;
+      case 'sail':
+        finsG
+          .moveTo(-L * 0.26, -H / 2 + 2)
+          .lineTo(L * 0.0, -H / 2 - H * 0.85 * FS)
+          .lineTo(L * 0.3, -H / 2 + 2)
+          .closePath()
+          .fill({ color: c.fin, alpha: 0.95 });
+        break;
+      default:
+        finsG
+          .moveTo(-L * 0.15, -H / 2 + 2)
+          .lineTo(L * 0.05, -H / 2 - H * 0.45 * FS)
+          .lineTo(L * 0.22, -H / 2 + 2)
+          .closePath()
+          .fill({ color: c.fin, alpha: 0.95 });
+    }
     if (sp.spiky) {
       for (let i = 0; i < 5; i++) {
         const sx = -L * 0.3 + i * L * 0.14;
