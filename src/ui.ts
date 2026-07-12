@@ -18,6 +18,14 @@ export function fmt(n: number): string {
   return String(n);
 }
 
+/** Türün id'sinden -1..1 aralığında deterministik bir sapma üretir (fish.ts'teki idJitter ile eşleşir). */
+function idJitter(id: string, salt: number): number {
+  let h = 0;
+  const s = id + ':' + salt;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return ((h >>> 0) % 2001) / 1000 - 1;
+}
+
 const TAIL_PIVOT_X = -48;
 
 /** Kuyruk şeklinin SVG path 'd' verisi (fish.ts'teki drawTail ile eşleşir). */
@@ -73,7 +81,11 @@ export function fishSVG(sp: Species, size = 84, silhouette = false): string {
   const c = silhouette
     ? { body: '#a9b8c2', belly: '#c3cfd8', fin: '#93a5b1', accent: '#c3cfd8' }
     : { body: hex(sp.colors.body), belly: hex(sp.colors.belly), fin: hex(sp.colors.fin), accent: hex(sp.colors.accent) };
-  const H = 100 * (sp.bodyH ?? 0.48);
+  const jTail = 1 + 0.09 * idJitter(sp.id, 1);
+  const jDorsal = 1 + 0.14 * idJitter(sp.id, 2);
+  const jEye = 1 + 0.09 * idJitter(sp.id, 3);
+  const jDetail = 1 + 0.08 * idJitter(sp.id, 5);
+  const H = 100 * ((sp.bodyH ?? 0.48) + 0.025 * idJitter(sp.id, 4));
   const FS = sp.finScale ?? 1;
   let pattern = '';
   if (!silhouette) {
@@ -97,20 +109,20 @@ export function fishSVG(sp: Species, size = 84, silhouette = false): string {
     ? `<circle cx="0" cy="0" r="66" fill="${hex(RARITY_INFO[sp.rarity].glow)}" opacity="0.35"/>`
     : '';
   const uid = sp.id + (silhouette ? '-s' : '') + '-' + size;
-  const snout = silhouette ? '' : snoutSVG(H, sp.snout, c.body);
+  const snout = snoutSVG(H, sp.snout, c.body);
   return `<svg viewBox="-105 -70 210 140" width="${size}" height="${(size * 140) / 210}" xmlns="http://www.w3.org/2000/svg">
     ${glow}
-    <path d="${tailPathD(H, FS, sp.tailShape)}" fill="${c.fin}"/>
-    <path d="${dorsalPathD(H, FS, sp.dorsalStyle)}" fill="${c.fin}" opacity="0.95"/>
+    <path d="${tailPathD(H, FS * jTail, sp.tailShape)}" fill="${c.fin}"/>
+    <path d="${dorsalPathD(H, FS * jDorsal, sp.dorsalStyle)}" fill="${c.fin}" opacity="0.95"/>
     <clipPath id="b-${uid}"><ellipse cx="0" cy="0" rx="50" ry="${H / 2}"/></clipPath>
     <ellipse cx="0" cy="0" rx="50" ry="${H / 2}" fill="${c.body}"/>
     ${snout}
     <g clip-path="url(#b-${uid})">
-      <ellipse cx="2" cy="${H * 0.16}" rx="40" ry="${H * 0.32}" fill="${c.belly}"/>
+      <ellipse cx="2" cy="${H * 0.16}" rx="${40 * jDetail}" ry="${H * 0.32}" fill="${c.belly}"/>
       ${pattern}
     </g>
-    <circle cx="30" cy="${-H * 0.08}" r="5.2" fill="${silhouette ? '#e6edf2' : '#ffffff'}"/>
-    <circle cx="31.5" cy="${-H * 0.08}" r="2.6" fill="${silhouette ? '#8a99a5' : '#26262e'}"/>
+    <circle cx="30" cy="${-H * 0.08}" r="${5.2 * jEye}" fill="${silhouette ? '#e6edf2' : '#ffffff'}"/>
+    <circle cx="31.5" cy="${-H * 0.08}" r="${2.6 * jEye}" fill="${silhouette ? '#8a99a5' : '#26262e'}"/>
   </svg>`;
 }
 

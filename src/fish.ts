@@ -22,6 +22,14 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** Türün id'sinden -1..1 aralığında deterministik bir sapma üretir. Aynı ailedeki (aynı tailShape/dorsalStyle) türlerin bile birebir aynı geometriyi paylaşmamasını sağlar. */
+function idJitter(id: string, salt: number): number {
+  let h = 0;
+  const s = id + ':' + salt;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return ((h >>> 0) % 2001) / 1000 - 1;
+}
+
 export interface Bounds { w: number; h: number }
 
 export class Fish {
@@ -148,7 +156,12 @@ export class Fish {
   private buildSprite(): void {
     const sp = this.sp;
     const L = sp.size;
-    const H = L * (sp.bodyH ?? 0.48);
+    // Türe özgü, id'den türetilen sabit sapmalar: aynı aileyi paylaşan türleri de birbirinden ayırır.
+    const jTail = 1 + 0.09 * idJitter(sp.id, 1);
+    const jDorsal = 1 + 0.14 * idJitter(sp.id, 2);
+    const jEye = 1 + 0.09 * idJitter(sp.id, 3);
+    const jDetail = 1 + 0.08 * idJitter(sp.id, 5);
+    const H = L * ((sp.bodyH ?? 0.48) + 0.025 * idJitter(sp.id, 4));
     const FS = sp.finScale ?? 1;
     const c = sp.colors;
     const rnd = mulberry32(this.seed + 7);
@@ -166,7 +179,7 @@ export class Fish {
 
     // Kuyruk (rotasyon merkezi gövdeye bağlantı noktası)
     this.tail.position.set(-L / 2 + 2, 0);
-    this.drawTail(L, H, FS, c.fin, sp.tailShape);
+    this.drawTail(L, H, FS * jTail, c.fin, sp.tailShape);
     this.root.addChild(this.tail);
 
     // Gövde
@@ -189,7 +202,7 @@ export class Fish {
     const maskG = new Graphics();
     maskG.ellipse(0, 0, L / 2, H / 2).fill(0xffffff);
     const patG = new Graphics();
-    patG.ellipse(L * 0.02, H * 0.16, L * 0.4, H * 0.32).fill(c.belly);
+    patG.ellipse(L * 0.02, H * 0.16, L * 0.4 * jDetail, H * 0.32).fill(c.belly);
     switch (sp.pattern) {
       case 'stripes': {
         const xs = sp.id === 'palyaco' ? [-0.28, 0, 0.28] : [-0.22, 0, 0.22];
@@ -215,19 +228,20 @@ export class Fish {
 
     // Yüzgeçler
     const finsG = new Graphics();
+    const DFS = FS * jDorsal;
     switch (sp.dorsalStyle) {
       case 'flowing':
         finsG
           .moveTo(-L * 0.22, -H / 2 + 2)
-          .quadraticCurveTo(-L * 0.02, -H / 2 - H * 0.55 * FS, L * 0.18, -H / 2 - H * 0.78 * FS)
-          .quadraticCurveTo(L * 0.3, -H / 2 - H * 0.3 * FS, L * 0.26, -H / 2 + 2)
+          .quadraticCurveTo(-L * 0.02, -H / 2 - H * 0.55 * DFS, L * 0.18, -H / 2 - H * 0.78 * DFS)
+          .quadraticCurveTo(L * 0.3, -H / 2 - H * 0.3 * DFS, L * 0.26, -H / 2 + 2)
           .closePath()
           .fill({ color: c.fin, alpha: 0.9 });
         break;
       case 'sail':
         finsG
           .moveTo(-L * 0.26, -H / 2 + 2)
-          .lineTo(L * 0.0, -H / 2 - H * 0.85 * FS)
+          .lineTo(L * 0.0, -H / 2 - H * 0.85 * DFS)
           .lineTo(L * 0.3, -H / 2 + 2)
           .closePath()
           .fill({ color: c.fin, alpha: 0.95 });
@@ -235,7 +249,7 @@ export class Fish {
       default:
         finsG
           .moveTo(-L * 0.15, -H / 2 + 2)
-          .lineTo(L * 0.05, -H / 2 - H * 0.45 * FS)
+          .lineTo(L * 0.05, -H / 2 - H * 0.45 * DFS)
           .lineTo(L * 0.22, -H / 2 + 2)
           .closePath()
           .fill({ color: c.fin, alpha: 0.95 });
@@ -253,7 +267,7 @@ export class Fish {
     }
     finsG
       .moveTo(L * 0.02, H * 0.08)
-      .lineTo(-L * 0.14, H * 0.34)
+      .lineTo(-L * 0.14 * jDetail, H * 0.34 * jDetail)
       .lineTo(L * 0.12, H * 0.22)
       .closePath()
       .fill({ color: c.fin, alpha: 0.8 });
@@ -261,9 +275,9 @@ export class Fish {
 
     // Göz
     const eyeG = new Graphics();
-    eyeG.circle(L * 0.3, -H * 0.08, L * 0.052).fill(0xffffff);
-    eyeG.circle(L * 0.315, -H * 0.08, L * 0.026).fill(0x26262e);
-    eyeG.circle(L * 0.3, -H * 0.1, L * 0.011).fill(0xffffff);
+    eyeG.circle(L * 0.3, -H * 0.08, L * 0.052 * jEye).fill(0xffffff);
+    eyeG.circle(L * 0.315, -H * 0.08, L * 0.026 * jEye).fill(0x26262e);
+    eyeG.circle(L * 0.3, -H * 0.1, L * 0.011 * jEye).fill(0xffffff);
     this.body.addChild(eyeG);
 
     this.root.addChild(this.body);
