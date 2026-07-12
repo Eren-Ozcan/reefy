@@ -297,6 +297,12 @@ const REAL_SPECIES: Record<Rarity, SpeciesSeed[]> = {
     { name: 'Bolivya Ram Çiklit', pattern: 'hstripe', size: 32, finScale: 1.2, tailShape: 'round',
       colors: { body: 0xd9b96a, belly: 0xf2e0b0, fin: 0x8a7a5c, accent: 0x2a2a2a },
       desc: 'Gözünden geçen siyah çizgisiyle sakin huylu bir çiklit.' },
+    { name: 'Neon Gökkuşağı Balığı', pattern: 'gradient', size: 34, tailShape: 'forked',
+      colors: { body: 0x3fae9a, belly: 0x8fdcc9, fin: 0x2f8f7d, accent: 0xd6d049 },
+      desc: 'Turkuaz-yeşil metalik parıltısıyla akvaryumu aydınlatır.' },
+    { name: 'Sarı Kuyruklu Mavi Damla', pattern: 'gradient', size: 34, tailShape: 'forked',
+      colors: { body: 0x1f3a6a, belly: 0x3a5c8a, fin: 0xf2d049, accent: 0x0a1a3a },
+      desc: 'Koyu mavi gövdesi ve parlak sarı kuyruğuyla resif sakini.' },
   ],
   rare: [],
   epic: [],
@@ -305,7 +311,7 @@ const REAL_SPECIES: Record<Rarity, SpeciesSeed[]> = {
 
 const RARITY_PLAN: { r: Rarity; count: number; buy: [number, number]; grow: [number, number]; lvl: [number, number] }[] = [
   { r: 'common',    count: 27, buy: [50, 650],      grow: [2, 6],   lvl: [1, 4] },
-  { r: 'uncommon',  count: 20, buy: [280, 2200],    grow: [5, 11],  lvl: [2, 8] },
+  { r: 'uncommon',  count: 22, buy: [280, 2200],    grow: [5, 11],  lvl: [2, 8] },
   { r: 'rare',      count: 0,  buy: [1100, 6500],   grow: [12, 20], lvl: [5, 12] },
   { r: 'epic',      count: 0,  buy: [4200, 12500],  grow: [22, 38], lvl: [8, 16] },
   { r: 'legendary', count: 0,  buy: [15000, 42000], grow: [45, 75], lvl: [12, 20] },
