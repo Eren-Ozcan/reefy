@@ -97,7 +97,7 @@ export interface SocialProvider {
  */
 /** Ziyaret/hediye ödülleri arkadaş başına günlük verildiği için kod kodu spam'iyle
  * sınırsız altın/yem çiftliğini önlemek amacıyla listeye üst sınır konur. */
-const MAX_FRIENDS = 20;
+const MAX_FRIENDS = 50;
 
 export class LocalSocial implements SocialProvider {
   readonly label = 'Yerel mod — çevrimiçi liderlik mobil sürümde';
