@@ -25,6 +25,14 @@ export const QUEST_POOL: QuestDef[] = [
   { id: 'q-earn2k',   name: '2.000 altın kazan',        emoji: '💰', target: 2000, event: 'earn',     rewardCoins: 300, rewardPearls: 0 },
   { id: 'q-collect1', name: 'Koleksiyona 1 tür ekle',   emoji: '📖', target: 1,  event: 'collect',    rewardCoins: 260, rewardPearls: 1 },
   { id: 'q-clean3',   name: '3 kir lekesi temizle',     emoji: '🧹', target: 3,  event: 'clean',      rewardCoins: 200, rewardPearls: 0 },
+  { id: 'q-feed80',   name: 'Balıklarına 80 yem yedir', emoji: '🍤', target: 80, event: 'feed',       rewardCoins: 520, rewardPearls: 1 },
+  { id: 'q-sell10',   name: '10 balık sat',             emoji: '🪙', target: 10, event: 'sell',       rewardCoins: 680, rewardPearls: 1 },
+  { id: 'q-hatch3',   name: '3 yumurta aç',             emoji: '🥚', target: 3,  event: 'hatch',      rewardCoins: 560, rewardPearls: 1 },
+  { id: 'q-buy4',     name: '4 yeni balık satın al',    emoji: '🐟', target: 4,  event: 'buyFish',    rewardCoins: 380, rewardPearls: 1 },
+  { id: 'q-decor2',   name: '2 dekor yerleştir',        emoji: '🪸', target: 2,  event: 'placeDecor', rewardCoins: 340, rewardPearls: 0 },
+  { id: 'q-earn5k',   name: '5.000 altın kazan',        emoji: '💰', target: 5000, event: 'earn',     rewardCoins: 620, rewardPearls: 1 },
+  { id: 'q-collect2', name: 'Koleksiyona 2 tür ekle',   emoji: '📖', target: 2,  event: 'collect',    rewardCoins: 480, rewardPearls: 2 },
+  { id: 'q-clean6',   name: '6 kir lekesi temizle',     emoji: '🧹', target: 6,  event: 'clean',      rewardCoins: 380, rewardPearls: 0 },
 ];
 
 /** Tarihten deterministik günlük görev seçimi */
@@ -48,6 +56,8 @@ export const WEEKLY_QUEST_POOL: QuestDef[] = [
   { id: 'w-hatch10',  name: 'Bu hafta 10 yumurta aç',         emoji: '🥚', target: 10,    event: 'hatch',   rewardCoins: 1800, rewardPearls: 4 },
   { id: 'w-clean15',  name: 'Bu hafta 15 kir lekesi temizle', emoji: '🧹', target: 15,    event: 'clean',   rewardCoins: 1200, rewardPearls: 3 },
   { id: 'w-collect5', name: 'Bu hafta koleksiyona 5 tür ekle', emoji: '📖', target: 5,    event: 'collect', rewardCoins: 2200, rewardPearls: 6 },
+  { id: 'w-buy12',    name: 'Bu hafta 12 yeni balık satın al', emoji: '🐟', target: 12,   event: 'buyFish', rewardCoins: 1900, rewardPearls: 4 },
+  { id: 'w-decor8',   name: 'Bu hafta 8 dekor yerleştir',      emoji: '🪸', target: 8,    event: 'placeDecor', rewardCoins: 1600, rewardPearls: 3 },
 ];
 
 /** Verilen tarihin içinde bulunduğu haftanın pazartesi gününü YYYY-MM-DD biçiminde döndürür. */
@@ -111,4 +121,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   // ulaşıp ödülü almadan bir gün kaçırırsa bestStreak olmasa başarım kalıcı olarak kilitli kalırdı.
   { id: 'a-streak7',  name: 'Sadık Dost',       emoji: '🔥', desc: '7 gün üst üste oyna',                check: (s) => s.bestStreak, target: 7, rewardCoins: 1200, rewardPearls: 3 },
   { id: 'a-clean25',  name: 'Temizlikçi',       emoji: '🧽', desc: '25 kir lekesi temizle',              check: (s) => s.stats.totalCleaned, target: 25, rewardCoins: 900, rewardPearls: 2 },
+  { id: 'a-feed500',  name: 'Sadık Besleyici',  emoji: '🍤', desc: 'Toplam 500 yem ver',                 check: (s) => s.stats.totalFed, target: 500,  rewardCoins: 700,  rewardPearls: 2 },
+  { id: 'a-feed2000', name: 'Yem Ustası',       emoji: '🍽️', desc: 'Toplam 2.000 yem ver',               check: (s) => s.stats.totalFed, target: 2000, rewardCoins: 3000, rewardPearls: 5 },
+  { id: 'a-decor50',  name: 'Saray Mimarı',     emoji: '🏰', desc: '50 dekor yerleştir',                 check: (s) => s.stats.decorPlacedCount, target: 50, rewardCoins: 4000, rewardPearls: 6 },
+  // friends.length: arkadaş listesindeki kod sayısı (üst sınır 50, bkz. services.ts MAX_FRIENDS).
+  { id: 'a-friend5',  name: 'Sosyal Kelebek',   emoji: '🦋', desc: '5 arkadaş ekle',                     check: (s) => s.friends.length, target: 5,  rewardCoins: 600,  rewardPearls: 1 },
+  { id: 'a-friend25', name: 'Resif Topluluğu',  emoji: '🐬', desc: '25 arkadaş ekle',                    check: (s) => s.friends.length, target: 25, rewardCoins: 3500, rewardPearls: 5 },
+  { id: 'a-streak30', name: 'Aylık Dost',       emoji: '🌙', desc: '30 gün üst üste oyna',               check: (s) => s.bestStreak, target: 30, rewardCoins: 6000, rewardPearls: 8 },
 ];
