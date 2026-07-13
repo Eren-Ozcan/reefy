@@ -2,11 +2,13 @@
 //
 // Web/geliştirme ortamında yerel (local) sağlayıcılar çalışır.
 // Capacitor ile paketlerken bu arayüzlerin native karşılıkları bağlanır:
-//   - Auth   -> Google Play Games Services / Apple Game Center
+//   - Auth   -> Google Play Games Services / Apple Game Center (bağlandı, bkz. GameCenterAuth)
 //   - IAP    -> Google Play Billing / Apple StoreKit (örn. RevenueCat üzerinden)
 //   - Social -> Play Games liderlik tablosu / Game Center veya Firebase backend
 // Oyun kodu yalnızca bu arayüzleri kullanır; sağlayıcı değişimi tek satırdır.
 
+import { Capacitor } from '@capacitor/core';
+import { CapacitorGameConnect } from '@openforge/capacitor-game-connect';
 import type { SaveData } from './save';
 
 // ---------- Kimlik / giriş ----------
@@ -35,6 +37,43 @@ export class LocalAuth implements AuthProvider {
       msg: 'Google Play Games / Game Center girişi mobil pakette etkinleşir. Şimdilik ilerlemen bu cihazda güvenle saklanıyor.',
     });
   }
+}
+
+/**
+ * iOS + Capacitor native paketinde Apple Game Center'a gerçek giriş.
+ * @openforge/capacitor-game-connect eklentisini kullanır (GKLocalPlayer üzerinden).
+ * Kurulum notu: Xcode'da hedef uygulamaya "Game Center" capability'si eklenmeli
+ * (ios/App/App/App.entitlements bu proje köküne zaten eklendi, capability'yi
+ * Xcode > Signing & Capabilities'ten açman pbxproj'a doğru şekilde bağlar) ve
+ * App Store Connect > Özellikler sekmesinden Game Center etkinleştirilmelidir.
+ * Web/Android'de bu sınıf hiç seçilmez; createServices() platforma göre seçer.
+ */
+export class GameCenterAuth implements AuthProvider {
+  readonly platformLabel = 'Game Center';
+  private identity: PlayerIdentity | null = null;
+
+  constructor(private save: SaveData) {}
+
+  current(): PlayerIdentity | null {
+    return this.identity;
+  }
+
+  async signIn(): Promise<{ ok: boolean; msg: string }> {
+    try {
+      const res = await CapacitorGameConnect.signIn();
+      this.identity = { id: res.player_id, name: res.player_name, platform: 'game-center' };
+      // Oyun içi isim/kimliği Game Center oyuncu adıyla senkronla (yerel yedek olarak kalır).
+      this.save.playerName = res.player_name || this.save.playerName;
+      return { ok: true, msg: `Game Center'a giriş yapıldı: ${res.player_name} 🎮` };
+    } catch {
+      return { ok: false, msg: 'Game Center girişi başarısız. Ayarlar > Game Center\'da oturum açık mı kontrol et.' };
+    }
+  }
+}
+
+/** Yalnızca iOS'ta ve native (Capacitor) ortamda çalışırken Game Center kullanılabilir olur. */
+export function isGameCenterAvailable(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 }
 
 // ---------- Mikro ödemeler ----------
@@ -151,9 +190,10 @@ export interface Services {
 }
 
 export function createServices(save: SaveData): Services {
-  // Capacitor paketinde burada platforma göre native sağlayıcılar seçilir.
+  // iOS + native (Capacitor) paketinde Game Center'a gerçek giriş; diğer tüm
+  // ortamlarda (web önizleme, Android, dev sunucusu) yerel sağlayıcıya düşülür.
   return {
-    auth: new LocalAuth(save),
+    auth: isGameCenterAvailable() ? new GameCenterAuth(save) : new LocalAuth(save),
     iap: new StubIAP(),
     social: new LocalSocial(),
   };
