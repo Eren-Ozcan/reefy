@@ -1,4 +1,4 @@
-import { Application, Container, FillGradient, Graphics } from 'pixi.js';
+import { Application, Container, FillGradient, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
@@ -66,7 +66,12 @@ export class Game {
   private fxG = new Graphics();
   private bubbleG = new Graphics();
   private dirtG = new Graphics();
-  private grimeG = new Graphics();
+  /** Kirli cam dokusu ekrandışı bu Graphics'e çizilir, ardından tek bir sprite'a "baked" edilir
+   *  (her karede birçok yarı saydam şekli yeniden rasterize etmek yerine tek doku çizimi). */
+  private grimeScratch = new Graphics();
+  private grimeSprite = new Sprite();
+  private grimeTex: Texture | null = null;
+  private grimeCacheKey = '';
   private dirtTimer = DIRT_SPAWN_MS * (0.3 + Math.random() * 0.7);
 
   private pellets: Pellet[] = [];
@@ -179,7 +184,7 @@ export class Game {
 
     this.world.addChild(
       this.bgG, this.rayLayer, this.biomeG, this.biomeAnimG, this.ambientG, this.decorAnimG, this.sandG,
-      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.moodG, this.grimeG,
+      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.moodG, this.grimeSprite,
     );
     this.app.stage.addChild(this.world);
 
@@ -1273,22 +1278,41 @@ export class Game {
    * camın üstüne "kirli" bir doku ekler.
    */
   private drawGrime(w: number, h: number, dl: number): void {
-    const g = this.grimeG;
-    g.clear();
-    if (dl <= 0.02) return;
+    // dirtLevel ve boyutlar değişmediği sürece yeniden çizmeye gerek yok (her frame vektör
+    // geometrisini yeniden üretmek gereksiz maliyetli; kirlilik seviyesi seyrek değişir).
+    const key = `${w}x${h}x${dl.toFixed(3)}`;
+    if (key === this.grimeCacheKey) return;
+    this.grimeCacheKey = key;
 
+    const g = this.grimeScratch;
+    g.clear();
+    if (dl <= 0.02) {
+      this.grimeSprite.visible = false;
+      return;
+    }
+    this.grimeSprite.visible = true;
+
+    // Köşe lekeleri: iç içe daireler yerine tek bir radyal gradyan dolgusu kullanılır
+    // (aynı gradyan dört köşede de yeniden kullanılır) — çok daha az örtüşen çizim, aynı görünüm.
+    const cornerAlpha = 0.16 + dl * 0.34;
+    const cornerGrad = new FillGradient({
+      type: 'radial',
+      center: { x: 0.5, y: 0.5 }, innerRadius: 0,
+      outerCenter: { x: 0.5, y: 0.5 }, outerRadius: 0.5,
+      colorStops: [
+        { offset: 0, color: [0.24, 0.29, 0.15, cornerAlpha] },
+        { offset: 1, color: [0.24, 0.29, 0.15, 0] },
+      ],
+    });
+    const rad = (0.22 + dl * 0.3) * Math.min(w, h);
     const corners: [number, number, number, number][] = [
       [0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1],
     ];
     for (const [cx, cy, sx, sy] of corners) {
-      const rad = (0.16 + dl * 0.22) * Math.min(w, h);
-      for (let i = 3; i >= 0; i--) {
-        const r = rad * (1 - i * 0.22);
-        const alpha = (0.05 + dl * 0.1) * (1 - i * 0.2);
-        g.circle(cx + sx * r * 0.35, cy + sy * r * 0.35, r).fill({ color: 0x3d4a26, alpha });
-      }
+      g.circle(cx + sx * rad * 0.3, cy + sy * rad * 0.3, rad).fill(cornerGrad);
     }
 
+    // Üst kenardan sarkan yosun/kireç damlaları
     const streaks = Math.round(3 + dl * 6);
     for (let i = 0; i < streaks; i++) {
       const fx = (i + 0.5) / streaks;
@@ -1305,7 +1329,13 @@ export class Game {
         .fill({ color: 0x4a5c34, alpha: 0.12 + dl * 0.18 });
     }
 
-    g.rect(0, 0, w, h).fill({ color: 0x4a5c34, alpha: dl * 0.05 });
+    // Yarı saydam şekilleri her karede yeniden rasterize etmek yerine tek bir dokuya
+    // "pişirip" sprite olarak gösteriyoruz: GPU her karede sadece bir quad çizer.
+    const oldTex = this.grimeTex;
+    this.grimeTex = this.app.renderer.generateTexture({ target: g, frame: new Rectangle(0, 0, w, h) });
+    this.grimeSprite.texture = this.grimeTex;
+    this.grimeSprite.position.set(0, 0);
+    if (oldTex) oldTex.destroy(true);
   }
 
   /** Tek yem tanesi at (dokunulan noktadan batar). Ücretli yem önce stoktan, stok yoksa altından düşer. */
