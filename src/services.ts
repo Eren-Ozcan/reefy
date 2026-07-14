@@ -2,7 +2,7 @@
 //
 // Web/geliştirme ortamında yerel (local) sağlayıcılar çalışır.
 // Capacitor ile paketlerken bu arayüzlerin native karşılıkları bağlanır:
-//   - Auth   -> Google Play Games Services / Apple Game Center (bağlandı, bkz. GameCenterAuth)
+//   - Auth   -> Google Play Games Services / Apple Game Center (bağlandı, bkz. NativeGameAuth)
 //   - IAP    -> Google Play Billing / Apple StoreKit (örn. RevenueCat üzerinden)
 //   - Social -> Play Games liderlik tablosu / Game Center veya Firebase backend
 // Oyun kodu yalnızca bu arayüzleri kullanır; sağlayıcı değişimi tek satırdır.
@@ -40,19 +40,31 @@ export class LocalAuth implements AuthProvider {
 }
 
 /**
- * iOS + Capacitor native paketinde Apple Game Center'a gerçek giriş.
- * @openforge/capacitor-game-connect eklentisini kullanır (GKLocalPlayer üzerinden).
- * Kurulum notu: Xcode'da hedef uygulamaya "Game Center" capability'si eklenmeli
- * (ios/App/App/App.entitlements bu proje köküne zaten eklendi, capability'yi
- * Xcode > Signing & Capabilities'ten açman pbxproj'a doğru şekilde bağlar) ve
- * App Store Connect > Özellikler sekmesinden Game Center etkinleştirilmelidir.
- * Web/Android'de bu sınıf hiç seçilmez; createServices() platforma göre seçer.
+ * Native (Capacitor) paketlerde Apple Game Center (iOS) / Google Play Games (Android)
+ * üzerinden gerçek giriş. @openforge/capacitor-game-connect eklentisini kullanır;
+ * eklentinin signIn() API'si her iki platformda da aynıdır, sadece etiket ve
+ * PlayerIdentity.platform alanı ayrışır.
+ *
+ * Kurulum notları:
+ *   - iOS: Xcode'da hedef uygulamaya "Game Center" capability'si eklenmeli
+ *     (ios/App/App/App.entitlements zaten eklendi, capability'yi
+ *     Xcode > Signing & Capabilities'ten açman pbxproj'a doğru şekilde bağlar)
+ *     ve App Store Connect > Özellikler sekmesinden Game Center etkinleştirilmelidir.
+ *   - Android: android/app/src/main/res/values/strings.xml içindeki
+ *     game_services_project_id yer tutucusu, Play Console > Play Games Services
+ *     ile alınan gerçek proje ID'siyle değiştirilmeli; aksi halde signIn() başarısız olur.
+ *
+ * Web'de bu sınıf hiç seçilmez; createServices() platforma göre seçer.
  */
-export class GameCenterAuth implements AuthProvider {
-  readonly platformLabel = 'Game Center';
+export class NativeGameAuth implements AuthProvider {
+  readonly platformLabel: string;
+  private readonly platform: 'game-center' | 'play-games';
   private identity: PlayerIdentity | null = null;
 
-  constructor(private save: SaveData) {}
+  constructor(private save: SaveData) {
+    this.platform = Capacitor.getPlatform() === 'ios' ? 'game-center' : 'play-games';
+    this.platformLabel = this.platform === 'game-center' ? 'Game Center' : 'Play Games';
+  }
 
   current(): PlayerIdentity | null {
     return this.identity;
@@ -61,19 +73,19 @@ export class GameCenterAuth implements AuthProvider {
   async signIn(): Promise<{ ok: boolean; msg: string }> {
     try {
       const res = await CapacitorGameConnect.signIn();
-      this.identity = { id: res.player_id, name: res.player_name, platform: 'game-center' };
-      // Oyun içi isim/kimliği Game Center oyuncu adıyla senkronla (yerel yedek olarak kalır).
+      this.identity = { id: res.player_id, name: res.player_name, platform: this.platform };
+      // Oyun içi isim/kimliği native oyuncu adıyla senkronla (yerel yedek olarak kalır).
       this.save.playerName = res.player_name || this.save.playerName;
-      return { ok: true, msg: `Game Center'a giriş yapıldı: ${res.player_name} 🎮` };
+      return { ok: true, msg: `${this.platformLabel}'a giriş yapıldı: ${res.player_name} 🎮` };
     } catch {
-      return { ok: false, msg: 'Game Center girişi başarısız. Ayarlar > Game Center\'da oturum açık mı kontrol et.' };
+      return { ok: false, msg: `${this.platformLabel} girişi başarısız. Hesabın cihazda oturum açık mı kontrol et.` };
     }
   }
 }
 
-/** Yalnızca iOS'ta ve native (Capacitor) ortamda çalışırken Game Center kullanılabilir olur. */
-export function isGameCenterAvailable(): boolean {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+/** Yalnızca native (Capacitor) ortamda (iOS veya Android) çalışırken oyun platformu girişi kullanılabilir olur. */
+export function isNativeGameAuthAvailable(): boolean {
+  return Capacitor.isNativePlatform() && (Capacitor.getPlatform() === 'ios' || Capacitor.getPlatform() === 'android');
 }
 
 // ---------- Mikro ödemeler ----------
@@ -190,10 +202,10 @@ export interface Services {
 }
 
 export function createServices(save: SaveData): Services {
-  // iOS + native (Capacitor) paketinde Game Center'a gerçek giriş; diğer tüm
-  // ortamlarda (web önizleme, Android, dev sunucusu) yerel sağlayıcıya düşülür.
+  // iOS/Android native (Capacitor) paketinde Game Center / Play Games'e gerçek giriş;
+  // diğer tüm ortamlarda (web önizleme, dev sunucusu) yerel sağlayıcıya düşülür.
   return {
-    auth: isGameCenterAvailable() ? new GameCenterAuth(save) : new LocalAuth(save),
+    auth: isNativeGameAuthAvailable() ? new NativeGameAuth(save) : new LocalAuth(save),
     iap: new StubIAP(),
     social: new LocalSocial(),
   };
