@@ -22,7 +22,7 @@ const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsin
 const MAX_DIRT_SPOTS = 6;              // akvaryum başına en fazla temizlenmemiş kir lekesi
 const DIRT_SPAWN_MS = 100_000;         // ortalama bu sürede yeni bir leke oluşur
 const DIRT_PENALTY_MAX = 0.35;         // tamamen kirli akvaryumda üretim/büyüme %35 azalır
-const DIRT_BLUR_MAX = 7;               // tamamen kirli akvaryumda cam bulanıklığı (piksel)
+const DIRT_BLUR_MAX = 3;               // tamamen kirli akvaryumda cam bulanıklığı (piksel)
 
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
@@ -907,7 +907,7 @@ export class Game {
     this.drawDirt(w, h);
     const dl = this.dirtLevel(this.save.activeTank);
     if (dl > 0.02) {
-      this.glassBlur.strength = 0.5 + dl * DIRT_BLUR_MAX;
+      this.glassBlur.strength = 0.3 + dl * DIRT_BLUR_MAX;
       this.world.filters = [this.glassBlur];
     } else {
       this.world.filters = null;
