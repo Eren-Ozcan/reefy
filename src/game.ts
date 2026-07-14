@@ -1,4 +1,4 @@
-import { Application, BlurFilter, Container, FillGradient, Graphics } from 'pixi.js';
+import { Application, Container, FillGradient, Graphics } from 'pixi.js';
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
@@ -22,7 +22,6 @@ const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsin
 const MAX_DIRT_SPOTS = 6;              // akvaryum başına en fazla temizlenmemiş kir lekesi
 const DIRT_SPAWN_MS = 100_000;         // ortalama bu sürede yeni bir leke oluşur
 const DIRT_PENALTY_MAX = 0.35;         // tamamen kirli akvaryumda üretim/büyüme %35 azalır
-const DIRT_BLUR_MAX = 3;               // tamamen kirli akvaryumda cam bulanıklığı (piksel)
 
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
@@ -67,7 +66,7 @@ export class Game {
   private fxG = new Graphics();
   private bubbleG = new Graphics();
   private dirtG = new Graphics();
-  private glassBlur = new BlurFilter({ strength: 0 });
+  private grimeG = new Graphics();
   private dirtTimer = DIRT_SPAWN_MS * (0.3 + Math.random() * 0.7);
 
   private pellets: Pellet[] = [];
@@ -180,7 +179,7 @@ export class Game {
 
     this.world.addChild(
       this.bgG, this.rayLayer, this.biomeG, this.biomeAnimG, this.ambientG, this.decorAnimG, this.sandG,
-      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.moodG,
+      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.moodG, this.grimeG,
     );
     this.app.stage.addChild(this.world);
 
@@ -905,13 +904,7 @@ export class Game {
       this.maybeSpawnDirt(this.save.activeTank);
     }
     this.drawDirt(w, h);
-    const dl = this.dirtLevel(this.save.activeTank);
-    if (dl > 0.02) {
-      this.glassBlur.strength = 0.3 + dl * DIRT_BLUR_MAX;
-      this.world.filters = [this.glassBlur];
-    } else {
-      this.world.filters = null;
-    }
+    this.drawGrime(w, h, this.dirtLevel(this.save.activeTank));
   }
 
   private onGrown(f: Fish): void {
@@ -1272,6 +1265,47 @@ export class Game {
       g.circle(cx + r * 0.35, cy - r * 0.25, r * 0.55).fill({ color: c2, alpha: 0.3 });
       g.circle(cx - r * 0.3, cy + r * 0.2, r * 0.4).fill({ color: c2, alpha: 0.22 });
     }
+  }
+
+  /**
+   * Kirlilik arttıkça camın kendisini kirli gösteren sabit bir yapı çizer: köşelerde birikmiş
+   * yosun/kireç lekeleri ve üst kenardan sarkan damla izleri. Sahneyi bulanıklaştırmaz, sadece
+   * camın üstüne "kirli" bir doku ekler.
+   */
+  private drawGrime(w: number, h: number, dl: number): void {
+    const g = this.grimeG;
+    g.clear();
+    if (dl <= 0.02) return;
+
+    const corners: [number, number, number, number][] = [
+      [0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1],
+    ];
+    for (const [cx, cy, sx, sy] of corners) {
+      const rad = (0.16 + dl * 0.22) * Math.min(w, h);
+      for (let i = 3; i >= 0; i--) {
+        const r = rad * (1 - i * 0.22);
+        const alpha = (0.05 + dl * 0.1) * (1 - i * 0.2);
+        g.circle(cx + sx * r * 0.35, cy + sy * r * 0.35, r).fill({ color: 0x3d4a26, alpha });
+      }
+    }
+
+    const streaks = Math.round(3 + dl * 6);
+    for (let i = 0; i < streaks; i++) {
+      const fx = (i + 0.5) / streaks;
+      const seed = Math.sin(i * 12.9898 + 4.1414) * 43758.5453;
+      const jitter = seed - Math.floor(seed);
+      const x = fx * w + (jitter - 0.5) * (w / streaks) * 0.6;
+      const len = h * (0.06 + jitter * 0.1) * (0.4 + dl);
+      const width = 3 + jitter * 5;
+      g.moveTo(x - width / 2, 0)
+        .lineTo(x + width / 2, 0)
+        .lineTo(x + width * 0.25, len)
+        .lineTo(x - width * 0.25, len)
+        .closePath()
+        .fill({ color: 0x4a5c34, alpha: 0.12 + dl * 0.18 });
+    }
+
+    g.rect(0, 0, w, h).fill({ color: 0x4a5c34, alpha: dl * 0.05 });
   }
 
   /** Tek yem tanesi at (dokunulan noktadan batar). Ücretli yem önce stoktan, stok yoksa altından düşer. */
