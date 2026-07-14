@@ -29,8 +29,12 @@ playBtn.addEventListener('click', () => {
     await game.init(document.getElementById('canvas-wrap')!);
     ui.mount(document.getElementById('ui')!);
 
-    // Test/geliştirme kancası: e2e testi oyun durumuna buradan erişir
-    (window as unknown as { __reefyGame?: Game }).__reefyGame = game;
+    // Test/geliştirme kancası: e2e testi oyun durumuna buradan erişir.
+    // Yalnızca dev sunucusunda etkin — prod/iOS derlemesinde tree-shake ile silinir,
+    // böylece herkese açık build'de tüm oyun state'i/API'si console'a sızmaz.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __reefyGame?: Game }).__reefyGame = game;
+    }
 
     menu.classList.add('hidden');
     audio.startAmbient();
