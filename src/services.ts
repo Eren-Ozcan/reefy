@@ -9,6 +9,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { CapacitorGameConnect } from '@openforge/capacitor-game-connect';
+import { Purchases, PURCHASES_ERROR_CODE, type PurchasesPackage } from '@revenuecat/purchases-capacitor';
 import type { SaveData } from './save';
 
 // ---------- Kimlik / giriş ----------
@@ -94,6 +95,7 @@ export interface IAPPack {
   id: string;
   name: string;
   pearls: number;
+  coins?: number;
   bonus: string;
   priceLabel: string; // gerçek fiyat mağaza API'sinden gelir; bu etiket tanıtım amaçlı
   emoji: string;
@@ -104,7 +106,7 @@ export const IAP_PACKS: IAPPack[] = [
   { id: 'pearls-m',  name: 'Kese İnci',      pearls: 170,  bonus: '+%15 bonus', priceLabel: '₺99,99',  emoji: '👛' },
   { id: 'pearls-l',  name: 'Sandık İnci',    pearls: 450,  bonus: '+%25 bonus', priceLabel: '₺229,99', emoji: '🧰' },
   { id: 'pearls-xl', name: 'Hazine İnci',    pearls: 1000, bonus: '+%40 bonus', priceLabel: '₺449,99', emoji: '💎' },
-  { id: 'starter',   name: 'Başlangıç Paketi', pearls: 80, bonus: '+5.000 altın', priceLabel: '₺49,99', emoji: '🎁' },
+  { id: 'starter',   name: 'Başlangıç Paketi', pearls: 80, coins: 5000, bonus: '+5.000 altın', priceLabel: '₺49,99', emoji: '🎁' },
 ];
 
 export interface IAPProvider {
@@ -122,6 +124,83 @@ export class StubIAP implements IAPProvider {
       ok: false,
       msg: 'Gerçek satın alma Google Play / App Store sürümünde etkinleşir. Bu önizlemede inci kazanmak için görevleri ve seviye ödüllerini kullanabilirsin.',
     });
+  }
+}
+
+/**
+ * RevenueCat API anahtarları (public SDK key'ler — Stripe publishable key gibi
+ * istemci tarafında gömülü olması güvenlidir, gizli tutulması gereken key değildir).
+ * RevenueCat dashboard > Project Settings > API Keys üzerinden alınır.
+ * Doldurulmadan (yer tutucu değerdeyken) RevenueCatIAP.configure() atlanır ve
+ * satın alma denemeleri "mağazaya bağlanılamadı" hatası döner.
+ */
+const REVENUECAT_API_KEYS: { android: string; ios: string } = {
+  android: 'REPLACE_WITH_REVENUECAT_GOOGLE_API_KEY',
+  ios: 'REPLACE_WITH_REVENUECAT_APPLE_API_KEY',
+};
+
+function isRevenueCatConfigured(): boolean {
+  return !REVENUECAT_API_KEYS.android.startsWith('REPLACE_') && !REVENUECAT_API_KEYS.ios.startsWith('REPLACE_');
+}
+
+/**
+ * Native (Capacitor) paketlerde RevenueCat üzerinden gerçek Google Play Billing /
+ * Apple StoreKit satın alma akışı. IAP_PACKS.id değerleri, RevenueCat dashboard'da
+ * tanımlanan "current offering"in paket (package) identifier'larıyla birebir eşleşmelidir.
+ *
+ * Kurulum notları:
+ *   - RevenueCat'te bir proje oluştur, Google Play / App Store Connect ürünlerini
+ *     (pearls-s, pearls-m, pearls-l, pearls-xl, starter) tanımla ve bunları bir
+ *     "offering" altında paketle.
+ *   - REVENUECAT_API_KEYS içindeki yer tutucuları RevenueCat dashboard'daki
+ *     gerçek public API key'lerle değiştir.
+ *   - grantPearls/grantCoins miktarları RevenueCat'ten değil, doğrudan IAP_PACKS'ten
+ *     okunur; yani gerçek para karşılığı verilecek miktar hep bu dosyada kontrol altında kalır.
+ */
+export class RevenueCatIAP implements IAPProvider {
+  readonly storeLabel: string;
+  private configured = false;
+  private offeringsPromise: ReturnType<typeof Purchases.getOfferings> | null = null;
+
+  constructor(appUserId: string) {
+    this.storeLabel = Capacitor.getPlatform() === 'ios' ? 'App Store' : 'Google Play';
+    if (!isRevenueCatConfigured()) return;
+    const apiKey = Capacitor.getPlatform() === 'ios' ? REVENUECAT_API_KEYS.ios : REVENUECAT_API_KEYS.android;
+    void Purchases.configure({ apiKey, appUserID: appUserId }).then(() => {
+      this.configured = true;
+    });
+  }
+
+  packs(): IAPPack[] { return IAP_PACKS; }
+
+  private async findStorePackage(packId: string): Promise<PurchasesPackage | null> {
+    if (!this.offeringsPromise) this.offeringsPromise = Purchases.getOfferings();
+    const offerings = await this.offeringsPromise;
+    const current = offerings.current;
+    if (!current) return null;
+    return current.availablePackages.find((p) => p.identifier === packId) ?? null;
+  }
+
+  async purchase(packId: string): Promise<{ ok: boolean; msg: string; grantPearls?: number; grantCoins?: number }> {
+    const pack = IAP_PACKS.find((p) => p.id === packId);
+    if (!pack) return { ok: false, msg: 'Bilinmeyen paket.' };
+    if (!this.configured) {
+      return { ok: false, msg: `${this.storeLabel} bağlantısı henüz kurulmadı. Lütfen daha sonra tekrar dene.` };
+    }
+    try {
+      const storePackage = await this.findStorePackage(packId);
+      if (!storePackage) {
+        return { ok: false, msg: 'Bu paket şu anda mağazada bulunamadı.' };
+      }
+      await Purchases.purchasePackage({ aPackage: storePackage });
+      return { ok: true, msg: `${pack.name} satın alındı! 🎉`, grantPearls: pack.pearls, grantCoins: pack.coins };
+    } catch (err) {
+      const rcError = err as { code?: PURCHASES_ERROR_CODE; message?: string };
+      if (rcError.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
+        return { ok: false, msg: 'Satın alma iptal edildi.' };
+      }
+      return { ok: false, msg: `Satın alma başarısız: ${rcError.message ?? 'bilinmeyen hata'}` };
+    }
   }
 }
 
@@ -202,11 +281,13 @@ export interface Services {
 }
 
 export function createServices(save: SaveData): Services {
-  // iOS/Android native (Capacitor) paketinde Game Center / Play Games'e gerçek giriş;
-  // diğer tüm ortamlarda (web önizleme, dev sunucusu) yerel sağlayıcıya düşülür.
+  // iOS/Android native (Capacitor) paketinde Game Center / Play Games'e gerçek giriş
+  // ve RevenueCat üzerinden gerçek satın alma; diğer tüm ortamlarda (web önizleme,
+  // dev sunucusu) yerel/stub sağlayıcılara düşülür.
+  const native = isNativeGameAuthAvailable();
   return {
-    auth: isNativeGameAuthAvailable() ? new NativeGameAuth(save) : new LocalAuth(save),
-    iap: new StubIAP(),
+    auth: native ? new NativeGameAuth(save) : new LocalAuth(save),
+    iap: native ? new RevenueCatIAP(save.friendCode) : new StubIAP(),
     social: new LocalSocial(),
   };
 }
