@@ -12,6 +12,7 @@
     "@capacitor/android": "^5.7.8",
     "@capacitor/core": "^5.7.8",
     "@openforge/capacitor-game-connect": "^5.0.2",
+    "@revenuecat/purchases-capacitor": "^7.7.1",
     "pixi.js": "^8.6.6"
   },
   "devDependencies": {
