@@ -4,3 +4,6 @@ project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/
 
 include ':openforge-capacitor-game-connect'
 project(':openforge-capacitor-game-connect').projectDir = new File('../node_modules/@openforge/capacitor-game-connect/android')
+
+include ':revenuecat-purchases-capacitor'
+project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')
