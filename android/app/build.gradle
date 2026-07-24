@@ -8,10 +8,10 @@ if (hasKeystoreProperties) {
 }
 
 android {
-    namespace "com.reefy.app"
+    namespace "com.yilkgames.reefy"
     compileSdkVersion rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.reefy.app"
+        applicationId "com.yilkgames.reefy"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -1,4 +1,4 @@
-package com.reefy.app;
+package com.yilkgames.reefy;
 
 import com.getcapacitor.BridgeActivity;
 

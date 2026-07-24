@@ -2,8 +2,8 @@
 <resources>
     <string name="app_name">Reefy</string>
     <string name="title_activity_main">Reefy</string>
-    <string name="package_name">com.reefy.app</string>
-    <string name="custom_url_scheme">com.reefy.app</string>
+    <string name="package_name">com.yilkgames.reefy</string>
+    <string name="custom_url_scheme">com.yilkgames.reefy</string>
 
     <!-- YER TUTUCU: Google Play Console > Play Games Services > Configuration'dan
          alınan gerçek proje ID'siyle değiştirilmeli, aksi halde Play Games girişi çalışmaz. -->
