@@ -24,6 +24,21 @@ allprojects {
     }
 }
 
+// Bazı eklentiler (örn. revenuecat-purchases-capacitor) kendi build.gradle'ında eski bir
+// Kotlin Gradle Plugin sürümü sabitliyor; bu sürüm JDK 21 altında çalışırken Kotlin
+// derleyicisinin jvmTarget'ı otomatik "21" olarak algılamasını tanımıyor ve
+// "Unknown Kotlin JVM target: 21" hatasıyla derleme başarısız oluyor. Tüm alt projelerin
+// Kotlin çıktısını projenin geri kalanıyla tutarlı şekilde 17'ye sabitleyerek bunu önlüyoruz.
+subprojects {
+    afterEvaluate { proj ->
+        if (proj.hasProperty('android') && proj.android.hasProperty('kotlinOptions')) {
+            proj.android.kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

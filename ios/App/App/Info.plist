@@ -45,5 +45,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-9709993577664180~9549891800</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Bu izin, sana daha ilgili reklamlar göstermemize yardımcı olur.</string>
 </dict>
 </plist>

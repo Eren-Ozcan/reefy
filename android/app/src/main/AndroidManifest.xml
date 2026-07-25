@@ -37,6 +37,11 @@
         <!-- @openforge/capacitor-game-connect (Play Games Services) için gerekli.
              game_services_project_id gerçek Play Console projesiyle strings.xml'de doldurulmalı. -->
         <meta-data android:name="com.google.android.gms.games.APP_ID" android:value="@string/game_services_project_id"/>
+
+        <!-- @capacitor-community/admob için gerekli — AdMob dashboard'da Reefy (Android) uygulamasının App ID'si. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-9709993577664180~6812047820"/>
     </application>
 
     <!-- Permissions -->
