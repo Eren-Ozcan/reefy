@@ -540,15 +540,32 @@ export class UI {
       }).join('')}</div>`;
     } else {
       const packs = this.game.services.iap.packs();
+      const adsRemoved = s.adsRemoved;
       body = `
         <p class="dex-info">💎 İnci paketleri gerçek parayla satın alınır. <b>${this.game.services.iap.storeLabel}</b> modundasın — satın alma, Google Play / App Store sürümünde etkinleşir. İnciyi görevlerden, seviye ve set ödüllerinden de kazanabilirsin.</p>
-        <div class="grid">${packs.map((p) => `
+        <div class="grid">
+          <div class="card">
+            <div class="egg-emoji">🎬</div>
+            <div class="card-name">Reklam İzle</div>
+            <div class="card-desc">🦪 5 inci kazan<br/><b>Ücretsiz</b></div>
+            <button class="buy-btn watch-ad">İzle</button>
+          </div>
+          ${packs.map((p) => p.removesAds ? `
+          <div class="card">
+            <div class="egg-emoji">${p.emoji}</div>
+            <div class="card-name">${p.name}</div>
+            <div class="card-desc">${p.bonus}</div>
+            ${adsRemoved
+              ? '<button class="buy-btn owned" disabled>Sahipsin ✓</button>'
+              : `<button class="buy-btn iap" data-iap="${p.id}">${p.priceLabel}</button>`}
+          </div>` : `
           <div class="card">
             <div class="egg-emoji">${p.emoji}</div>
             <div class="card-name">${p.name}</div>
             <div class="card-desc">🦪 ${p.pearls} inci ${p.bonus ? `<br/><b>${p.bonus}</b>` : ''}</div>
             <button class="buy-btn iap" data-iap="${p.id}">${p.priceLabel}</button>
-          </div>`).join('')}</div>`;
+          </div>`).join('')}
+        </div>`;
     }
 
     const el = this.panelShell('🛒 Mağaza', body, this.shopTabs(tab));
@@ -586,11 +603,24 @@ export class UI {
           if (res.ok) this.renderShop('tanks', st);
         } else if (btn.dataset.iap) {
           void this.game.services.iap.purchase(btn.dataset.iap).then((res) => {
-            if (res.ok && res.grantPearls) {
-              this.game.save.pearls += res.grantPearls;
+            if (res.ok) {
+              if (res.grantPearls) this.game.save.pearls += res.grantPearls;
               if (res.grantCoins) this.game.save.coins += res.grantCoins;
+              if (res.grantRemovesAds) this.game.save.adsRemoved = true;
               this.game.syncSave();
               this.refreshHUD();
+              this.renderShop('pearls', st);
+            }
+            this.toast(res.msg);
+          });
+        } else if (btn.classList.contains('watch-ad')) {
+          void this.game.services.ads.showRewarded().then((res) => {
+            if (res.ok && res.grantPearls) {
+              this.game.save.pearls += res.grantPearls;
+              this.game.syncSave();
+              this.refreshHUD();
+            } else if (!res.ok) {
+              audio.error();
             }
             this.toast(res.msg);
           });

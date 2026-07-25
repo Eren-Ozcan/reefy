@@ -1597,6 +1597,7 @@ export class Game {
     audio.setBiome(this.activeTank.biome);
     this.syncSave();
     this.ui.refreshHUD();
+    this.services.ads.maybeShowInterstitial();
     return { ok: true, msg: `${this.activeTank.name} 🌊` };
   }
 
