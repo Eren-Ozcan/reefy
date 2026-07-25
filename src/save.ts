@@ -69,6 +69,7 @@ export interface SaveData {
   lastSeen: number;
   lastDaily: string;
   tutorialDone: boolean;
+  adsRemoved: boolean; // "Reklamları kaldır" IAP'i satın alındı mı
 }
 
 const KEY = 'reefy-save-v1';
@@ -121,6 +122,7 @@ export function defaultSave(): SaveData {
     lastSeen: Date.now(),
     lastDaily: '',
     tutorialDone: false,
+    adsRemoved: false,
   };
 }
 
