@@ -103,13 +103,16 @@ export interface IAPPack {
   removesAds?: boolean; // true ise inci/altın değil, kalıcı "reklamları kaldır" hakkı verir
 }
 
+// Not: id'ler Play Console'un "tek seferlik ürün" kimliği kısıtlamasına uygun
+// olarak alt çizgi kullanır (tire desteklenmiyor) — bu id'ler RevenueCat/Play
+// Billing'de mağazadaki ürün kimlikleriyle birebir eşleşmeli.
 export const IAP_PACKS: IAPPack[] = [
-  { id: 'pearls-s',  name: 'Avuç İnci',      pearls: 60,   bonus: '',          priceLabel: '₺39,99',  emoji: '🫧' },
-  { id: 'pearls-m',  name: 'Kese İnci',      pearls: 170,  bonus: '+%15 bonus', priceLabel: '₺99,99',  emoji: '👛' },
-  { id: 'pearls-l',  name: 'Sandık İnci',    pearls: 450,  bonus: '+%25 bonus', priceLabel: '₺229,99', emoji: '🧰' },
-  { id: 'pearls-xl', name: 'Hazine İnci',    pearls: 1000, bonus: '+%40 bonus', priceLabel: '₺449,99', emoji: '💎' },
+  { id: 'pearls_s',  name: 'Avuç İnci',      pearls: 60,   bonus: '',          priceLabel: '₺39,99',  emoji: '🫧' },
+  { id: 'pearls_m',  name: 'Kese İnci',      pearls: 170,  bonus: '+%15 bonus', priceLabel: '₺99,99',  emoji: '👛' },
+  { id: 'pearls_l',  name: 'Sandık İnci',    pearls: 450,  bonus: '+%25 bonus', priceLabel: '₺229,99', emoji: '🧰' },
+  { id: 'pearls_xl', name: 'Hazine İnci',    pearls: 1000, bonus: '+%40 bonus', priceLabel: '₺449,99', emoji: '💎' },
   { id: 'starter',   name: 'Başlangıç Paketi', pearls: 80, coins: 5000, bonus: '+5.000 altın', priceLabel: '₺49,99', emoji: '🎁' },
-  { id: 'remove-ads', name: 'Reklamları Kaldır', pearls: 0, bonus: 'Geçiş reklamlarını kalıcı olarak kaldırır', priceLabel: '₺79,99', emoji: '🚫', removesAds: true },
+  { id: 'remove_ads', name: 'Reklamları Kaldır', pearls: 0, bonus: 'Geçiş reklamlarını kalıcı olarak kaldırır', priceLabel: '₺79,99', emoji: '🚫', removesAds: true },
 ];
 
 export interface IAPProvider {
