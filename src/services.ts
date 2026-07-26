@@ -4,13 +4,18 @@
 // Capacitor ile paketlerken bu arayüzlerin native karşılıkları bağlanır:
 //   - Auth   -> Google Play Games Services / Apple Game Center (bağlandı, bkz. NativeGameAuth)
 //   - IAP    -> Google Play Billing / Apple StoreKit (örn. RevenueCat üzerinden)
-//   - Social -> Play Games liderlik tablosu / Game Center veya Firebase backend
+//   - Social -> arkadaş kodu doğrulaması Firebase/Firestore ile (bağlandı, bkz. FirebaseSocial);
+//              liderlik tablosu hâlâ yerel/bot (gerçek skorlar kapsam dışı)
 // Oyun kodu yalnızca bu arayüzleri kullanır; sağlayıcı değişimi tek satırdır.
 
 import { Capacitor } from '@capacitor/core';
 import { CapacitorGameConnect } from '@openforge/capacitor-game-connect';
 import { Purchases, PURCHASES_ERROR_CODE, type PurchasesPackage } from '@revenuecat/purchases-capacitor';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AdMobAds, StubAds, type AdsProvider } from './ads';
+import { FIREBASE_CONFIG, isFirebaseConfigured } from './firebase-config';
 import type { SaveData } from './save';
 
 // ---------- Kimlik / giriş ----------
@@ -232,58 +237,125 @@ export interface LeaderboardEntry {
 export interface SocialProvider {
   readonly label: string;
   leaderboard(save: SaveData): LeaderboardEntry[];
-  addFriend(save: SaveData, code: string): { ok: boolean; msg: string };
+  addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }>;
 }
 
-/**
- * Yerel sosyal sağlayıcı: liderlik tablosu, oyuncunun skorunu topluluk
- * botlarıyla kıyaslar (çevrimiçi sürümde gerçek oyuncularla değişir).
- * Arkadaş kodları kaydedilir ve backend bağlandığında eşleşir.
- */
 /** Ziyaret/hediye ödülleri arkadaş başına günlük verildiği için kod kodu spam'iyle
  * sınırsız altın/yem çiftliğini önlemek amacıyla listeye üst sınır konur. */
 const MAX_FRIENDS = 50;
 
+const BOTS = [
+  { name: 'MercanKral 🤖', mult: 3.2 },
+  { name: 'DerinMavi 🤖', mult: 2.1 },
+  { name: 'KaptanYosun 🤖', mult: 1.6 },
+  { name: 'İnciAvcısı 🤖', mult: 1.25 },
+  { name: 'BalonBalık 🤖', mult: 0.85 },
+  { name: 'MinikYüzgeç 🤖', mult: 0.5 },
+  { name: 'TembelDeniz 🤖', mult: 0.2 },
+];
+
+/** Liderlik tablosu, oyuncunun skorunu topluluk botlarıyla kıyaslar (gerçek
+ * arkadaş skorları henüz gösterilmiyor, bkz. friendRows'taki ⏳ placeholder).
+ * LocalSocial ve FirebaseSocial aynı liderlik mantığını paylaşır. */
+function buildLocalLeaderboard(save: SaveData): LeaderboardEntry[] {
+  const base = Math.max(1000, save.stats.totalEarned);
+  const rows = BOTS.map((b) => ({
+    name: b.name,
+    score: Math.round((base * b.mult) / 10) * 10,
+    isPlayer: false,
+    isBot: true,
+  }));
+  rows.push({ name: save.playerName + ' (sen)', score: save.stats.totalEarned, isPlayer: true, isBot: false });
+  for (const f of save.friends) {
+    rows.push({ name: f.name + ' ⏳', score: 0, isPlayer: false, isBot: false });
+  }
+  rows.sort((a, b) => b.score - a.score);
+  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+/** Ortak biçim/tekrar/üst-sınır kontrolleri — hem yerel hem Firebase sağlayıcı
+ * ağa gitmeden önce bunları senkron olarak eler. */
+function validateFriendCode(save: SaveData, code: string): { c: string } | { msg: string } {
+  const c = code.trim().toUpperCase();
+  if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { msg: 'Geçersiz kod. Örnek biçim: REEF-AB12C' };
+  if (c === save.friendCode) return { msg: 'Bu senin kendi kodun! 😄' };
+  if (save.friends.some((f) => f.code === c)) return { msg: 'Bu arkadaş zaten listende.' };
+  if (save.friends.length >= MAX_FRIENDS) return { msg: `En fazla ${MAX_FRIENDS} arkadaş ekleyebilirsin.` };
+  return { c };
+}
+
+/**
+ * Yerel sosyal sağlayıcı: arkadaş kodları biçim olarak doğrulanır ve
+ * kaydedilir, ama karşı tarafın gerçekten var olup olmadığı kontrol
+ * edilmez — bunun için bkz. FirebaseSocial. Firebase yapılandırılmadığında
+ * (bkz. isFirebaseConfigured) createServices() bu sağlayıcıya düşer.
+ */
 export class LocalSocial implements SocialProvider {
   readonly label = 'Yerel mod — çevrimiçi liderlik mobil sürümde';
 
-  private bots = [
-    { name: 'MercanKral 🤖', mult: 3.2 },
-    { name: 'DerinMavi 🤖', mult: 2.1 },
-    { name: 'KaptanYosun 🤖', mult: 1.6 },
-    { name: 'İnciAvcısı 🤖', mult: 1.25 },
-    { name: 'BalonBalık 🤖', mult: 0.85 },
-    { name: 'MinikYüzgeç 🤖', mult: 0.5 },
-    { name: 'TembelDeniz 🤖', mult: 0.2 },
-  ];
-
   leaderboard(save: SaveData): LeaderboardEntry[] {
-    const base = Math.max(1000, save.stats.totalEarned);
-    const rows = this.bots.map((b) => ({
-      name: b.name,
-      score: Math.round((base * b.mult) / 10) * 10,
-      isPlayer: false,
-      isBot: true,
-    }));
-    rows.push({ name: save.playerName + ' (sen)', score: save.stats.totalEarned, isPlayer: true, isBot: false });
-    for (const f of save.friends) {
-      rows.push({ name: f.name + ' ⏳', score: 0, isPlayer: false, isBot: false });
-    }
-    rows.sort((a, b) => b.score - a.score);
-    return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+    return buildLocalLeaderboard(save);
   }
 
-  addFriend(save: SaveData, code: string): { ok: boolean; msg: string } {
-    const c = code.trim().toUpperCase();
-    if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { ok: false, msg: 'Geçersiz kod. Örnek biçim: REEF-AB12C' };
-    if (c === save.friendCode) return { ok: false, msg: 'Bu senin kendi kodun! 😄' };
-    if (save.friends.some((f) => f.code === c)) return { ok: false, msg: 'Bu arkadaş zaten listende.' };
-    if (save.friends.length >= MAX_FRIENDS) return { ok: false, msg: `En fazla ${MAX_FRIENDS} arkadaş ekleyebilirsin.` };
-    save.friends.push({ code: c, name: 'Dost ' + c.slice(5) });
+  async addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }> {
+    const v = validateFriendCode(save, code);
+    if (!('c' in v)) return { ok: false, msg: v.msg };
+    save.friends.push({ code: v.c, name: 'Dost ' + v.c.slice(5) });
     return {
       ok: true,
       msg: 'Arkadaş kodu kaydedildi! Çevrimiçi sürümde otomatik eşleşecek. 🤝',
     };
+  }
+}
+
+/**
+ * Firebase/Firestore üzerinden gerçek arkadaş kodu doğrulaması. Anonim olarak
+ * giriş yapar, kendi kodunu `players/{friendCode}` dokümanı olarak kaydeder,
+ * ve addFriend() girilen kodun Firestore'da gerçekten var olup olmadığını
+ * kontrol edip gerçek oyuncu adını çeker (bkz. firestore.rules: `get` herkese
+ * açık, `list` kapalı — kod taranamaz/enumerate edilemez, sadece bilinen tek
+ * bir kod sorgulanabilir).
+ *
+ * Liderlik tablosu bu ilk sürümde hâlâ yerel/bot (bkz. buildLocalLeaderboard) —
+ * gerçek arkadaş skorları kapsam dışı bırakıldı.
+ */
+export class FirebaseSocial implements SocialProvider {
+  readonly label = 'Firebase — arkadaş kodu doğrulanıyor';
+  private db = getFirestore(initializeApp(FIREBASE_CONFIG));
+  private ready: Promise<void>;
+
+  constructor(save: SaveData) {
+    const auth = getAuth();
+    this.ready = signInAnonymously(auth)
+      .then((cred) =>
+        setDoc(doc(this.db, 'players', save.friendCode), {
+          name: save.playerName,
+          uid: cred.user.uid,
+          updatedAt: serverTimestamp(),
+        }),
+      )
+      .catch(() => {
+        /* bağlantı yoksa/başarısızsa sessizce geç — addFriend await sırasında zaten hata verecek */
+      });
+  }
+
+  leaderboard(save: SaveData): LeaderboardEntry[] {
+    return buildLocalLeaderboard(save);
+  }
+
+  async addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }> {
+    const v = validateFriendCode(save, code);
+    if (!('c' in v)) return { ok: false, msg: v.msg };
+    await this.ready;
+    try {
+      const snap = await getDoc(doc(this.db, 'players', v.c));
+      if (!snap.exists()) return { ok: false, msg: 'Bu kod bulunamadı. Arkadaşının doğru kodu paylaştığından emin ol.' };
+      const name = (snap.data().name as string) || 'Dost ' + v.c.slice(5);
+      save.friends.push({ code: v.c, name });
+      return { ok: true, msg: `${name} arkadaş listene eklendi! 🤝` };
+    } catch {
+      return { ok: false, msg: 'Bağlantı sorunu oldu, daha sonra tekrar dene.' };
+    }
   }
 }
 
@@ -304,7 +376,8 @@ export function createServices(save: SaveData): Services {
   return {
     auth: native ? new NativeGameAuth(save) : new LocalAuth(save),
     iap: native ? new RevenueCatIAP(save.friendCode) : new StubIAP(),
-    social: new LocalSocial(),
+    // Native bayrağına bağlı değil: config girildikten sonra web preview'de de gerçek backend'e karşı çalışır.
+    social: isFirebaseConfigured() ? new FirebaseSocial(save) : new LocalSocial(),
     ads: native ? new AdMobAds(save) : new StubAds(),
   };
 }
