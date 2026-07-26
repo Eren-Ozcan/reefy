@@ -834,12 +834,16 @@ export class UI {
       void navigator.clipboard?.writeText(s.friendCode);
       this.toast('Kod kopyalandı! Arkadaşlarınla paylaş 📋');
     });
-    el.querySelector('#friend-add-btn')?.addEventListener('click', () => {
+    el.querySelector<HTMLButtonElement>('#friend-add-btn')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
       const input = el.querySelector<HTMLInputElement>('#friend-input')!;
-      const res = this.game.services.social.addFriend(s, input.value);
-      if (!res.ok) audio.error(); else { audio.click(); this.game.syncSave(); }
-      this.toast(res.msg);
-      if (res.ok) this.renderSocial('friends');
+      btn.disabled = true;
+      this.game.services.social.addFriend(s, input.value).then((res) => {
+        btn.disabled = false;
+        if (!res.ok) audio.error(); else { audio.click(); this.game.syncSave(); }
+        this.toast(res.msg);
+        if (res.ok) this.renderSocial('friends');
+      });
     });
     el.querySelectorAll<HTMLButtonElement>('[data-visit]').forEach((btn) => {
       btn.addEventListener('click', () => {
