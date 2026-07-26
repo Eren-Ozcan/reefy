@@ -50,6 +50,42 @@ The pearl packs in `IAP_PACKS` (`src/services.ts`) are sold through RevenueCat. 
 
 Until the API keys are filled in, `RevenueCatIAP` skips configuration and purchases fail with a "not connected" message instead of crashing.
 
+### Friend code verification (Firebase)
+
+Adding a friend by code (`src/services.ts` → `FirebaseSocial`) checks a Firestore
+collection (`players/{friendCode}`) to confirm the code is real and to fetch the
+real player name, instead of blindly accepting any well-formed code (`LocalSocial`'s
+fallback behavior when Firebase isn't configured — see `isFirebaseConfigured()` in
+`src/firebase-config.ts`).
+
+This uses a **separate, dedicated Firebase project for Reefy** — each game gets its
+own Firebase/GCP project, never shared with another title.
+
+Setup:
+
+1. Create a new Firebase project (`npx firebase projects:create`, or via
+   [console.firebase.google.com](https://console.firebase.google.com)).
+2. Enable **Firestore** in Native mode (`npx firebase firestore:databases:create`)
+   — pick the region carefully, it can't be changed later.
+3. Enable **Anonymous Authentication**: Console → Authentication → Sign-in method →
+   Anonymous → Enable. `firebase-tools` has no CLI command for this, it's a
+   one-time manual toggle.
+4. Register a Web app in the project (`npx firebase apps:create WEB "Reefy Web"`),
+   then fetch its config (`npx firebase apps:sdkconfig WEB <appId>`) and paste the
+   values into `src/firebase-config.ts` (`FIREBASE_CONFIG`), replacing the
+   `REPLACE_WITH_...` placeholders. These values are public identifiers safe to
+   embed client-side (like the RevenueCat key above) — the actual protection is
+   the security rules below.
+5. Deploy the security rules from the repo: `npx firebase deploy --only firestore:rules`
+   (rules source: `firestore.rules`). They allow anyone signed in (anonymously) to
+   `get` a single player doc by its exact code, but disallow `list` — so friend
+   codes can be validated one at a time but not scraped/enumerated. Writes are
+   restricted to the doc's own owner (`uid` match).
+
+Until `FIREBASE_CONFIG` is filled in, `isFirebaseConfigured()` is false and
+`createServices()` falls back to `LocalSocial`, which accepts any correctly
+formatted code without checking whether it's real.
+
 ### Ads (AdMob)
 
 Ad unit IDs live in `src/ads.ts` (`INTERSTITIAL_AD_IDS`, `REWARDED_AD_IDS`), registered under the "Reefy" app in [AdMob](https://apps.admob.com) for both Android and iOS. The Android app ID is also declared in `android/app/src/main/AndroidManifest.xml` (`com.google.android.gms.ads.APPLICATION_ID` meta-data) and the iOS one in `ios/App/App/Info.plist` (`GADApplicationIdentifier`) — both are required by the native SDK independently of the ad unit IDs used at runtime.
