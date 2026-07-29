@@ -229,6 +229,7 @@ export class UI {
   private panelHost!: HTMLElement;
   private toastHost!: HTMLElement;
   private fishInfoTimer: number | null = null;
+  private friendScoresCache: Record<string, number> = {};
 
   constructor(game: Game) {
     this.game = game;
@@ -776,7 +777,7 @@ export class UI {
 
   // ---------- SOSYAL ----------
 
-  renderSocial(tab: 'leaderboard' | 'friends'): void {
+  renderSocial(tab: 'leaderboard' | 'friends', skipFriendScoreFetch = false): void {
     const s = this.game.save;
     const tabs = [
       { id: 'leaderboard', label: '🏆 Liderlik', active: tab === 'leaderboard' },
@@ -785,7 +786,7 @@ export class UI {
     let body = '';
 
     if (tab === 'leaderboard') {
-      const rows = this.game.services.social.leaderboard(s);
+      const rows = this.game.services.social.leaderboard(s, this.friendScoresCache);
       body = `
         <p class="dex-info">Toplam kazanca göre sıralama. <i>${this.game.services.social.label}</i></p>
         <div class="lb">${rows.map((r) => `
@@ -824,6 +825,12 @@ export class UI {
     }
 
     const el = this.panelShell('🏆 Sosyal', body, tabs);
+    if (tab === 'leaderboard' && !skipFriendScoreFetch && s.friends.length) {
+      this.game.services.social.friendScores(s).then((scores) => {
+        this.friendScoresCache = scores;
+        if (this.panelHost.contains(el)) this.renderSocial('leaderboard', true);
+      });
+    }
     el.querySelectorAll<HTMLButtonElement>('.tab').forEach((btn) => {
       btn.addEventListener('click', () => {
         audio.click();
