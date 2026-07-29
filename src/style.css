@@ -119,21 +119,26 @@ html, body {
 #bottombar {
   position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: 50%;
   transform: translateX(-50%);
-  display: flex; gap: 8px;
+  display: flex; gap: 4px;
   background: var(--panel-bg);
   padding: 8px;
   border-radius: 22px;
   box-shadow: 0 10px 30px rgba(20, 60, 75, 0.25);
+  width: min(96vw, 430px);
 }
 #bottombar button {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   border: none; background: transparent;
-  font-size: 24px; cursor: pointer;
-  padding: 6px 14px; border-radius: 14px;
+  font-size: 25px; cursor: pointer;
+  padding: 8px 4px; border-radius: 14px;
   color: var(--ink-soft);
+  flex: 1 1 0; min-width: 0; min-height: 54px;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-#bottombar button span { font-size: 11px; font-weight: 600; }
+#bottombar button span {
+  font-size: 11px; font-weight: 600;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 #bottombar button:hover { background: rgba(47, 158, 143, 0.12); }
 #bottombar button:active { transform: scale(0.93); }
 
@@ -167,8 +172,8 @@ html, body {
 .panel-head h2 { font-size: 20px; color: var(--ink); }
 .close-btn {
   border: none; background: #e5edf1; color: var(--ink-soft);
-  width: 32px; height: 32px; border-radius: 50%;
-  font-size: 14px; cursor: pointer;
+  width: 42px; height: 42px; border-radius: 50%;
+  font-size: 16px; cursor: pointer; flex-shrink: 0;
 }
 .panel-body { padding: 10px 20px 24px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
 
@@ -198,8 +203,9 @@ html, body {
 .buy-btn {
   border: none; cursor: pointer;
   background: linear-gradient(180deg, #57c9a6, #2f9e8f);
-  color: #fff; font-weight: 700; font-size: 14px;
-  padding: 9px 18px; border-radius: 999px;
+  color: #fff; font-weight: 700; font-size: 14.5px;
+  padding: 11px 20px; border-radius: 999px;
+  min-height: 44px;
   box-shadow: 0 4px 12px rgba(47, 158, 143, 0.4);
   transition: transform 0.12s ease;
 }
@@ -273,8 +279,9 @@ html, body {
 #mode-done {
   border: none; cursor: pointer;
   background: linear-gradient(180deg, #57c9a6, #2f9e8f);
-  color: #fff; font-weight: 700; font-size: 12.5px;
-  padding: 7px 14px; border-radius: 999px;
+  color: #fff; font-weight: 700; font-size: 13px;
+  padding: 10px 18px; border-radius: 999px;
+  min-height: 40px;
 }
 .edit-mode-btn { width: 100%; margin-bottom: 4px; }
 .bonus-line { color: #b0894a; font-weight: 700; }
@@ -287,14 +294,15 @@ html, body {
 .tab {
   border: none; cursor: pointer; white-space: nowrap;
   background: #e2ebef; color: var(--ink-soft);
-  font-weight: 700; font-size: 12px;
-  padding: 7px 11px; border-radius: 999px;
+  font-weight: 700; font-size: 13px;
+  padding: 11px 14px; border-radius: 999px;
+  min-height: 42px;
   transition: background 0.15s ease;
   flex: 1 1 auto; text-align: center;
 }
 .tab.active { background: linear-gradient(180deg, #57c9a6, #2f9e8f); color: #fff; }
 @media (max-width: 420px) {
-  .tab { font-size: 11px; padding: 6px 8px; }
+  .tab { font-size: 12px; padding: 10px 8px; }
 }
 
 /* HUD akvaryum çipi */
@@ -460,8 +468,9 @@ html, body {
 .tgl {
   border: none; cursor: pointer;
   background: #d6e2e8; color: var(--ink-soft);
-  font-weight: 700; font-size: 13px;
-  padding: 8px 20px; border-radius: 999px;
+  font-weight: 700; font-size: 13.5px;
+  padding: 10px 20px; border-radius: 999px;
+  min-height: 42px;
 }
 .tgl.on { background: linear-gradient(180deg, #57c9a6, #2f9e8f); color: #fff; }
 .tgl.danger { background: #f3c1bb; color: #9c3d31; }
@@ -515,7 +524,6 @@ hr { border: none; border-top: 1px solid #dfe9ee; margin: 6px 0; }
 @media (max-width: 480px) {
   .menu-card { padding: 32px 26px; margin: 0 14px; }
   #menu h1 { font-size: 42px; }
-  #bottombar button { padding: 5px 9px; font-size: 21px; }
   .grid { grid-template-columns: repeat(2, 1fr); }
   #collect-btn { top: 104px; } /* HUD dar ekranda iki satıra sarınca çakışmasın */
   #toasts { top: 156px; }
