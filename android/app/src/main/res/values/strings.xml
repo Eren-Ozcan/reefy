@@ -5,7 +5,8 @@
     <string name="package_name">com.yilkgames.reefy</string>
     <string name="custom_url_scheme">com.yilkgames.reefy</string>
 
-    <!-- YER TUTUCU: Google Play Console > Play Games Services > Configuration'dan
-         alınan gerçek proje ID'siyle değiştirilmeli, aksi halde Play Games girişi çalışmaz. -->
-    <string translatable="false" name="game_services_project_id">REPLACE_WITH_PLAY_GAMES_PROJECT_ID</string>
+    <!-- Play Console > Play Games Services > Configuration (proje reefy-67ac5'e bağlı).
+         OAuth consent screen + Android istemci kimlik bilgisi GCP tarafında ayrıca kurulmalı,
+         aksi halde Play Games girişi başarısız olur (bkz. services.ts NativeGameAuth notları). -->
+    <string translatable="false" name="game_services_project_id">778208134304</string>
 </resources>
