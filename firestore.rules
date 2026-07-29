@@ -1,8 +1,8 @@
 rules_version = '2';
 
-// Arkadaş kodu doğrulaması için (bkz. src/services.ts FirebaseSocial).
+// Arkadaş kodu doğrulaması + liderlik skoru için (bkz. src/services.ts FirebaseSocial).
 // Tek koleksiyon: players/{code} — doküman ID'si oyuncunun REEF-XXXXX kodu.
-//   { name: string, uid: string, updatedAt: Timestamp }
+//   { name: string, uid: string, updatedAt: Timestamp, score?: number }
 //
 // - get: herhangi bir signed-in (anonim) kullanıcı tek bir kodu doğrulayabilir.
 // - list: kapalı — tüm kodların taranmasını/enumerate edilmesini engeller.
@@ -18,14 +18,18 @@ service cloud.firestore {
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
-                    && request.resource.data.name.size() <= 40;
+                    && request.resource.data.name.size() <= 40
+                    && (!('score' in request.resource.data)
+                        || (request.resource.data.score is number && request.resource.data.score >= 0));
 
       allow update: if request.auth != null
                     && resource.data.uid == request.auth.uid
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
-                    && request.resource.data.name.size() <= 40;
+                    && request.resource.data.name.size() <= 40
+                    && (!('score' in request.resource.data)
+                        || (request.resource.data.score is number && request.resource.data.score >= 0));
 
       allow delete: if false;
     }

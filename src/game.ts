@@ -1773,6 +1773,7 @@ export class Game {
   syncSave(): void {
     this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
     persist(this.save);
+    this.services.social.updateScore?.(this.save);
   }
 
   resetAll(): void {

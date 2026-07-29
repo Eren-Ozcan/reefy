@@ -4,8 +4,8 @@
 // Capacitor ile paketlerken bu arayüzlerin native karşılıkları bağlanır:
 //   - Auth   -> Google Play Games Services / Apple Game Center (bağlandı, bkz. NativeGameAuth)
 //   - IAP    -> Google Play Billing / Apple StoreKit (örn. RevenueCat üzerinden)
-//   - Social -> arkadaş kodu doğrulaması Firebase/Firestore ile (bağlandı, bkz. FirebaseSocial);
-//              liderlik tablosu hâlâ yerel/bot (gerçek skorlar kapsam dışı)
+//   - Social -> arkadaş kodu doğrulaması ve arkadaş skorları Firebase/Firestore ile
+//              (bağlandı, bkz. FirebaseSocial); liderlik tablosundaki botlar hâlâ simüle
 // Oyun kodu yalnızca bu arayüzleri kullanır; sağlayıcı değişimi tek satırdır.
 
 import { Capacitor } from '@capacitor/core';
@@ -236,8 +236,12 @@ export interface LeaderboardEntry {
 
 export interface SocialProvider {
   readonly label: string;
-  leaderboard(save: SaveData): LeaderboardEntry[];
+  leaderboard(save: SaveData, friendScores?: Record<string, number>): LeaderboardEntry[];
   addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }>;
+  /** Arkadaş kodu -> güncel skor. Sağlayıcı gerçek skorları desteklemiyorsa boş döner. */
+  friendScores(save: SaveData): Promise<Record<string, number>>;
+  /** Oyuncunun kendi skorunu arkadaşlarının görebilmesi için sağlayıcıya bildirir (fire-and-forget). */
+  updateScore?(save: SaveData): void;
 }
 
 /** Ziyaret/hediye ödülleri arkadaş başına günlük verildiği için kod kodu spam'iyle
@@ -254,10 +258,11 @@ const BOTS = [
   { name: 'TembelDeniz 🤖', mult: 0.2 },
 ];
 
-/** Liderlik tablosu, oyuncunun skorunu topluluk botlarıyla kıyaslar (gerçek
- * arkadaş skorları henüz gösterilmiyor, bkz. friendRows'taki ⏳ placeholder).
+/** Liderlik tablosu, oyuncunun skorunu topluluk botlarıyla kıyaslar. Arkadaşların
+ * skoru `friendScores` (kod -> skor) ile geldiyse gerçek değer, gelmediyse
+ * (sağlayıcı desteklemiyor veya henüz çekilmedi) ⏳ placeholder gösterilir.
  * LocalSocial ve FirebaseSocial aynı liderlik mantığını paylaşır. */
-function buildLocalLeaderboard(save: SaveData): LeaderboardEntry[] {
+function buildLocalLeaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {
   const base = Math.max(1000, save.stats.totalEarned);
   const rows = BOTS.map((b) => ({
     name: b.name,
@@ -267,7 +272,13 @@ function buildLocalLeaderboard(save: SaveData): LeaderboardEntry[] {
   }));
   rows.push({ name: save.playerName + ' (sen)', score: save.stats.totalEarned, isPlayer: true, isBot: false });
   for (const f of save.friends) {
-    rows.push({ name: f.name + ' ⏳', score: 0, isPlayer: false, isBot: false });
+    const score = friendScores[f.code];
+    rows.push({
+      name: score === undefined ? f.name + ' ⏳' : f.name,
+      score: score ?? 0,
+      isPlayer: false,
+      isBot: false,
+    });
   }
   rows.sort((a, b) => b.score - a.score);
   return rows.map((r, i) => ({ ...r, rank: i + 1 }));
@@ -293,8 +304,12 @@ function validateFriendCode(save: SaveData, code: string): { c: string } | { msg
 export class LocalSocial implements SocialProvider {
   readonly label = 'Yerel mod — çevrimiçi liderlik mobil sürümde';
 
-  leaderboard(save: SaveData): LeaderboardEntry[] {
-    return buildLocalLeaderboard(save);
+  leaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {
+    return buildLocalLeaderboard(save, friendScores);
+  }
+
+  async friendScores(): Promise<Record<string, number>> {
+    return {};
   }
 
   async addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }> {
@@ -316,13 +331,16 @@ export class LocalSocial implements SocialProvider {
  * açık, `list` kapalı — kod taranamaz/enumerate edilemez, sadece bilinen tek
  * bir kod sorgulanabilir).
  *
- * Liderlik tablosu bu ilk sürümde hâlâ yerel/bot (bkz. buildLocalLeaderboard) —
- * gerçek arkadaş skorları kapsam dışı bırakıldı.
+ * Botlarla kıyaslanan liderlik tablosu iskeleti buildLocalLeaderboard'tan gelir;
+ * arkadaşların skoru friendScores() ile ayrıca çekilip UI'da bu iskeleye enjekte
+ * edilir (bkz. ui.ts renderSocial) — Firestore `list` kapalı olduğu için tek
+ * sorguyla arkadaş listesi çekilemez, her kod ayrı ayrı get edilir.
  */
 export class FirebaseSocial implements SocialProvider {
   readonly label = 'Firebase — arkadaş kodu doğrulanıyor';
   private db = getFirestore(initializeApp(FIREBASE_CONFIG));
   private ready: Promise<void>;
+  private lastScoreWrite = { at: 0, score: -1 };
 
   constructor(save: SaveData) {
     const auth = getAuth();
@@ -331,6 +349,7 @@ export class FirebaseSocial implements SocialProvider {
         setDoc(doc(this.db, 'players', save.friendCode), {
           name: save.playerName,
           uid: cred.user.uid,
+          score: save.stats.totalEarned,
           updatedAt: serverTimestamp(),
         }),
       )
@@ -339,8 +358,41 @@ export class FirebaseSocial implements SocialProvider {
       });
   }
 
-  leaderboard(save: SaveData): LeaderboardEntry[] {
-    return buildLocalLeaderboard(save);
+  leaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {
+    return buildLocalLeaderboard(save, friendScores);
+  }
+
+  /** Her arkadaş kodunu ayrı ayrı get eder (bkz. sınıf yorumu) — MAX_FRIENDS
+   * sınırı sayesinde bu paralel istek sayısı kontrol altında kalır. */
+  async friendScores(save: SaveData): Promise<Record<string, number>> {
+    await this.ready;
+    const entries = await Promise.all(
+      save.friends.map(async (f): Promise<[string, number] | null> => {
+        try {
+          const snap = await getDoc(doc(this.db, 'players', f.code));
+          if (!snap.exists()) return null;
+          const score = snap.data().score;
+          return typeof score === 'number' ? [f.code, score] : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return Object.fromEntries(entries.filter((e): e is [string, number] => e !== null));
+  }
+
+  /** Skoru en fazla dakikada bir ve gerçekten değiştiyse yazar — sık syncSave
+   * çağrılarında Firestore günlük yazma kotasını (Spark planı) tüketmemek için. */
+  updateScore(save: SaveData): void {
+    const score = save.stats.totalEarned;
+    const now = Date.now();
+    if (score === this.lastScoreWrite.score || now - this.lastScoreWrite.at < 60_000) return;
+    this.lastScoreWrite = { at: now, score };
+    void this.ready
+      .then(() => setDoc(doc(this.db, 'players', save.friendCode), { score }, { merge: true }))
+      .catch(() => {
+        /* bağlantı sorunu — bir sonraki syncSave'de tekrar denenecek */
+      });
   }
 
   async addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }> {
