@@ -6,6 +6,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { AdMob, RewardAdPluginEvents } from '@capacitor-community/admob';
+import { t } from './i18n';
 import type { SaveData } from './save';
 
 /** AdMob dashboard'da oluşturulan reklam birimi kimlikleri (bkz. apps.admob.com > Reefy). */
@@ -38,7 +39,7 @@ export class StubAds implements AdsProvider {
   showRewarded(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
-      msg: 'Reklamlar Google Play / App Store sürümünde etkinleşir.',
+      msg: t('Reklamlar Google Play / App Store sürümünde etkinleşir.'),
     });
   }
 }
@@ -88,10 +89,10 @@ export class AdMobAds implements AdsProvider {
   }
 
   async showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }> {
-    if (!this.ready) return { ok: false, msg: 'Reklam sistemi henüz hazır değil, birazdan tekrar dene.' };
+    if (!this.ready) return { ok: false, msg: t('Reklam sistemi henüz hazır değil, birazdan tekrar dene.') };
     const now = Date.now();
     if (now - this.lastRewarded < REWARDED_COOLDOWN_MS) {
-      return { ok: false, msg: 'Az önce bir reklam izledin, biraz sonra tekrar dene.' };
+      return { ok: false, msg: t('Az önce bir reklam izledin, biraz sonra tekrar dene.') };
     }
     try {
       await AdMob.prepareRewardVideoAd({ adId: REWARDED_AD_IDS[this.platform()] });
@@ -101,11 +102,11 @@ export class AdMobAds implements AdsProvider {
       });
       await AdMob.showRewardVideoAd();
       await listener.remove();
-      if (!rewarded) return { ok: false, msg: 'Reklamı tamamlamadan çıktın, ödül verilmedi.' };
+      if (!rewarded) return { ok: false, msg: t('Reklamı tamamlamadan çıktın, ödül verilmedi.') };
       this.lastRewarded = now;
-      return { ok: true, msg: `Reklamı izledin! +${REWARDED_AD_PEARLS} inci 🦪`, grantPearls: REWARDED_AD_PEARLS };
+      return { ok: true, msg: t('Reklamı izledin! +{n} inci 🦪', { n: REWARDED_AD_PEARLS }), grantPearls: REWARDED_AD_PEARLS };
     } catch {
-      return { ok: false, msg: 'Şu anda gösterilecek reklam bulunamadı, daha sonra tekrar dene.' };
+      return { ok: false, msg: t('Şu anda gösterilecek reklam bulunamadı, daha sonra tekrar dene.') };
     }
   }
 }

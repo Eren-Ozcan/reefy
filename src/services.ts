@@ -16,6 +16,7 @@ import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AdMobAds, StubAds, type AdsProvider } from './ads';
 import { FIREBASE_CONFIG, isFirebaseConfigured } from './firebase-config';
+import { t } from './i18n';
 import type { SaveData } from './save';
 
 // ---------- Kimlik / giriş ----------
@@ -33,7 +34,7 @@ export interface AuthProvider {
 }
 
 export class LocalAuth implements AuthProvider {
-  readonly platformLabel = 'Misafir (yerel kayıt)';
+  readonly platformLabel = t('Misafir (yerel kayıt)');
   constructor(private save: SaveData) {}
   current(): PlayerIdentity {
     return { id: this.save.friendCode, name: this.save.playerName, platform: 'local' };
@@ -41,7 +42,7 @@ export class LocalAuth implements AuthProvider {
   signIn(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
-      msg: 'Google Play Games / Game Center girişi mobil pakette etkinleşir. Şimdilik ilerlemen bu cihazda güvenle saklanıyor.',
+      msg: t('Google Play Games / Game Center girişi mobil pakette etkinleşir. Şimdilik ilerlemen bu cihazda güvenle saklanıyor.'),
     });
   }
 }
@@ -83,9 +84,9 @@ export class NativeGameAuth implements AuthProvider {
       this.identity = { id: res.player_id, name: res.player_name, platform: this.platform };
       // Oyun içi isim/kimliği native oyuncu adıyla senkronla (yerel yedek olarak kalır).
       this.save.playerName = res.player_name || this.save.playerName;
-      return { ok: true, msg: `${this.platformLabel}'a giriş yapıldı: ${res.player_name} 🎮` };
+      return { ok: true, msg: t("{platform}'a giriş yapıldı: {name} 🎮", { platform: this.platformLabel, name: res.player_name }) };
     } catch {
-      return { ok: false, msg: `${this.platformLabel} girişi başarısız. Hesabın cihazda oturum açık mı kontrol et.` };
+      return { ok: false, msg: t('{platform} girişi başarısız. Hesabın cihazda oturum açık mı kontrol et.', { platform: this.platformLabel }) };
     }
   }
 }
@@ -128,12 +129,12 @@ export interface IAPProvider {
 }
 
 export class StubIAP implements IAPProvider {
-  readonly storeLabel = 'Web önizleme';
+  readonly storeLabel = t('Web önizleme');
   packs(): IAPPack[] { return IAP_PACKS; }
   purchase(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
-      msg: 'Gerçek satın alma Google Play / App Store sürümünde etkinleşir. Bu önizlemede inci kazanmak için görevleri ve seviye ödüllerini kullanabilirsin.',
+      msg: t('Gerçek satın alma Google Play / App Store sürümünde etkinleşir. Bu önizlemede inci kazanmak için görevleri ve seviye ödüllerini kullanabilirsin.'),
     });
   }
 }
@@ -197,19 +198,19 @@ export class RevenueCatIAP implements IAPProvider {
 
   async purchase(packId: string): Promise<{ ok: boolean; msg: string; grantPearls?: number; grantCoins?: number; grantRemovesAds?: boolean }> {
     const pack = IAP_PACKS.find((p) => p.id === packId);
-    if (!pack) return { ok: false, msg: 'Bilinmeyen paket.' };
+    if (!pack) return { ok: false, msg: t('Bilinmeyen paket.') };
     if (!this.configured) {
-      return { ok: false, msg: `${this.storeLabel} bağlantısı henüz kurulmadı. Lütfen daha sonra tekrar dene.` };
+      return { ok: false, msg: t('{store} bağlantısı henüz kurulmadı. Lütfen daha sonra tekrar dene.', { store: this.storeLabel }) };
     }
     try {
       const storePackage = await this.findStorePackage(packId);
       if (!storePackage) {
-        return { ok: false, msg: 'Bu paket şu anda mağazada bulunamadı.' };
+        return { ok: false, msg: t('Bu paket şu anda mağazada bulunamadı.') };
       }
       await Purchases.purchasePackage({ aPackage: storePackage });
       return {
         ok: true,
-        msg: `${pack.name} satın alındı! 🎉`,
+        msg: t('{name} satın alındı! 🎉', { name: t(pack.name) }),
         grantPearls: pack.pearls,
         grantCoins: pack.coins,
         grantRemovesAds: pack.removesAds,
@@ -217,9 +218,9 @@ export class RevenueCatIAP implements IAPProvider {
     } catch (err) {
       const rcError = err as { code?: PURCHASES_ERROR_CODE; message?: string };
       if (rcError.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
-        return { ok: false, msg: 'Satın alma iptal edildi.' };
+        return { ok: false, msg: t('Satın alma iptal edildi.') };
       }
-      return { ok: false, msg: `Satın alma başarısız: ${rcError.message ?? 'bilinmeyen hata'}` };
+      return { ok: false, msg: t('Satın alma başarısız: {err}', { err: rcError.message ?? t('bilinmeyen hata') }) };
     }
   }
 }
@@ -270,7 +271,7 @@ function buildLocalLeaderboard(save: SaveData, friendScores: Record<string, numb
     isPlayer: false,
     isBot: true,
   }));
-  rows.push({ name: save.playerName + ' (sen)', score: save.stats.totalEarned, isPlayer: true, isBot: false });
+  rows.push({ name: save.playerName + ' ' + t('(sen)'), score: save.stats.totalEarned, isPlayer: true, isBot: false });
   for (const f of save.friends) {
     const score = friendScores[f.code];
     rows.push({
@@ -288,10 +289,10 @@ function buildLocalLeaderboard(save: SaveData, friendScores: Record<string, numb
  * ağa gitmeden önce bunları senkron olarak eler. */
 function validateFriendCode(save: SaveData, code: string): { c: string } | { msg: string } {
   const c = code.trim().toUpperCase();
-  if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { msg: 'Geçersiz kod. Örnek biçim: REEF-AB12C' };
-  if (c === save.friendCode) return { msg: 'Bu senin kendi kodun! 😄' };
-  if (save.friends.some((f) => f.code === c)) return { msg: 'Bu arkadaş zaten listende.' };
-  if (save.friends.length >= MAX_FRIENDS) return { msg: `En fazla ${MAX_FRIENDS} arkadaş ekleyebilirsin.` };
+  if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { msg: t('Geçersiz kod. Örnek biçim: REEF-AB12C') };
+  if (c === save.friendCode) return { msg: t('Bu senin kendi kodun! 😄') };
+  if (save.friends.some((f) => f.code === c)) return { msg: t('Bu arkadaş zaten listende.') };
+  if (save.friends.length >= MAX_FRIENDS) return { msg: t('En fazla {n} arkadaş ekleyebilirsin.', { n: MAX_FRIENDS }) };
   return { c };
 }
 
@@ -302,7 +303,7 @@ function validateFriendCode(save: SaveData, code: string): { c: string } | { msg
  * (bkz. isFirebaseConfigured) createServices() bu sağlayıcıya düşer.
  */
 export class LocalSocial implements SocialProvider {
-  readonly label = 'Yerel mod — çevrimiçi liderlik mobil sürümde';
+  readonly label = t('Yerel mod — çevrimiçi liderlik mobil sürümde');
 
   leaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {
     return buildLocalLeaderboard(save, friendScores);
@@ -315,10 +316,10 @@ export class LocalSocial implements SocialProvider {
   async addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }> {
     const v = validateFriendCode(save, code);
     if (!('c' in v)) return { ok: false, msg: v.msg };
-    save.friends.push({ code: v.c, name: 'Dost ' + v.c.slice(5) });
+    save.friends.push({ code: v.c, name: t('Dost') + ' ' + v.c.slice(5) });
     return {
       ok: true,
-      msg: 'Arkadaş kodu kaydedildi! Çevrimiçi sürümde otomatik eşleşecek. 🤝',
+      msg: t('Arkadaş kodu kaydedildi! Çevrimiçi sürümde otomatik eşleşecek. 🤝'),
     };
   }
 }
@@ -337,7 +338,7 @@ export class LocalSocial implements SocialProvider {
  * sorguyla arkadaş listesi çekilemez, her kod ayrı ayrı get edilir.
  */
 export class FirebaseSocial implements SocialProvider {
-  readonly label = 'Firebase — arkadaş kodu doğrulanıyor';
+  readonly label = t('Firebase — arkadaş kodu doğrulanıyor');
   private db = getFirestore(initializeApp(FIREBASE_CONFIG));
   private ready: Promise<void>;
   private lastScoreWrite = { at: 0, score: -1 };
@@ -401,12 +402,12 @@ export class FirebaseSocial implements SocialProvider {
     await this.ready;
     try {
       const snap = await getDoc(doc(this.db, 'players', v.c));
-      if (!snap.exists()) return { ok: false, msg: 'Bu kod bulunamadı. Arkadaşının doğru kodu paylaştığından emin ol.' };
-      const name = (snap.data().name as string) || 'Dost ' + v.c.slice(5);
+      if (!snap.exists()) return { ok: false, msg: t('Bu kod bulunamadı. Arkadaşının doğru kodu paylaştığından emin ol.') };
+      const name = (snap.data().name as string) || t('Dost') + ' ' + v.c.slice(5);
       save.friends.push({ code: v.c, name });
-      return { ok: true, msg: `${name} arkadaş listene eklendi! 🤝` };
+      return { ok: true, msg: t('{name} arkadaş listene eklendi! 🤝', { name }) };
     } catch {
-      return { ok: false, msg: 'Bağlantı sorunu oldu, daha sonra tekrar dene.' };
+      return { ok: false, msg: t('Bağlantı sorunu oldu, daha sonra tekrar dene.') };
     }
   }
 }
