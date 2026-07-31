@@ -51,7 +51,7 @@ html, body {
 /* Arka planda süzülen balık silüetleri — sadece dekor, kartın gerisinde (z-index 1) */
 .menu-fish { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
 .menu-fish span {
-  position: absolute; display: block; opacity: 0.22; filter: blur(0.3px);
+  position: absolute; display: block; opacity: 0.4;
   font-size: 46px; animation: swim-by linear infinite;
 }
 .menu-fish span:nth-child(1) { top: 22%; animation-duration: 26s; animation-delay: 0s; font-size: 38px; }
