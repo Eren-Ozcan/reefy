@@ -28,6 +28,25 @@
     </div>
   </div>
 
+  <script>
+    // main.ts (type=module) çalışana kadar çekilen ilk boyama İngilizce kullanıcılarda
+    // bir an Türkçe metin göstermesin diye (FOUC), dil senkron olarak burada çözülüyor.
+    (function () {
+      try {
+        var stored = localStorage.getItem('reefy-lang');
+        var lang = stored === 'tr' || stored === 'en'
+          ? stored
+          : (((navigator.language || '').toLowerCase().indexOf('tr') === 0) ? 'tr' : 'en');
+        document.documentElement.lang = lang;
+        if (lang === 'en') {
+          var tagline = document.querySelector('.tagline');
+          if (tagline) tagline.innerHTML = 'Build your own reef, grow your fish,<br/>complete your collection';
+          var playBtn = document.getElementById('play-btn');
+          if (playBtn) playBtn.innerHTML = '▶&nbsp; Play';
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
