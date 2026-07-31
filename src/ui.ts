@@ -7,6 +7,7 @@ import { ACHIEVEMENTS } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species } from './species';
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
+import { getLang, setLang, t as tt } from './i18n';
 
 function hex(c: number): string {
   return '#' + c.toString(16).padStart(6, '0');
@@ -210,7 +211,7 @@ export function decorSVG(d: DecorDef, size = 64): string {
 
 function rarityChip(r: Rarity): string {
   const info = RARITY_INFO[r];
-  return `<span class="chip" style="background:${info.color}">${info.name}</span>`;
+  return `<span class="chip" style="background:${info.color}">${tt(info.name)}</span>`;
 }
 
 function tankSwatch(t: TankDef): string {
@@ -246,18 +247,18 @@ export class UI {
           <span class="xpbar"><span id="hud-xp"></span></span>
         </div>
         <div class="hud-chip">🐟 <span id="hud-cap"></span></div>
-        <div class="hud-chip hud-tank" id="hud-tank" title="Akvaryum değiştir"></div>
+        <div class="hud-chip hud-tank" id="hud-tank" title="${tt('Akvaryum değiştir')}"></div>
       </div>
       <div id="bottombar">
-        <button data-act="feed">🍤<span>Besle</span></button>
-        <button data-act="shop">🛒<span>Mağaza</span></button>
-        <button data-act="inventory">🎒<span>Envanter</span></button>
-        <button data-act="social">🏆<span>Sosyal</span></button>
-        <button data-act="more">☰<span>Daha</span></button>
+        <button data-act="feed">🍤<span>${tt('Besle')}</span></button>
+        <button data-act="shop">🛒<span>${tt('Mağaza')}</span></button>
+        <button data-act="inventory">🎒<span>${tt('Envanter')}</span></button>
+        <button data-act="social">🏆<span>${tt('Sosyal')}</span></button>
+        <button data-act="more">☰<span>${tt('Daha')}</span></button>
       </div>
-      <button id="collect-btn" class="empty">🪙 <b id="collect-amount">0</b><span id="collect-rate">0/sa</span></button>
+      <button id="collect-btn" class="empty">🪙 <b id="collect-amount">0</b><span id="collect-rate">0${tt('/sa')}</span></button>
       <div id="feed-pop" class="hidden"></div>
-      <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">Bitti ✓</button></div>
+      <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">${tt('Bitti ✓')}</button></div>
       <div id="panel-host"></div>
       <div id="toasts"></div>
     `;
@@ -304,15 +305,15 @@ export class UI {
     const s = this.game.save;
     this.hudCoins.textContent = fmt(s.coins);
     this.hudPearls.textContent = fmt(s.pearls);
-    this.hudLevel.textContent = `Sv ${s.level}`;
+    this.hudLevel.textContent = `${tt('Sv')} ${s.level}`;
     this.hudXpBar.style.width = `${Math.min(100, (100 * s.xp) / this.game.xpNeed(s.level))}%`;
     this.hudCap.textContent = `${this.game.fishes.length}/${this.game.capacity}`;
-    const t = this.game.activeTank;
+    const activeTank = this.game.activeTank;
     const boost = Math.round((this.game.growthMult - 1) * 100);
     const dirtBadge = this.game.dirtPct(s.activeTank) > 0
-      ? ` <b class="dirt-badge" title="Kirli — camı temizlemek için dokun">🧹 -%${this.game.dirtPct(s.activeTank)}</b>` : '';
+      ? ` <b class="dirt-badge" title="${tt('Kirli — camı temizlemek için dokun')}">🧹 -%${this.game.dirtPct(s.activeTank)}</b>` : '';
     const boostBadge = boost !== 0 ? ` <b class="${boost > 0 ? 'boost' : 'boost-neg'}">${boost > 0 ? '+' : ''}%${boost}</b>` : '';
-    this.hudTank.innerHTML = `${BIOME_INFO[t.biome].emoji} ${t.name}${boostBadge}${dirtBadge}`;
+    this.hudTank.innerHTML = `${BIOME_INFO[activeTank.biome].emoji} ${tt(activeTank.name)}${boostBadge}${dirtBadge}`;
   }
 
   private toggleFeedPop(): void {
@@ -328,11 +329,11 @@ export class UI {
     const s = this.game.save;
     pop.innerHTML = FEEDS.map((f) => {
       const stock = s.feedOwned[f.id] ?? 0;
-      const cost = f.cost === 0 ? 'Ücretsiz' : stock > 0 ? `🎒 ${stock} stokta` : `🪙 ${f.cost}/tane`;
+      const cost = f.cost === 0 ? tt('Ücretsiz') : stock > 0 ? `🎒 ${tt('{n} stokta', { n: stock })}` : `🪙 ${tt('{cost}/tane', { cost: f.cost })}`;
       return `
         <button class="feed-opt" data-feed="${f.id}">
           <span class="feed-emoji">${f.emoji}</span>
-          <span class="feed-info"><b>${f.name}</b><small>${f.desc}</small></span>
+          <span class="feed-info"><b>${tt(f.name)}</b><small>${tt(f.desc)}</small></span>
           <span class="feed-cost">${cost}</span>
         </button>`;
     }).join('');
@@ -352,7 +353,7 @@ export class UI {
   updateFeedChip(f: FeedDef): void {
     const stock = this.game.save.feedOwned[f.id] ?? 0;
     this.root.querySelector('#mode-label')!.textContent =
-      stock > 0 ? `${f.emoji} ${f.name} — 🎒 ${stock} kaldı` : `${f.emoji} ${f.name} — suya dokunarak yemle`;
+      stock > 0 ? `${f.emoji} ${tt(f.name)} — 🎒 ${tt('{stock} kaldı', { stock })}` : `${f.emoji} ${tt(f.name)} — ${tt('suya dokunarak yemle')}`;
   }
 
   private showModeChip(label: string): void {
@@ -374,7 +375,7 @@ export class UI {
   startEditMode(): void {
     this.closePanel();
     this.game.setEditMode(true);
-    this.showModeChip('🛠️ Düzenleme — dekoru sürükle; bıraktığın en öne gelir');
+    this.showModeChip(tt('🛠️ Düzenleme — dekoru sürükle; bıraktığın en öne gelir'));
   }
 
   /** Pasif gelir butonunu günceller (oyun döngüsünden ~saniyede 2 kez çağrılır). */
@@ -386,7 +387,7 @@ export class UI {
     btn.classList.remove('hidden');
     btn.classList.toggle('empty', pot < 1);
     this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
-    this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}/sa`;
+    this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}${tt('/sa')}`;
   }
 
   toast(msg: string): void {
@@ -438,12 +439,12 @@ export class UI {
 
   private shopTabs(active: string) {
     return [
-      { id: 'fish', label: '🐟 Balık', active: active === 'fish' },
-      { id: 'eggs', label: '🥚 Yumurta', active: active === 'eggs' },
-      { id: 'feeds', label: '🍤 Yem', active: active === 'feeds' },
-      { id: 'decor', label: '🪸 Dekor', active: active === 'decor' },
-      { id: 'tanks', label: '🏝️ Akvaryum', active: active === 'tanks' },
-      { id: 'pearls', label: '💎 İnci', active: active === 'pearls' },
+      { id: 'fish', label: tt('🐟 Balık'), active: active === 'fish' },
+      { id: 'eggs', label: tt('🥚 Yumurta'), active: active === 'eggs' },
+      { id: 'feeds', label: tt('🍤 Yem'), active: active === 'feeds' },
+      { id: 'decor', label: tt('🪸 Dekor'), active: active === 'decor' },
+      { id: 'tanks', label: tt('🏝️ Akvaryum'), active: active === 'tanks' },
+      { id: 'pearls', label: tt('💎 İnci'), active: active === 'pearls' },
     ];
   }
 
@@ -468,25 +469,25 @@ export class UI {
         return `
           <div class="card ${locked ? 'locked' : ''}">
             <div class="card-art">${fishSVG(sp, 88, locked)}</div>
-            <div class="card-name">${locked ? '🔒 ' + sp.name : sp.name}</div>
+            <div class="card-name">${locked ? '🔒 ' + tt(sp.name) : tt(sp.name)}</div>
             ${rarityChip(sp.rarity)}
-            <div class="card-meta">Satış: 🪙 ${fmt(sp.sellPrice)} • ${Math.round(sp.growthMs / 60000)} dk${locked ? ` • Sv ${sp.unlockLevel}` : ''}</div>
+            <div class="card-meta">${tt('Satış: 🪙 {price} • {min} dk', { price: fmt(sp.sellPrice), min: Math.round(sp.growthMs / 60000) })}${locked ? ` • ${tt('Sv')} ${sp.unlockLevel}` : ''}</div>
             <button class="buy-btn" data-sp="${sp.id}" ${locked ? 'disabled' : ''}>${price}</button>
           </div>`;
       }).join('')}</div>`;
     } else if (tab === 'eggs') {
       body = `<div class="grid">${this.game.eggList().map((egg) => {
         const odds = (Object.entries(egg.odds) as [Rarity, number][])
-          .map(([r, p]) => `<div class="odd-row"><span style="color:${RARITY_INFO[r].color}">●</span> ${RARITY_INFO[r].name} <b>%${p}</b></div>`)
+          .map(([r, p]) => `<div class="odd-row"><span style="color:${RARITY_INFO[r].color}">●</span> ${tt(RARITY_INFO[r].name)} <b>%${p}</b></div>`)
           .join('');
         const cur = egg.currency === 'coins' ? '🪙' : '🦪';
         const pity = egg.id === 'altin'
-          ? `<div class="pity">Efsanevi garanti: ${s.pityCounter}/${PITY_LIMIT}</div>` : '';
+          ? `<div class="pity">${tt('Efsanevi garanti: {cur}/{max}', { cur: s.pityCounter, max: PITY_LIMIT })}</div>` : '';
         return `
           <div class="card">
             <div class="egg-emoji">${egg.emoji}</div>
-            <div class="card-name">${egg.name}</div>
-            <div class="card-desc">${egg.desc}</div>
+            <div class="card-name">${tt(egg.name)}</div>
+            <div class="card-desc">${tt(egg.desc)}</div>
             <div class="odds">${odds}</div>
             ${pity}
             <button class="buy-btn" data-egg="${egg.id}">${cur} ${fmt(egg.cost)}</button>
@@ -494,16 +495,16 @@ export class UI {
       }).join('')}</div>`;
     } else if (tab === 'feeds') {
       body = `
-        <p class="dex-info">Paketten alınan yem çantana stok olarak girer ve tane başına <b>normalden ucuza</b> gelir. Stok bitince seçili yem, tane başı normal fiyattan altınla atılmaya devam eder.</p>
+        <p class="dex-info">${tt('Paketten alınan yem çantana stok olarak girer ve tane başına <b>normalden ucuza</b> gelir. Stok bitince seçili yem, tane başına normal fiyattan altınla atılmaya devam eder.')}</p>
         <div class="grid">${FEED_PACKS.map((p) => {
           const fd = feedById(p.feed);
           const stock = s.feedOwned[fd.id] ?? 0;
           return `
             <div class="card">
               <div class="egg-emoji">${fd.emoji}</div>
-              <div class="card-name">${fd.name} ×${p.qty}</div>
-              <div class="card-desc">${fd.desc}</div>
-              <div class="card-meta">Tane başı 🪙 ${(p.price / p.qty).toLocaleString('tr-TR')} (normal ${fd.cost})${stock ? ` • 🎒 ${stock} stokta` : ''}</div>
+              <div class="card-name">${tt(fd.name)} ×${p.qty}</div>
+              <div class="card-desc">${tt(fd.desc)}</div>
+              <div class="card-meta">${tt('Tane başı 🪙 {price} (normal {cost})', { price: (p.price / p.qty).toLocaleString('tr-TR'), cost: fd.cost })}${stock ? ` • 🎒 ${tt('{n} stokta', { n: stock })}` : ''}</div>
               <button class="buy-btn" data-feedpack="${p.id}">🪙 ${fmt(p.price)}</button>
             </div>`;
         }).join('')}</div>`;
@@ -515,9 +516,9 @@ export class UI {
         return `
           <div class="card">
             <div class="card-art">${decorSVG(d, 60)}</div>
-            <div class="card-name">${d.name}</div>
+            <div class="card-name">${tt(d.name)}</div>
             ${rarityChip(d.rarity)}
-            <div class="card-meta">+%${DECOR_BOOST[d.rarity]} büyüme & gelir${owned ? ` • 🎒 ${owned}` : ''}</div>
+            <div class="card-meta">${tt('+%{n} büyüme & gelir', { n: DECOR_BOOST[d.rarity] })}${owned ? ` • 🎒 ${owned}` : ''}</div>
             <button class="buy-btn" data-decor="${d.id}">${cur} ${fmt(d.price)}</button>
           </div>`;
       }).join('')}</div>`;
@@ -530,46 +531,46 @@ export class UI {
         return `
           <div class="card ${locked ? 'locked' : ''}">
             ${tankSwatch(t)}
-            <div class="card-name">${BIOME_INFO[t.biome].emoji} ${t.name}</div>
+            <div class="card-name">${BIOME_INFO[t.biome].emoji} ${tt(t.name)}</div>
             ${rarityChip(t.rarity)}
-            <div class="card-desc">${t.desc}</div>
-            <div class="card-meta">+%${t.growthBonus} büyüme & gelir${TANK_CAP_BONUS[t.rarity] ? ` • 🐟 +${TANK_CAP_BONUS[t.rarity]} kapasite` : ''}${locked ? ` • Sv ${t.unlockLevel}` : ''}</div>
+            <div class="card-desc">${tt(t.desc)}</div>
+            <div class="card-meta">${tt('+%{n} büyüme & gelir', { n: t.growthBonus })}${TANK_CAP_BONUS[t.rarity] ? ` • ${tt('🐟 +{n} kapasite', { n: TANK_CAP_BONUS[t.rarity] })}` : ''}${locked ? ` • ${tt('Sv')} ${t.unlockLevel}` : ''}</div>
             ${ownedT
-              ? '<button class="buy-btn owned" disabled>Sahipsin ✓</button>'
-              : `<button class="buy-btn" data-tank="${t.id}" ${locked ? 'disabled' : ''}>${t.price === 0 ? 'Ücretsiz' : `${cur} ${fmt(t.price)}`}</button>`}
+              ? `<button class="buy-btn owned" disabled>${tt('Sahipsin ✓')}</button>`
+              : `<button class="buy-btn" data-tank="${t.id}" ${locked ? 'disabled' : ''}>${t.price === 0 ? tt('Ücretsiz') : `${cur} ${fmt(t.price)}`}</button>`}
           </div>`;
       }).join('')}</div>`;
     } else {
       const packs = this.game.services.iap.packs();
       const adsRemoved = s.adsRemoved;
       body = `
-        <p class="dex-info">💎 İnci paketleri gerçek parayla satın alınır. <b>${this.game.services.iap.storeLabel}</b> modundasın — satın alma, Google Play / App Store sürümünde etkinleşir. İnciyi görevlerden, seviye ve set ödüllerinden de kazanabilirsin.</p>
+        <p class="dex-info">${tt('💎 İnci paketleri gerçek parayla satın alınır. <b>{store}</b> modundasın — satın alma, Google Play / App Store sürümünde etkinleşir. İnciyi görevlerden, seviye ve set ödüllerinden de kazanabilirsin.', { store: this.game.services.iap.storeLabel })}</p>
         <div class="grid">
           <div class="card">
             <div class="egg-emoji">🎬</div>
-            <div class="card-name">Reklam İzle</div>
-            <div class="card-desc">🦪 5 inci kazan<br/><b>Ücretsiz</b></div>
-            <button class="buy-btn watch-ad">İzle</button>
+            <div class="card-name">${tt('Reklam İzle')}</div>
+            <div class="card-desc">${tt('🦪 5 inci kazan<br/><b>Ücretsiz</b>')}</div>
+            <button class="buy-btn watch-ad">${tt('İzle')}</button>
           </div>
           ${packs.map((p) => p.removesAds ? `
           <div class="card">
             <div class="egg-emoji">${p.emoji}</div>
-            <div class="card-name">${p.name}</div>
-            <div class="card-desc">${p.bonus}</div>
+            <div class="card-name">${tt(p.name)}</div>
+            <div class="card-desc">${tt(p.bonus)}</div>
             ${adsRemoved
-              ? '<button class="buy-btn owned" disabled>Sahipsin ✓</button>'
+              ? `<button class="buy-btn owned" disabled>${tt('Sahipsin ✓')}</button>`
               : `<button class="buy-btn iap" data-iap="${p.id}">${p.priceLabel}</button>`}
           </div>` : `
           <div class="card">
             <div class="egg-emoji">${p.emoji}</div>
-            <div class="card-name">${p.name}</div>
-            <div class="card-desc">🦪 ${p.pearls} inci ${p.bonus ? `<br/><b>${p.bonus}</b>` : ''}</div>
+            <div class="card-name">${tt(p.name)}</div>
+            <div class="card-desc">${tt('🦪 {n} inci {bonus}', { n: p.pearls, bonus: p.bonus ? `<br/><b>${tt(p.bonus)}</b>` : '' })}</div>
             <button class="buy-btn iap" data-iap="${p.id}">${p.priceLabel}</button>
           </div>`).join('')}
         </div>`;
     }
 
-    const el = this.panelShell('🛒 Mağaza', body, this.shopTabs(tab));
+    const el = this.panelShell(tt('🛒 Mağaza'), body, this.shopTabs(tab));
     this.bindShopTabs(el);
     const bodyEl = el.querySelector<HTMLElement>('.panel-body')!;
     if (keepScroll > 0) bodyEl.scrollTop = keepScroll;
@@ -635,10 +636,10 @@ export class UI {
   renderInventory(tab: 'fish' | 'feeds' | 'decor' | 'tanks'): void {
     const s = this.game.save;
     const tabs = [
-      { id: 'fish', label: '🐟 Balıklarım', active: tab === 'fish' },
-      { id: 'feeds', label: '🍤 Yemlerim', active: tab === 'feeds' },
-      { id: 'decor', label: '🪸 Dekorlarım', active: tab === 'decor' },
-      { id: 'tanks', label: '🏝️ Akvaryumlarım', active: tab === 'tanks' },
+      { id: 'fish', label: tt('🐟 Balıklarım'), active: tab === 'fish' },
+      { id: 'feeds', label: tt('🍤 Yemlerim'), active: tab === 'feeds' },
+      { id: 'decor', label: tt('🪸 Dekorlarım'), active: tab === 'decor' },
+      { id: 'tanks', label: tt('🏝️ Akvaryumlarım'), active: tab === 'tanks' },
     ];
     let body = '';
 
@@ -650,20 +651,20 @@ export class UI {
           ? g.fishes.map((fe) => {
               const i = flat.push(fe) - 1;
               const sub = fe.adult
-                ? `${fe.sp.name} • 🪙 ${fmt(fe.perHour)}/sa${fe.sad ? ' • 😢 aç' : ''}`
-                : `${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}${fe.sad ? ' • 😢 aç' : ''}`;
+                ? `${tt(fe.sp.name)} • 🪙 ${fmt(fe.perHour)}${tt('/sa')}${fe.sad ? ` • ${tt('😢 aç')}` : ''}`
+                : `${tt(fe.sp.name)} • ${tt('Satış')} 🪙 ${fmt(fe.sellValue)}${fe.sad ? ` • ${tt('😢 aç')}` : ''}`;
               return `
                 <div class="inv-row">
                   <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
                   <span class="inv-name">${fe.name}<small class="inv-sub">${sub}</small></span>
                   ${fe.adult
-                    ? `<button class="tgl on inv-sell" data-sell="${i}">🪙 ${fmt(fe.sellValue)} sat</button>`
-                    : '<span class="inv-right">🌱 büyüyor</span>'}
+                    ? `<button class="tgl on inv-sell" data-sell="${i}">${tt('{n} sat', { n: `🪙 ${fmt(fe.sellValue)}` })}</button>`
+                    : `<span class="inv-right">${tt('🌱 büyüyor')}</span>`}
                 </div>`;
             }).join('')
-          : '<p class="empty">Bu akvaryumda balık yok.</p>';
+          : `<p class="empty">${tt('Bu akvaryumda balık yok.')}</p>`;
         return `
-          <h3 class="inv-head">${BIOME_INFO[g.tank.biome].emoji} ${g.tank.name} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}/sa` : ''}${g.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -%${g.dirtPct}</span>` : ''}</h3>
+          <h3 class="inv-head">${BIOME_INFO[g.tank.biome].emoji} ${tt(g.tank.name)} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}${tt('/sa')}` : ''}${g.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -%${g.dirtPct}</span>` : ''}</h3>
           ${rows}`;
       }).join('');
     } else if (tab === 'feeds') {
@@ -674,12 +675,12 @@ export class UI {
           return `
             <div class="inv-row">
               <span class="inv-art feed-art">${f.emoji}</span>
-              <span class="inv-name">${f.name}<small class="inv-sub">${f.desc}</small></span>
-              <span class="inv-right">${stock > 0 ? `🎒 ×${stock}` : 'stok yok'}</span>
+              <span class="inv-name">${tt(f.name)}<small class="inv-sub">${tt(f.desc)}</small></span>
+              <span class="inv-right">${stock > 0 ? `🎒 ×${stock}` : tt('stok yok')}</span>
             </div>`;
         }).join('')}
-        <p class="dex-info">Stok bittiğinde yem, tane başına normal fiyattan altınla atılır. Paketler tane başına daha ucuzdur.</p>
-        <button class="buy-btn" id="go-feed-shop">🛒 Yem paketlerine git</button>`;
+        <p class="dex-info">${tt('Stok bittiğinde yem, tane başına normal fiyattan altınla atılır. Paketler tane başına daha ucuzdur.')}</p>
+        <button class="buy-btn" id="go-feed-shop">${tt('🛒 Yem paketlerine git')}</button>`;
     } else if (tab === 'decor') {
       const placed = s.decorPlaced[s.activeTank] ?? [];
       const ownedIds = Object.keys(s.decorOwned).filter((id) => (s.decorOwned[id] ?? 0) > 0);
@@ -689,26 +690,26 @@ export class UI {
             return `
               <div class="inv-row">
                 <span class="inv-art">${decorSVG(d, 44)}</span>
-                <span class="inv-name">${d.name} ${rarityChip(d.rarity)}</span>
-                <button class="tgl danger" data-remove="${i}">Kaldır</button>
+                <span class="inv-name">${tt(d.name)} ${rarityChip(d.rarity)}</span>
+                <button class="tgl danger" data-remove="${i}">${tt('Kaldır')}</button>
               </div>`;
           }).join('')
-        : '<p class="empty">Bu akvaryumda henüz dekor yok.</p>';
+        : `<p class="empty">${tt('Bu akvaryumda henüz dekor yok.')}</p>`;
       const ownedHTML = ownedIds.length
         ? ownedIds.map((id) => {
             const d = decorById(id);
             return `
               <div class="inv-row">
                 <span class="inv-art">${decorSVG(d, 44)}</span>
-                <span class="inv-name">${d.name} <b>×${s.decorOwned[id]}</b> ${rarityChip(d.rarity)}</span>
-                <button class="tgl on" data-place="${id}">Yerleştir</button>
+                <span class="inv-name">${tt(d.name)} <b>×${s.decorOwned[id]}</b> ${rarityChip(d.rarity)}</span>
+                <button class="tgl on" data-place="${id}">${tt('Yerleştir')}</button>
               </div>`;
           }).join('')
-        : '<p class="empty">Çantanda dekor yok — Mağaza → Dekor sekmesine göz at! 🛒</p>';
+        : `<p class="empty">${tt('Çantanda dekor yok — Mağaza → Dekor sekmesine göz at! 🛒')}</p>`;
       body = `
-        ${placed.length ? '<button class="buy-btn edit-mode-btn">🛠️ Yerleşimi Düzenle</button>' : ''}
-        <h3 class="inv-head">Bu akvaryumda (${placed.length}/${MAX_PLACED})</h3>${placedHTML}
-        <h3 class="inv-head">Çantanda</h3>${ownedHTML}`;
+        ${placed.length ? `<button class="buy-btn edit-mode-btn">${tt('🛠️ Yerleşimi Düzenle')}</button>` : ''}
+        <h3 class="inv-head">${tt('Bu akvaryumda ({n}/{max})', { n: placed.length, max: MAX_PLACED })}</h3>${placedHTML}
+        <h3 class="inv-head">${tt('Çantanda')}</h3>${ownedHTML}`;
     } else {
       body = `<div class="grid tanks-grid">${this.game.tankList()
         .filter((t) => s.tanksOwned.includes(t.id))
@@ -718,17 +719,17 @@ export class UI {
           return `
             <div class="card ${active ? 'active-tank' : ''}">
               ${tankSwatch(t)}
-              <div class="card-name">${BIOME_INFO[t.biome].emoji} ${t.name}</div>
-              <div class="card-meta">🐟 ${count}/${this.game.capacityFor(t.id)} balık • +%${this.game.tankBoostPct(t.id)} büyüme & gelir</div>
+              <div class="card-name">${BIOME_INFO[t.biome].emoji} ${tt(t.name)}</div>
+              <div class="card-meta">${tt('🐟 {n}/{cap} balık • +%{boost} büyüme & gelir', { n: count, cap: this.game.capacityFor(t.id), boost: this.game.tankBoostPct(t.id) })}</div>
               ${active
-                ? '<button class="buy-btn owned" disabled>Buradasın 📍</button>'
-                : `<button class="buy-btn" data-switch="${t.id}">Geç</button>`}
+                ? `<button class="buy-btn owned" disabled>${tt('Buradasın 📍')}</button>`
+                : `<button class="buy-btn" data-switch="${t.id}">${tt('Geç')}</button>`}
             </div>`;
         }).join('')}</div>
-        <p class="dex-info">Yeni akvaryumlar Mağaza → Akvaryum sekmesinde! 🛒</p>`;
+        <p class="dex-info">${tt('Yeni akvaryumlar Mağaza → Akvaryum sekmesinde! 🛒')}</p>`;
     }
 
-    const el = this.panelShell('🎒 Envanter', body, tabs);
+    const el = this.panelShell(tt('🎒 Envanter'), body, tabs);
     el.querySelectorAll<HTMLButtonElement>('.tab').forEach((btn) => {
       btn.addEventListener('click', () => {
         audio.click();
@@ -780,19 +781,19 @@ export class UI {
   renderSocial(tab: 'leaderboard' | 'friends', skipFriendScoreFetch = false): void {
     const s = this.game.save;
     const tabs = [
-      { id: 'leaderboard', label: '🏆 Liderlik', active: tab === 'leaderboard' },
-      { id: 'friends', label: '👥 Arkadaşlar', active: tab === 'friends' },
+      { id: 'leaderboard', label: tt('🏆 Liderlik'), active: tab === 'leaderboard' },
+      { id: 'friends', label: tt('👥 Arkadaşlar'), active: tab === 'friends' },
     ];
     let body = '';
 
     if (tab === 'leaderboard') {
       const rows = this.game.services.social.leaderboard(s, this.friendScoresCache);
       body = `
-        <p class="dex-info">Toplam kazanca göre sıralama. <i>${this.game.services.social.label}</i></p>
+        <p class="dex-info">${tt('Toplam kazanca göre sıralama.')} <i>${tt(this.game.services.social.label)}</i></p>
         <div class="lb">${rows.map((r) => `
           <div class="lb-row ${r.isPlayer ? 'me' : ''}">
             <span class="lb-rank">${r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : '#' + r.rank}</span>
-            <span class="lb-name">${r.name}</span>
+            <span class="lb-name">${tt(r.name)}</span>
             <span class="lb-score">🪙 ${fmt(r.score)}</span>
           </div>`).join('')}</div>`;
     } else {
@@ -802,29 +803,29 @@ export class UI {
             const gifted = this.game.hasGiftedFriendToday(f.code);
             return `
             <div class="inv-row">
-              <span class="inv-name">👤 ${f.name} <span class="lb-code">${f.code}</span></span>
+              <span class="inv-name">👤 ${tt(f.name)} <span class="lb-code">${f.code}</span></span>
               <div class="friend-actions">
-                <button class="tgl" data-visit="${f.code}" ${visited ? 'disabled' : ''}>${visited ? 'Ziyaret edildi ✓' : 'Ziyaret Et'}</button>
-                <button class="tgl" data-gift="${f.code}" ${gifted ? 'disabled' : ''}>${gifted ? 'Hediye gönderildi ✓' : '🎁 Hediye Gönder'}</button>
+                <button class="tgl" data-visit="${f.code}" ${visited ? 'disabled' : ''}>${visited ? tt('Ziyaret edildi ✓') : tt('Ziyaret Et')}</button>
+                <button class="tgl" data-gift="${f.code}" ${gifted ? 'disabled' : ''}>${gifted ? tt('Hediye gönderildi ✓') : tt('🎁 Hediye Gönder')}</button>
               </div>
             </div>`;
           }).join('')
-        : '<p class="empty">Henüz arkadaş eklemedin.</p>';
+        : `<p class="empty">${tt('Henüz arkadaş eklemedin.')}</p>`;
       body = `
         <div class="friend-code-box">
-          <span>Senin kodun:</span> <b id="my-code">${s.friendCode}</b>
-          <button class="tgl" id="copy-code">Kopyala</button>
+          <span>${tt('Senin kodun:')}</span> <b id="my-code">${s.friendCode}</b>
+          <button class="tgl" id="copy-code">${tt('Kopyala')}</button>
         </div>
         <div class="friend-add">
           <input id="friend-input" placeholder="REEF-XXXXX" maxlength="10" autocomplete="off"/>
-          <button class="buy-btn" id="friend-add-btn">Ekle</button>
+          <button class="buy-btn" id="friend-add-btn">${tt('Ekle')}</button>
         </div>
-        <h3 class="inv-head">Arkadaşların</h3>
+        <h3 class="inv-head">${tt('Arkadaşların')}</h3>
         ${friendRows}
-        <p class="dex-info">Her arkadaşı günde bir kez ziyaret ederek altın ve XP kazan. Çevrimiçi sürüm bağlandığında gerçek akvaryumlarını görebileceksin. 🤝</p>`;
+        <p class="dex-info">${tt('Her arkadaşı günde bir kez ziyaret ederek altın ve XP kazan. Çevrimiçi sürüm bağlandığında gerçek akvaryumlarını görebileceksin. 🤝')}</p>`;
     }
 
-    const el = this.panelShell('🏆 Sosyal', body, tabs);
+    const el = this.panelShell(tt('🏆 Sosyal'), body, tabs);
     if (tab === 'leaderboard' && !skipFriendScoreFetch && s.friends.length) {
       this.game.services.social.friendScores(s).then((scores) => {
         this.friendScoresCache = scores;
@@ -839,7 +840,7 @@ export class UI {
     });
     el.querySelector('#copy-code')?.addEventListener('click', () => {
       void navigator.clipboard?.writeText(s.friendCode);
-      this.toast('Kod kopyalandı! Arkadaşlarınla paylaş 📋');
+      this.toast(tt('Kod kopyalandı! Arkadaşlarınla paylaş 📋'));
     });
     el.querySelector<HTMLButtonElement>('#friend-add-btn')?.addEventListener('click', (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
@@ -873,13 +874,13 @@ export class UI {
   // ---------- DAHA / GÖREVLER / KOLEKSİYON / AYARLAR ----------
 
   private renderMore(): void {
-    const el = this.panelShell('☰ Menü', `
+    const el = this.panelShell(tt('☰ Menü'), `
       <div class="more-grid">
-        <button class="more-btn" data-go="quests">📋<span>Görevler</span></button>
-        <button class="more-btn" data-go="collection">📖<span>Koleksiyon</span></button>
-        <button class="more-btn" data-go="earnings">📈<span>Kazanç</span></button>
-        <button class="more-btn" data-go="profile">👤<span>Profil</span></button>
-        <button class="more-btn" data-go="settings">⚙️<span>Ayarlar</span></button>
+        <button class="more-btn" data-go="quests">📋<span>${tt('Görevler')}</span></button>
+        <button class="more-btn" data-go="collection">📖<span>${tt('Koleksiyon')}</span></button>
+        <button class="more-btn" data-go="earnings">📈<span>${tt('Kazanç')}</span></button>
+        <button class="more-btn" data-go="profile">👤<span>${tt('Profil')}</span></button>
+        <button class="more-btn" data-go="settings">⚙️<span>${tt('Ayarlar')}</span></button>
       </div>`);
     el.querySelectorAll<HTMLButtonElement>('.more-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -902,25 +903,25 @@ export class UI {
     const fishCount = s.tanksOwned.reduce((n, t) => n + this.game.tankFishCount(t), 0);
     const row = (label: string, value: string) =>
       `<div class="set-row"><span>${label}</span><b class="stat-val">${value}</b></div>`;
-    this.panelShell('👤 Profil', `
+    this.panelShell(tt('👤 Profil'), `
       <div class="profile-head">
         <div class="profile-name">${s.playerName}</div>
         <div class="profile-code">${s.friendCode}</div>
       </div>
-      ${row('⭐ Seviye', `${s.level} (${fmt(s.xp)}/${fmt(this.game.xpNeed(s.level))} XP)`)}
-      ${row('🐟 Balıkların', `${fishCount}`)}
-      ${row('🏝️ Akvaryumların', `${s.tanksOwned.length}/${this.game.tankList().length}`)}
-      ${row('📖 Koleksiyon', `${s.collection.length}/${SPECIES.length} tür`)}
-      ${row('🏆 Başarımlar', `${achDone}/${ACHIEVEMENTS.length}`)}
-      ${row('🔥 Günlük seri', `${s.streak} gün`)}
+      ${row(tt('⭐ Seviye'), tt('{n} ({xp}/{need} XP)', { n: s.level, xp: fmt(s.xp), need: fmt(this.game.xpNeed(s.level)) }))}
+      ${row(tt('🐟 Balıkların'), `${fishCount}`)}
+      ${row(tt('🏝️ Akvaryumların'), tt('{count}/{total}', { count: s.tanksOwned.length, total: this.game.tankList().length }))}
+      ${row(tt('📖 Koleksiyon'), tt('{n}/{total} tür', { n: s.collection.length, total: SPECIES.length }))}
+      ${row(tt('🏆 Başarımlar'), tt('{count}/{total}', { count: achDone, total: ACHIEVEMENTS.length }))}
+      ${row(tt('🔥 Günlük seri'), tt('{n} gün', { n: s.streak }))}
       <hr/>
-      <h3 class="inv-head">📊 Ömür boyu istatistikler</h3>
-      ${row('🤝 Satılan balık', fmt(st.totalSold))}
-      ${row('💰 Toplam kazanç', `🪙 ${fmt(st.totalEarned)}`)}
-      ${row('🍤 Yedirilen yem', fmt(st.totalFed))}
-      ${row('🥚 Açılan yumurta', fmt(st.eggsHatched))}
-      ${row('🪸 Yerleştirilen dekor', fmt(st.decorPlacedCount))}
-      ${row('🧹 Temizlenen leke', fmt(st.totalCleaned))}
+      <h3 class="inv-head">${tt('📊 Ömür boyu istatistikler')}</h3>
+      ${row(tt('🤝 Satılan balık'), fmt(st.totalSold))}
+      ${row(tt('💰 Toplam kazanç'), `🪙 ${fmt(st.totalEarned)}`)}
+      ${row(tt('🍤 Yedirilen yem'), fmt(st.totalFed))}
+      ${row(tt('🥚 Açılan yumurta'), fmt(st.eggsHatched))}
+      ${row(tt('🪸 Yerleştirilen dekor'), fmt(st.decorPlacedCount))}
+      ${row(tt('🧹 Temizlenen leke'), fmt(st.totalCleaned))}
     `);
   }
 
@@ -936,18 +937,17 @@ export class UI {
         ? grp.fishes.map((fe) => `
             <div class="inv-row">
               <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
-              <span class="inv-name">${fe.name}<small class="inv-sub">${fe.sp.name} • Satış 🪙 ${fmt(fe.sellValue)}${fe.sad ? ' • 😢 aç' : ''}</small></span>
-              <span class="inv-right">${fe.adult ? `🪙 ${fmt(fe.perHour)}/sa` : `🌱 olunca ${fmt(fe.perHour)}/sa`}</span>
+              <span class="inv-name">${fe.name}<small class="inv-sub">${tt(fe.sp.name)} • ${tt('Satış')} 🪙 ${fmt(fe.sellValue)}${fe.sad ? ` • ${tt('😢 aç')}` : ''}</small></span>
+              <span class="inv-right">${fe.adult ? `🪙 ${fmt(fe.perHour)}${tt('/sa')}` : tt('🌱 olunca {n}/sa', { n: fmt(fe.perHour) })}</span>
             </div>`).join('')
-        : '<p class="empty">Bu akvaryumda balık yok.</p>';
+        : `<p class="empty">${tt('Bu akvaryumda balık yok.')}</p>`;
       return `
-        <h3 class="inv-head">${BIOME_INFO[grp.tank.biome].emoji} ${grp.tank.name}
-          — 🪙 ${fmt(grp.perHour)}/sa${grp.boostPct > 0 ? ` <span class="boost">+%${grp.boostPct}</span>` : ''}${grp.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -%${grp.dirtPct}</span>` : ''}</h3>
+        <h3 class="inv-head">${BIOME_INFO[grp.tank.biome].emoji} ${tt(grp.tank.name)}
+          — 🪙 ${fmt(grp.perHour)}${tt('/sa')}${grp.boostPct > 0 ? ` <span class="boost">+%${grp.boostPct}</span>` : ''}${grp.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -%${grp.dirtPct}</span>` : ''}</h3>
         ${rows}`;
     }).join('');
-    this.panelShell('📈 Kazanç Raporu', `
-      <p class="dex-info">Toplam üretim: <b>🪙 ${fmt(total)}/saat</b> • Birikmiş: <b>${fmt(pot)}</b>${total > 0 ? ` (tavan ${fmt(cap)})` : ''}.
-      Yalnızca yetişkin balıklar üretir; akvaryum + dekor bonusu üretime ve büyümeye işler. Kirlenen akvaryumlarda cam bulanıklaşır, üretim ve büyüme yavaşlar — kir lekelerine dokunarak temizle! 🧹</p>
+    this.panelShell(tt('📈 Kazanç Raporu'), `
+      <p class="dex-info">${tt('Toplam üretim: <b>🪙 {n}/saat</b> • Birikmiş: <b>{pot}</b>{cap}.\n      Yalnızca yetişkin balıklar üretir; akvaryum + dekor bonusu üretime ve büyümeye işler. Kirlenen akvaryumlarda cam bulanıklaşır, üretim ve büyüme yavaşlar — kir lekelerine dokunarak temizle! 🧹', { n: fmt(total), pot: fmt(pot), cap: total > 0 ? tt(' (tavan {n})', { n: fmt(cap) }) : '' })}</p>
       ${blocks}`);
   }
 
@@ -963,12 +963,12 @@ export class UI {
         <div class="quest-row ${claimed ? 'claimed' : ''}">
           <span class="q-emoji">${q.emoji}</span>
           <div class="q-mid">
-            <div class="q-name">${q.name}</div>
+            <div class="q-name">${tt(q.name)}</div>
             <div class="bar"><div style="width:${(100 * cur) / q.target}%"></div></div>
             <div class="q-meta">${cur}/${q.target} • 🪙 ${coins}${q.rewardPearls ? ` + 🦪 ${q.rewardPearls}` : ''}</div>
           </div>
           ${claimed ? '<span class="q-done">✓</span>'
-            : done ? `<button class="buy-btn" data-claim="${q.id}">Al</button>`
+            : done ? `<button class="buy-btn" data-claim="${q.id}">${tt('Al')}</button>`
             : ''}
         </div>`;
     }).join('');
@@ -982,12 +982,12 @@ export class UI {
         <div class="quest-row weekly ${wClaimed ? 'claimed' : ''}">
           <span class="q-emoji">${wq.emoji}</span>
           <div class="q-mid">
-            <div class="q-name">${wq.name}</div>
+            <div class="q-name">${tt(wq.name)}</div>
             <div class="bar"><div style="width:${(100 * wCur) / wq.target}%"></div></div>
             <div class="q-meta">${wCur}/${wq.target} • 🪙 ${wCoins}${wq.rewardPearls ? ` + 🦪 ${wq.rewardPearls}` : ''}</div>
           </div>
           ${wClaimed ? '<span class="q-done">✓</span>'
-            : wDone ? '<button class="buy-btn" id="weekly-claim">Al</button>'
+            : wDone ? `<button class="buy-btn" id="weekly-claim">${tt('Al')}</button>`
             : ''}
         </div>`;
 
@@ -999,22 +999,22 @@ export class UI {
         <div class="quest-row ${claimed ? 'claimed' : ''}">
           <span class="q-emoji">${a.emoji}</span>
           <div class="q-mid">
-            <div class="q-name">${a.name} — <span class="q-desc">${a.desc}</span></div>
+            <div class="q-name">${tt(a.name)} — <span class="q-desc">${tt(a.desc)}</span></div>
             <div class="bar"><div style="width:${(100 * cur) / a.target}%"></div></div>
             <div class="q-meta">${cur}/${a.target} • 🪙 ${a.rewardCoins}${a.rewardPearls ? ` + 🦪 ${a.rewardPearls}` : ''}</div>
           </div>
           ${claimed ? '<span class="q-done">✓</span>'
-            : done ? `<button class="buy-btn" data-ach="${a.id}">Al</button>`
+            : done ? `<button class="buy-btn" data-ach="${a.id}">${tt('Al')}</button>`
             : ''}
         </div>`;
     }).join('');
 
-    const el = this.panelShell('📋 Görevler', `
-      <h3 class="inv-head">Günlük görevler 🔥 Seri: ${s.streak} gün</h3>
+    const el = this.panelShell(tt('📋 Görevler'), `
+      <h3 class="inv-head">${tt('Günlük görevler 🔥 Seri: {n} gün', { n: s.streak })}</h3>
       ${dailyHTML}
-      <h3 class="inv-head">Haftalık görev</h3>
+      <h3 class="inv-head">${tt('Haftalık görev')}</h3>
       ${weeklyHTML}
-      <h3 class="inv-head">Başarımlar</h3>
+      <h3 class="inv-head">${tt('Başarımlar')}</h3>
       ${achHTML}`);
     el.querySelectorAll<HTMLButtonElement>('[data-claim]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1050,58 +1050,75 @@ export class UI {
         return `
           <div class="dex-card ${has ? '' : 'unknown'}">
             ${fishSVG(sp, 60, !has)}
-            <div class="dex-name">${has ? sp.name : '???'}</div>
+            <div class="dex-name">${has ? tt(sp.name) : '???'}</div>
           </div>`;
       }).join('');
       return `
         <div class="dex-group">
           <div class="dex-head">
-            <span class="chip" style="background:${info.color}">${info.name}</span>
-            <span class="dex-count">${got}/${list.length} ${done ? '✅ +%5 satış bonusu' : ''}</span>
+            <span class="chip" style="background:${info.color}">${tt(info.name)}</span>
+            <span class="dex-count">${got}/${list.length} ${done ? tt('✅ +%5 satış bonusu') : ''}</span>
           </div>
           <div class="dex-row">${cards}</div>
         </div>`;
     }).join('');
     const bonus = Math.round((this.game.sellMult - 1) * 100);
-    this.panelShell('📖 Koleksiyon', `
-      <p class="dex-info">${s.collection.length}/100 tür toplandı. Bir türü ilk kez yetişkinliğe ulaştırdığında koleksiyona eklenir.
-      Tamamlanan her set kalıcı <b>+%5 satış bonusu</b> verir. Şu anki bonus: <b>+%${bonus}</b></p>
+    this.panelShell(tt('📖 Koleksiyon'), `
+      <p class="dex-info">${tt('{n}/100 tür toplandı. Bir türü ilk kez yetişkinliğe ulaştırdığında koleksiyona eklenir.\n      Tamamlanan her set kalıcı <b>+%5 satış bonusu</b> verir. Şu anki bonus: <b>+%{n2}</b>', { n: s.collection.length, n2: bonus })}</p>
       ${groups}`);
   }
 
   private renderSettings(): void {
     const s = this.game.save;
     const identity = this.game.services.auth.current();
-    const el = this.panelShell('⚙️ Ayarlar', `
-      <div class="set-row"><span>👤 Oyuncu adı</span>
-        <span class="name-edit"><input id="name-input" value="${s.playerName}" maxlength="16"/><button class="tgl" id="name-save">Kaydet</button></span></div>
-      <div class="set-row"><span>🎮 Hesap</span>
-        <button class="tgl" id="auth-btn">${identity ? this.game.services.auth.platformLabel : 'Giriş yap'}</button></div>
+    const lang = getLang();
+    const el = this.panelShell(tt('⚙️ Ayarlar'), `
+      <div class="set-row"><span>${tt('👤 Oyuncu adı')}</span>
+        <span class="name-edit"><input id="name-input" value="${s.playerName}" maxlength="16"/><button class="tgl" id="name-save">${tt('Kaydet')}</button></span></div>
+      <div class="set-row"><span>${tt('🎮 Hesap')}</span>
+        <button class="tgl" id="auth-btn">${identity ? this.game.services.auth.platformLabel : tt('Giriş yap')}</button></div>
       <hr/>
-      <div class="set-row"><span>🎵 Müzik</span><button class="tgl ${s.music ? 'on' : ''}" data-t="music">${s.music ? 'Açık' : 'Kapalı'}</button></div>
-      <div class="set-row"><span>🔊 Ses Efektleri</span><button class="tgl ${s.sfx ? 'on' : ''}" data-t="sfx">${s.sfx ? 'Açık' : 'Kapalı'}</button></div>
-      <div class="set-row"><span>📤 Arkadaşlarına anlat</span><button class="tgl" data-t="share">Paylaş</button></div>
+      <div class="set-row"><span>${tt('🌐 dil / language')}</span>
+        <span class="lang-toggle">
+          <button class="tgl ${lang === 'tr' ? 'on' : ''}" data-lang="tr">${tt('Türkçe')}</button>
+          <button class="tgl ${lang === 'en' ? 'on' : ''}" data-lang="en">${tt('English')}</button>
+        </span></div>
+      <hr/>
+      <div class="set-row"><span>${tt('🎵 Müzik')}</span><button class="tgl ${s.music ? 'on' : ''}" data-t="music">${s.music ? tt('Açık') : tt('Kapalı')}</button></div>
+      <div class="set-row"><span>${tt('🔊 Ses Efektleri')}</span><button class="tgl ${s.sfx ? 'on' : ''}" data-t="sfx">${s.sfx ? tt('Açık') : tt('Kapalı')}</button></div>
+      <div class="set-row"><span>${tt('📤 Arkadaşlarına anlat')}</span><button class="tgl" data-t="share">${tt('Paylaş')}</button></div>
       <hr/>
       <div class="set-links">
         <a href="https://reefy.games" target="_blank" rel="noopener">🌐 reefy.games</a>
         <a href="mailto:destek@reefy.games">✉️ destek@reefy.games</a>
       </div>
       <hr/>
-      <div class="set-row"><span>🗑️ Tüm ilerlemeyi sil</span><button class="tgl danger" data-t="reset">Sıfırla</button></div>
-      <p class="version">Reefy v${APP_VERSION} — sevgiyle yapıldı 🐠</p>
+      <div class="set-row"><span>${tt('🗑️ Tüm ilerlemeyi sil')}</span><button class="tgl danger" data-t="reset">${tt('Sıfırla')}</button></div>
+      <p class="version">${tt('Reefy v{v} — sevgiyle yapıldı 🐠', { v: APP_VERSION })}</p>
     `);
     el.querySelector('#name-save')!.addEventListener('click', () => {
       const input = el.querySelector<HTMLInputElement>('#name-input')!;
       const name = input.value.replace(/[<>&"']/g, '').trim();
-      if (name.length < 3) { this.toast('İsim en az 3 karakter olmalı'); return; }
+      if (name.length < 3) { this.toast(tt('İsim en az 3 karakter olmalı')); return; }
       s.playerName = name;
       input.value = name;
       this.game.syncSave();
       audio.click();
-      this.toast('İsim güncellendi: ' + name);
+      this.toast(tt('İsim güncellendi: {name}', { name }));
     });
     el.querySelector('#auth-btn')!.addEventListener('click', () => {
       void this.game.services.auth.signIn().then((res) => this.toast(res.msg));
+    });
+    el.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const l = btn.dataset.lang as 'tr' | 'en';
+        if (l === lang) return;
+        s.lang = l;
+        setLang(l);
+        this.game.syncSave();
+        audio.click();
+        location.reload();
+      });
     });
     el.querySelectorAll<HTMLButtonElement>('.tgl[data-t]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1111,14 +1128,14 @@ export class UI {
         } else if (t === 'sfx') {
           s.sfx = !s.sfx; audio.setSfx(s.sfx); audio.click(); this.game.syncSave(); this.renderSettings();
         } else if (t === 'share') {
-          const data = { title: 'Reefy', text: 'Akvaryumuma bir bak! 🐠', url: 'https://reefy.games' };
+          const data = { title: 'Reefy', text: tt('Akvaryumuma bir bak! 🐠'), url: 'https://reefy.games' };
           if (navigator.share) void navigator.share(data).catch(() => undefined);
           else {
             void navigator.clipboard?.writeText(data.url);
-            this.toast('Bağlantı kopyalandı! 📋');
+            this.toast(tt('Bağlantı kopyalandı! 📋'));
           }
         } else if (t === 'reset') {
-          if (confirm('Tüm ilerleme silinecek. Emin misin?')) this.game.resetAll();
+          if (confirm(tt('Tüm ilerleme silinecek. Emin misin?'))) this.game.resetAll();
         }
       });
     });
@@ -1133,10 +1150,10 @@ export class UI {
         <div class="reveal-egg">${egg.emoji}</div>
         <div class="reveal-fish" style="--glow:${info.color}">
           ${fishSVG(sp, 150)}
-          <div class="card-name big">${sp.name}</div>
+          <div class="card-name big">${tt(sp.name)}</div>
           ${rarityChip(sp.rarity)}
-          <p class="card-desc">${sp.desc}</p>
-          <button class="buy-btn reveal-ok">Harika! 🎉</button>
+          <p class="card-desc">${tt(sp.desc)}</p>
+          <button class="buy-btn reveal-ok">${tt('Harika! 🎉')}</button>
         </div>
       </div>`);
     setTimeout(() => el.querySelector('.reveal')!.classList.add('hatched'), 1100);
@@ -1152,7 +1169,7 @@ export class UI {
     const otherTanks = this.game.tankList().filter((t) => s.tanksOwned.includes(t.id) && t.id !== s.activeTank);
     const moveHTML = otherTanks.length
       ? `
-        <h3 class="inv-head">🔀 Başka akvaryuma taşı</h3>
+        <h3 class="inv-head">${tt('🔀 Başka akvaryuma taşı')}</h3>
         <div class="move-list">${otherTanks.map((t) => {
           const count = this.game.tankFishCount(t.id);
           const cap = this.game.capacityFor(t.id);
@@ -1160,42 +1177,42 @@ export class UI {
           const full = count >= cap;
           return `
             <button class="tgl move-btn" data-move="${t.id}" ${full ? 'disabled' : ''}>
-              <span>${BIOME_INFO[t.biome].emoji} ${t.name}</span>
-              <small>🐟 ${count}/${cap}${boost > 0 ? ` • +%${boost}` : ''}${full ? ' • dolu' : ''}</small>
+              <span>${BIOME_INFO[t.biome].emoji} ${tt(t.name)}</span>
+              <small>${tt('🐟 {n}/{cap}{boost}{full}', { n: count, cap, boost: boost > 0 ? tt(' • +%{n}', { n: boost }) : '', full: full ? tt(' • dolu') : '' })}</small>
             </button>`;
         }).join('')}</div>`
       : '';
     const el = this.panelShell(`${f.name}`, `
       <div class="fish-info">
         <div class="card-art">${fishSVG(f.sp, 120)}</div>
-        <div class="card-name">${f.sp.name} ${rarityChip(f.sp.rarity)}</div>
+        <div class="card-name">${tt(f.sp.name)} ${rarityChip(f.sp.rarity)}</div>
         <div class="name-edit fish-rename">
           <input id="fish-name-input" value="${f.name}" maxlength="14" autocomplete="off"/>
-          <button class="tgl" id="fish-name-save">✏️ Adlandır</button>
+          <button class="tgl" id="fish-name-save">${tt('✏️ Adlandır')}</button>
         </div>
-        <button class="tgl" id="fish-pet-btn" ${this.game.canPetToday ? '' : 'disabled'}>${this.game.canPetToday ? '🤗 Okşa' : '🤗 Bugün okşadın'}</button>
-        <p class="card-desc">${f.sp.desc}</p>
-        <div class="bar-row"><span>Büyüme (${f.stageName})</span>
+        <button class="tgl" id="fish-pet-btn" ${this.game.canPetToday ? '' : 'disabled'}>${this.game.canPetToday ? tt('🤗 Okşa') : tt('🤗 Bugün okşadın')}</button>
+        <p class="card-desc">${tt(f.sp.desc)}</p>
+        <div class="bar-row"><span>${tt('Büyüme ({stage})', { stage: f.stageName })}</span>
           <div class="bar"><div id="fi-grow" style="width:${Math.min(100, f.progress * 100)}%"></div></div></div>
-        <div class="bar-row"><span>Tokluk ${f.isSad ? '😢 aç!' : ''}</span>
+        <div class="bar-row"><span>${tt('Tokluk')} ${f.isSad ? tt('😢 aç!') : ''}</span>
           <div class="bar"><div id="fi-hunger" class="hunger" style="width:${f.hunger * 100}%"></div></div></div>
-        <div class="card-meta">Üretim: 🪙 ${RARITY_INCOME[f.sp.rarity]}/saat ${f.isAdult ? '(aktif)' : '(yetişkin olunca)'}</div>
-        ${f.bonus > 0 ? `<div class="card-meta bonus-line">✨ Yem bonusu: satış +%${Math.round(f.bonus * 100)}</div>` : ''}
+        <div class="card-meta">${tt('Üretim: 🪙 {n}/saat {state}', { n: RARITY_INCOME[f.sp.rarity], state: f.isAdult ? tt('(aktif)') : tt('(yetişkin olunca)') })}</div>
+        ${f.bonus > 0 ? `<div class="card-meta bonus-line">${tt('✨ Yem bonusu: satış +%{n}', { n: Math.round(f.bonus * 100) })}</div>` : ''}
         ${f.isAdult
-          ? `<button class="buy-btn sell">🪙 ${fmt(gain)} karşılığında sat</button>`
-          : `<p class="growing">Büyüyor… satmak için yetişkin olmasını bekle 🌱</p>`}
+          ? `<button class="buy-btn sell">${tt('🪙 {n} karşılığında sat', { n: fmt(gain) })}</button>`
+          : `<p class="growing">${tt('Büyüyor… satmak için yetişkin olmasını bekle 🌱')}</p>`}
         ${moveHTML}
       </div>`);
     el.querySelector('#fish-name-save')!.addEventListener('click', () => {
       const input = el.querySelector<HTMLInputElement>('#fish-name-input')!;
       const name = input.value.replace(/[<>&"']/g, '').trim();
-      if (name.length < 2) { this.toast('İsim en az 2 karakter olmalı'); return; }
+      if (name.length < 2) { this.toast(tt('İsim en az 2 karakter olmalı')); return; }
       f.name = name;
       input.value = name;
       el.querySelector('.panel-head h2')!.textContent = name;
       this.game.syncSave();
       audio.click();
-      this.toast(`İsim güncellendi: ${name} 🐟`);
+      this.toast(tt('İsim güncellendi: {name} 🐟', { name }));
     });
     el.querySelector('#fish-pet-btn')?.addEventListener('click', () => {
       const res = this.game.petFish(f);
@@ -1233,17 +1250,17 @@ export class UI {
     if (o.minutes < 3 && !o.dailyGift) return;
     const parts: string[] = [];
     if (o.minutes >= 3) {
-      parts.push(`Sen yokken <b>${o.minutes} dakika</b> geçti — balıkların büyümeye devam etti.`);
-      if (o.grown > 0) parts.push(`🎉 <b>${o.grown} balık</b> yetişkin oldu, satılmaya hazır!`);
-      if (o.income > 0) parts.push(`🪙 Balıkların senin için <b>${fmt(o.income)} altın</b> üretti — toplamayı unutma!`);
+      parts.push(tt('Sen yokken <b>{n} dakika</b> geçti — balıkların büyümeye devam etti.', { n: o.minutes }));
+      if (o.grown > 0) parts.push(tt('🎉 <b>{n} balık</b> yetişkin oldu, satılmaya hazır!', { n: o.grown }));
+      if (o.income > 0) parts.push(tt('🪙 Balıkların senin için <b>{n} altın</b> üretti — toplamayı unutma!', { n: fmt(o.income) }));
     }
     if (o.dailyGift) {
-      parts.push(`🎁 Günlük hediyen: <b>+${o.giftCoins} altın, +${o.giftPearls} inci</b>`);
-      if (this.game.save.streak > 1) parts.push(`🔥 Seri: <b>${this.game.save.streak} gün</b> — devam ettikçe hediyeler büyüyor!`);
+      parts.push(tt('🎁 Günlük hediyen: <b>+{coins} altın, +{pearls} inci</b>', { coins: o.giftCoins, pearls: o.giftPearls }));
+      if (this.game.save.streak > 1) parts.push(tt('🔥 Seri: <b>{n} gün</b> — devam ettikçe hediyeler büyüyor!', { n: this.game.save.streak }));
     }
-    const el = this.panelShell('🌊 Tekrar hoş geldin!', `
+    const el = this.panelShell(tt('🌊 Tekrar hoş geldin!'), `
       <div class="welcome">${parts.map((p) => `<p>${p}</p>`).join('')}
-      <button class="buy-btn welcome-ok">Akvaryuma dal 🐠</button></div>`);
+      <button class="buy-btn welcome-ok">${tt('Akvaryuma dal 🐠')}</button></div>`);
     el.querySelector('.welcome-ok')!.addEventListener('click', () => {
       audio.click(); this.closePanel();
     });
@@ -1254,9 +1271,9 @@ export class UI {
     if (s.tutorialDone) return;
     s.tutorialDone = true;
     this.game.syncSave();
-    setTimeout(() => this.toast('🌊 Reefy\'ye hoş geldin! Bu resif artık senin.'), 1200);
-    setTimeout(() => this.toast('🍤 "Besle"den yem seç, suya dokunarak yemle — kaliteli yem satış fiyatını artırabilir!'), 5200);
-    setTimeout(() => this.toast('🐟 Yetişkin balıklara dokunup satabilir, kazancınla yeni türler alabilirsin.'), 9600);
-    setTimeout(() => this.toast('📋 Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüt!'), 14200);
+    setTimeout(() => this.toast(tt('🌊 Reefy\'ye hoş geldin! Bu resif artık senin.')), 1200);
+    setTimeout(() => this.toast(tt('🍤 "Besle"den yem seç, suya dokunarak yemle — kaliteli yem satış fiyatını artırabilir!')), 5200);
+    setTimeout(() => this.toast(tt('🐟 Yetişkin balıklara dokunup satabilir, kazancınla yeni türler alabilirsin.')), 9600);
+    setTimeout(() => this.toast(tt('📋 Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüt!')), 14200);
   }
 }
