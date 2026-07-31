@@ -39,8 +39,20 @@ export function initLang(saved?: Lang): void {
   current = saved ?? detectLang();
 }
 
+/** Türkçe'de "gün" sayıya göre değişmediği için tekil/çoğul ayrımı gerektiren birkaç
+ * şablon burada özel olarak çözülür (İngilizce'de "1 day" / "2 days" farkı için). */
+const EN_PLURAL: Record<string, (n: number) => string> = {
+  '{n} gün': (n) => `${n} day${n === 1 ? '' : 's'}`,
+  'Günlük görevler 🔥 Seri: {n} gün': (n) => `Daily quests 🔥 Streak: ${n} day${n === 1 ? '' : 's'}`,
+  '🔥 Seri: <b>{n} gün</b> — devam ettikçe hediyeler büyüyor!': (n) =>
+    `🔥 Streak: <b>${n} day${n === 1 ? '' : 's'}</b> — keep it up and gifts grow bigger!`,
+};
+
 /** Türkçe metni (anahtar) mevcut dile çevirir; {var} kalıplarını vars ile değiştirir. */
 export function t(s: string, vars?: Record<string, string | number>): string {
+  if (current === 'en' && vars && typeof vars.n === 'number' && EN_PLURAL[s]) {
+    return EN_PLURAL[s](vars.n);
+  }
   let out = current === 'en' ? (EN[s] ?? s) : s;
   if (vars) {
     for (const k of Object.keys(vars)) out = out.split(`{${k}}`).join(String(vars[k]));
@@ -662,7 +674,6 @@ const EN: Record<string, string> = {
   '{n} ({xp}/{need} XP)': '{n} ({xp}/{need} XP)',
   '{count}/{total}': '{count}/{total}',
   '{n}/{total} tür': '{n}/{total} species',
-  '{n} gün': '{n} days',
   '📊 Ömür boyu istatistikler': '📊 Lifetime stats',
   '🤝 Satılan balık': '🤝 Fish sold', '💰 Toplam kazanç': '💰 Total earned', '🍤 Yedirilen yem': '🍤 Times fed',
   '🥚 Açılan yumurta': '🥚 Eggs hatched', '🪸 Yerleştirilen dekor': '🪸 Decorations placed', '🧹 Temizlenen leke': '🧹 Dirt cleaned',
@@ -670,7 +681,6 @@ const EN: Record<string, string> = {
     'Total output: <b>🪙 {n}/hour</b> • Accumulated: <b>{pot}</b>{cap}.\n      Only adult fish produce; tank + decor bonuses affect output and growth. Dirty tanks fog up the glass and slow production and growth — tap dirt spots to clean them! 🧹',
   ' (tavan {n})': ' (cap {n})',
   '🌱 olunca {n}/sa': '🌱 once grown {n}/hr',
-  'Günlük görevler 🔥 Seri: {n} gün': 'Daily quests 🔥 Streak: {n} days',
   'Haftalık görev': 'Weekly quest',
   'Al': 'Claim',
   '{n}/100 tür toplandı. Bir türü ilk kez yetişkinliğe ulaştırdığında koleksiyona eklenir.\n      Tamamlanan her set kalıcı <b>+%5 satış bonusu</b> verir. Şu anki bonus: <b>+%{n2}</b>':
@@ -709,7 +719,6 @@ const EN: Record<string, string> = {
   '🎉 <b>{n} balık</b> yetişkin oldu, satılmaya hazır!': '🎉 <b>{n} fish</b> grew up, ready to sell!',
   '🪙 Balıkların senin için <b>{n} altın</b> üretti — toplamayı unutma!': '🪙 Your fish produced <b>{n} coins</b> for you — don\'t forget to collect!',
   '🎁 Günlük hediyen: <b>+{coins} altın, +{pearls} inci</b>': '🎁 Your daily gift: <b>+{coins} coins, +{pearls} pearls</b>',
-  '🔥 Seri: <b>{n} gün</b> — devam ettikçe hediyeler büyüyor!': '🔥 Streak: <b>{n} days</b> — keep it up and gifts grow bigger!',
   '🌊 Tekrar hoş geldin!': '🌊 Welcome back!',
   'Akvaryuma dal 🐠': 'Dive into your tank 🐠',
   'Reefy\'ye hoş geldin! Bu resif artık senin.': 'Welcome to Reefy! This reef is now yours.',
