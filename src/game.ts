@@ -11,6 +11,7 @@ import {
 import { FEEDS, FISH_BONUS_CAP, FeedDef, feedById, feedPackById } from './feeds';
 import { Biome, TANKS, TANK_CAP_BONUS, TankDef, tankById } from './tanks';
 import type { UI } from './ui';
+import { t } from './i18n';
 
 interface Pellet { x: number; y: number; vy: number; sway: number; age: number; feed: string }
 interface Particle { x: number; y: number; vy: number; life: number; color: number; r: number }
@@ -157,7 +158,7 @@ export class Game {
   /** Biriken geliri kasaya aktarır. */
   collectIncome(): { ok: boolean; msg: string } {
     const amount = Math.floor(this.save.incomePot);
-    if (amount < 1) return { ok: false, msg: 'Henüz birikmiş gelir yok' };
+    if (amount < 1) return { ok: false, msg: t('Henüz birikmiş gelir yok') };
     this.save.incomePot -= amount;
     this.save.coins += amount;
     this.save.stats.totalEarned += amount;
@@ -166,7 +167,7 @@ export class Game {
     audio.coin();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `+${amount} altın toplandı! 🪙` };
+    return { ok: true, msg: t('+{n} altın toplandı! 🪙', { n: amount }) };
   }
 
   completedSets(): Rarity[] {
@@ -914,7 +915,7 @@ export class Game {
 
   private onGrown(f: Fish): void {
     audio.grown();
-    this.ui.toast(`🎉 ${f.name} yetişkin oldu! Satmak için üzerine dokun.`);
+    this.ui.toast(t('🎉 {name} yetişkin oldu! Satmak için üzerine dokun.', { name: f.name }));
     this.addToCollection(f.sp);
     this.syncSave();
     this.ui.refreshHUD();
@@ -922,7 +923,7 @@ export class Game {
 
   private onDormantGrown(d: FishSave): void {
     audio.grown();
-    this.ui.toast(`🎉 ${d.name}, ${tankById(d.tank).name} akvaryumunda yetişkin oldu!`);
+    this.ui.toast(t('🎉 {name}, {tank} akvaryumunda yetişkin oldu!', { name: d.name, tank: t(tankById(d.tank).name) }));
     this.addToCollection(speciesById(d.sp));
     this.syncSave();
     this.ui.refreshHUD();
@@ -932,12 +933,12 @@ export class Game {
     if (this.save.collection.includes(sp.id)) return;
     this.save.collection.push(sp.id);
     this.questEvent('collect', 1);
-    this.ui.toast(`📖 Koleksiyona eklendi: ${sp.name}`);
+    this.ui.toast(t('📖 Koleksiyona eklendi: {name}', { name: t(sp.name) }));
     const all = SPECIES.filter((s) => s.rarity === sp.rarity);
     if (all.every((s) => this.save.collection.includes(s.id))) {
       this.save.pearls += 15;
       audio.levelup();
-      this.ui.toast(`✨ ${RARITY_INFO[sp.rarity].name} seti tamamlandı! +15 inci, satışlara kalıcı +%5`);
+      this.ui.toast(t('✨ {rarity} seti tamamlandı! +15 inci, satışlara kalıcı +%5', { rarity: t(RARITY_INFO[sp.rarity].name) }));
     }
   }
 
@@ -1053,7 +1054,7 @@ export class Game {
       this.save.quests.progress[q.id] = next;
       if (next >= q.target) {
         audio.quest();
-        this.ui.toast(`✅ Görev tamamlandı: ${q.name} — ödülünü Görevler'den al!`);
+        this.ui.toast(t('✅ Görev tamamlandı: {name} — ödülünü Görevler\'den al!', { name: t(q.name) }));
       }
     }
 
@@ -1066,7 +1067,7 @@ export class Game {
         this.save.weeklyQuest.progress[wq.id] = next;
         if (next >= wq.target) {
           audio.quest();
-          this.ui.toast(`🏅 Haftalık görev tamamlandı: ${wq.name} — ödülünü Görevler'den al!`);
+          this.ui.toast(t('🏅 Haftalık görev tamamlandı: {name} — ödülünü Görevler\'den al!', { name: t(wq.name) }));
         }
       }
     }
@@ -1075,8 +1076,8 @@ export class Game {
   claimQuest(q: QuestDef): { ok: boolean; msg: string } {
     this.ensureQuestDay();
     const cur = this.save.quests.progress[q.id] ?? 0;
-    if (cur < q.target) return { ok: false, msg: 'Görev henüz tamamlanmadı.' };
-    if (this.save.quests.claimed.includes(q.id)) return { ok: false, msg: 'Ödül zaten alındı.' };
+    if (cur < q.target) return { ok: false, msg: t('Görev henüz tamamlanmadı.') };
+    if (this.save.quests.claimed.includes(q.id)) return { ok: false, msg: t('Ödül zaten alındı.') };
     this.save.quests.claimed.push(q.id);
     const coins = Math.round(q.rewardCoins * (1 + this.save.level * 0.1));
     this.save.coins += coins;
@@ -1084,15 +1085,15 @@ export class Game {
     audio.coin();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `+${coins} altın${q.rewardPearls ? `, +${q.rewardPearls} inci` : ''}` };
+    return { ok: true, msg: t('+{coins} altın', { coins }) + (q.rewardPearls ? t(', +{n} inci', { n: q.rewardPearls }) : '') };
   }
 
   claimWeeklyQuest(): { ok: boolean; msg: string } {
     this.ensureQuestWeek();
     const q = this.weeklyQuest();
     const cur = this.save.weeklyQuest.progress[q.id] ?? 0;
-    if (cur < q.target) return { ok: false, msg: 'Haftalık görev henüz tamamlanmadı.' };
-    if (this.save.weeklyQuest.claimed.includes(q.id)) return { ok: false, msg: 'Ödül zaten alındı.' };
+    if (cur < q.target) return { ok: false, msg: t('Haftalık görev henüz tamamlanmadı.') };
+    if (this.save.weeklyQuest.claimed.includes(q.id)) return { ok: false, msg: t('Ödül zaten alındı.') };
     this.save.weeklyQuest.claimed.push(q.id);
     const coins = Math.round(q.rewardCoins * (1 + this.save.level * 0.1));
     this.save.coins += coins;
@@ -1100,21 +1101,21 @@ export class Game {
     audio.levelup();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `Haftalık ödül: +${coins} altın${q.rewardPearls ? `, +${q.rewardPearls} inci` : ''}` };
+    return { ok: true, msg: t('Haftalık ödül: +{coins} altın', { coins }) + (q.rewardPearls ? t(', +{n} inci', { n: q.rewardPearls }) : '') };
   }
 
   claimAchievement(id: string): { ok: boolean; msg: string } {
     const a = ACHIEVEMENTS.find((x) => x.id === id);
-    if (!a) return { ok: false, msg: 'Bilinmeyen başarım' };
-    if (this.save.achievementsClaimed.includes(id)) return { ok: false, msg: 'Ödül zaten alındı.' };
-    if (a.check(this.save) < a.target) return { ok: false, msg: 'Başarım henüz tamamlanmadı.' };
+    if (!a) return { ok: false, msg: t('Bilinmeyen başarım') };
+    if (this.save.achievementsClaimed.includes(id)) return { ok: false, msg: t('Ödül zaten alındı.') };
+    if (a.check(this.save) < a.target) return { ok: false, msg: t('Başarım henüz tamamlanmadı.') };
     this.save.achievementsClaimed.push(id);
     this.save.coins += a.rewardCoins;
     this.save.pearls += a.rewardPearls;
     audio.levelup();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${a.name}: +${a.rewardCoins} altın, +${a.rewardPearls} inci` };
+    return { ok: true, msg: t('{name}: +{coins} altın, +{pearls} inci', { name: t(a.name), coins: a.rewardCoins, pearls: a.rewardPearls }) };
   }
 
   // ---------- oyuncu eylemleri ----------
@@ -1249,7 +1250,7 @@ export class Game {
       this.save.cleanRewardCount++;
       this.save.coins += Game.CLEAN_REWARD_COINS;
       this.addXp(Game.CLEAN_REWARD_XP);
-      this.ui.toast(`🧹 Leke temizlendi! +${Game.CLEAN_REWARD_COINS} altın`);
+      this.ui.toast(t('🧹 Leke temizlendi! +{n} altın', { n: Game.CLEAN_REWARD_COINS }));
     }
 
     this.syncSave();
@@ -1273,9 +1274,9 @@ export class Game {
   }
 
   /**
-   * Kirlilik arttıkça camın kendisini kirli gösteren sabit bir yapı çizer: köşelerde birikmiş
-   * yosun/kireç lekeleri ve üst kenardan sarkan damla izleri. Sahneyi bulanıklaştırmaz, sadece
-   * camın üstüne "kirli" bir doku ekler.
+   * Kirlilik arttıkça camın kendisini kirli gösteren bir vinyet çizer: dört köşeden merkeze
+   * doğru yumuşakça yayılan tek bir yosun/kireç rengi gradyanı. Sahneyi bulanıklaştırmaz,
+   * sadece camın üstüne "kirli" bir filtre ekler.
    */
   private drawGrime(w: number, h: number, dl: number): void {
     // dirtLevel ve boyutlar değişmediği sürece yeniden çizmeye gerek yok (her frame vektör
@@ -1292,9 +1293,9 @@ export class Game {
     }
     this.grimeSprite.visible = true;
 
-    // Köşe lekeleri: iç içe daireler yerine tek bir radyal gradyan dolgusu kullanılır
-    // (aynı gradyan dört köşede de yeniden kullanılır) — çok daha az örtüşen çizim, aynı görünüm.
-    const cornerAlpha = 0.16 + dl * 0.34;
+    // Köşelerden merkeze doğru yumuşak bir "kirli cam" vinyeti — çizgi/damla değil, dört köşeden
+    // yayılan tek bir gradyan dolgu (aynı gradyan nesnesi dört köşede yeniden kullanılır).
+    const cornerAlpha = 0.18 + dl * 0.42;
     const cornerGrad = new FillGradient({
       type: 'radial',
       center: { x: 0.5, y: 0.5 }, innerRadius: 0,
@@ -1304,29 +1305,10 @@ export class Game {
         { offset: 1, color: [0.24, 0.29, 0.15, 0] },
       ],
     });
-    const rad = (0.22 + dl * 0.3) * Math.min(w, h);
-    const corners: [number, number, number, number][] = [
-      [0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1],
-    ];
-    for (const [cx, cy, sx, sy] of corners) {
-      g.circle(cx + sx * rad * 0.3, cy + sy * rad * 0.3, rad).fill(cornerGrad);
-    }
-
-    // Üst kenardan sarkan yosun/kireç damlaları
-    const streaks = Math.round(3 + dl * 6);
-    for (let i = 0; i < streaks; i++) {
-      const fx = (i + 0.5) / streaks;
-      const seed = Math.sin(i * 12.9898 + 4.1414) * 43758.5453;
-      const jitter = seed - Math.floor(seed);
-      const x = fx * w + (jitter - 0.5) * (w / streaks) * 0.6;
-      const len = h * (0.06 + jitter * 0.1) * (0.4 + dl);
-      const width = 3 + jitter * 5;
-      g.moveTo(x - width / 2, 0)
-        .lineTo(x + width / 2, 0)
-        .lineTo(x + width * 0.25, len)
-        .lineTo(x - width * 0.25, len)
-        .closePath()
-        .fill({ color: 0x4a5c34, alpha: 0.12 + dl * 0.18 });
+    const rad = (0.3 + dl * 0.4) * Math.min(w, h);
+    const corners: [number, number][] = [[0, 0], [w, 0], [0, h], [w, h]];
+    for (const [cx, cy] of corners) {
+      g.circle(cx, cy, rad).fill(cornerGrad);
     }
 
     // Yarı saydam şekilleri her karede yeniden rasterize etmek yerine tek bir dokuya
@@ -1351,7 +1333,7 @@ export class Game {
       } else {
         if (this.save.coins < f.cost) {
           audio.error();
-          this.ui.toast(`Yeterli altın yok (${f.name}: ${f.cost} 🪙/tane)`);
+          this.ui.toast(t('Yeterli altın yok ({name}: {cost} 🪙/tane)', { name: t(f.name), cost: f.cost }));
           return;
         }
         this.save.coins -= f.cost;
@@ -1373,25 +1355,25 @@ export class Game {
   /** Yem paketi satın al: stok çantaya eklenir. */
   buyFeedPack(packId: string): { ok: boolean; msg: string } {
     const p = feedPackById(packId);
-    if (!p) return { ok: false, msg: 'Bilinmeyen paket' };
-    if (this.save.coins < p.price) return { ok: false, msg: 'Yeterli altın yok' };
+    if (!p) return { ok: false, msg: t('Bilinmeyen paket') };
+    if (this.save.coins < p.price) return { ok: false, msg: t('Yeterli altın yok') };
     this.save.coins -= p.price;
     this.save.feedOwned[p.feed] = (this.save.feedOwned[p.feed] ?? 0) + p.qty;
     audio.coin();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${p.qty} × ${feedById(p.feed).name} çantana eklendi! 🎒` };
+    return { ok: true, msg: t('{qty} × {name} çantana eklendi! 🎒', { qty: p.qty, name: t(feedById(p.feed).name) }) };
   }
 
   buyFish(spId: string): { ok: boolean; msg: string } {
     const sp = speciesById(spId);
-    if (this.fishes.length >= this.capacity) return { ok: false, msg: `Bu akvaryum dolu (${this.capacity} balık)` };
+    if (this.fishes.length >= this.capacity) return { ok: false, msg: t('Bu akvaryum dolu ({cap} balık)', { cap: this.capacity }) };
     if (sp.pearlPrice) {
-      if (this.save.pearls < sp.pearlPrice) return { ok: false, msg: 'Yeterli inci yok' };
+      if (this.save.pearls < sp.pearlPrice) return { ok: false, msg: t('Yeterli inci yok') };
       this.save.pearls -= sp.pearlPrice;
     } else {
-      if (this.save.level < sp.unlockLevel) return { ok: false, msg: `Seviye ${sp.unlockLevel} gerekli` };
-      if (this.save.coins < sp.buyPrice) return { ok: false, msg: 'Yeterli altın yok' };
+      if (this.save.level < sp.unlockLevel) return { ok: false, msg: t('Seviye {n} gerekli', { n: sp.unlockLevel }) };
+      if (this.save.coins < sp.buyPrice) return { ok: false, msg: t('Yeterli altın yok') };
       this.save.coins -= sp.buyPrice;
     }
     const f = this.spawnFish(this.newFishSave(sp));
@@ -1399,7 +1381,7 @@ export class Game {
     this.questEvent('buyFish', 1);
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${f.name} akvaryuma katıldı! 🐟` };
+    return { ok: true, msg: t('{name} akvaryuma katıldı! 🐟', { name: f.name }) };
   }
 
   private newFishSave(sp: Species): FishSave {
@@ -1414,7 +1396,7 @@ export class Game {
   }
 
   sellFish(f: Fish): { ok: boolean; msg: string } {
-    if (!f.isAdult) return { ok: false, msg: 'Henüz yavru — büyümesini bekle' };
+    if (!f.isAdult) return { ok: false, msg: t('Henüz yavru — büyümesini bekle') };
     const gain = Math.round(f.sp.sellPrice * this.sellMult * (1 + f.bonus));
     this.save.coins += gain;
     if (f.sp.rarity === 'legendary') this.save.pearls += 2;
@@ -1435,14 +1417,14 @@ export class Game {
     audio.coin();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${f.name} satıldı: +${gain} altın` };
+    return { ok: true, msg: t('{name} satıldı: +{n} altın', { name: f.name, n: gain }) };
   }
 
   /** Uyuyan (başka akvaryumdaki) yetişkin balığı satar — akvaryum değiştirmeye gerek kalmaz. */
   sellDormant(fs: FishSave): { ok: boolean; msg: string } {
-    if (fs.progress < 1) return { ok: false, msg: 'Henüz yavru — büyümesini bekle' };
+    if (fs.progress < 1) return { ok: false, msg: t('Henüz yavru — büyümesini bekle') };
     const idx = this.dormant.indexOf(fs);
-    if (idx < 0) return { ok: false, msg: 'Balık bulunamadı' };
+    if (idx < 0) return { ok: false, msg: t('Balık bulunamadı') };
     const sp = speciesById(fs.sp);
     const gain = Math.round(sp.sellPrice * this.sellMult * (1 + (fs.bonus ?? 0)));
     this.dormant.splice(idx, 1);
@@ -1456,23 +1438,23 @@ export class Game {
     audio.coin();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${fs.name} satıldı: +${gain} altın` };
+    return { ok: true, msg: t('{name} satıldı: +{n} altın', { name: fs.name, n: gain }) };
   }
 
   /** Kazanç/envanter satırından satış: aktif balığa ya da uyuyan kayda yönlenir. */
   sellEarning(fe: FishEarning): { ok: boolean; msg: string } {
     if (fe.live) return this.sellFish(fe.live);
     if (fe.saved) return this.sellDormant(fe.saved);
-    return { ok: false, msg: 'Balık bulunamadı' };
+    return { ok: false, msg: t('Balık bulunamadı') };
   }
 
   hatchEgg(tier: EggTier): { ok: boolean; msg: string; species?: Species } {
-    if (this.fishes.length >= this.capacity) return { ok: false, msg: `Bu akvaryum dolu (${this.capacity} balık)` };
+    if (this.fishes.length >= this.capacity) return { ok: false, msg: t('Bu akvaryum dolu ({cap} balık)', { cap: this.capacity }) };
     if (tier.currency === 'coins') {
-      if (this.save.coins < tier.cost) return { ok: false, msg: 'Yeterli altın yok' };
+      if (this.save.coins < tier.cost) return { ok: false, msg: t('Yeterli altın yok') };
       this.save.coins -= tier.cost;
     } else {
-      if (this.save.pearls < tier.cost) return { ok: false, msg: 'Yeterli inci yok' };
+      if (this.save.pearls < tier.cost) return { ok: false, msg: t('Yeterli inci yok') };
       this.save.pearls -= tier.cost;
     }
 
@@ -1508,24 +1490,24 @@ export class Game {
   buyDecor(defId: string): { ok: boolean; msg: string } {
     const d = decorById(defId);
     if (d.currency === 'coins') {
-      if (this.save.coins < d.price) return { ok: false, msg: 'Yeterli altın yok' };
+      if (this.save.coins < d.price) return { ok: false, msg: t('Yeterli altın yok') };
       this.save.coins -= d.price;
     } else {
-      if (this.save.pearls < d.price) return { ok: false, msg: 'Yeterli inci yok' };
+      if (this.save.pearls < d.price) return { ok: false, msg: t('Yeterli inci yok') };
       this.save.pearls -= d.price;
     }
     this.save.decorOwned[defId] = (this.save.decorOwned[defId] ?? 0) + 1;
     audio.coin();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${d.name} envanterine eklendi! 🎒 Envanterden yerleştir.` };
+    return { ok: true, msg: t('{name} envanterine eklendi! 🎒 Envanterden yerleştir.', { name: t(d.name) }) };
   }
 
   placeDecor(defId: string): { ok: boolean; msg: string } {
     const owned = this.save.decorOwned[defId] ?? 0;
-    if (owned <= 0) return { ok: false, msg: 'Envanterinde bu dekordan yok' };
+    if (owned <= 0) return { ok: false, msg: t('Envanterinde bu dekordan yok') };
     const placed = this.save.decorPlaced[this.save.activeTank] ?? (this.save.decorPlaced[this.save.activeTank] = []);
-    if (placed.length >= MAX_PLACED) return { ok: false, msg: `Bu akvaryumda en fazla ${MAX_PLACED} dekor olabilir` };
+    if (placed.length >= MAX_PLACED) return { ok: false, msg: t('Bu akvaryumda en fazla {n} dekor olabilir', { n: MAX_PLACED }) };
     // Diğerlerinden uzak bir yatay konum seç
     let fx = 0.1 + Math.random() * 0.8;
     for (let tries = 0; tries < 12; tries++) {
@@ -1544,44 +1526,44 @@ export class Game {
     this.syncSave();
     this.ui.refreshHUD();
     const d = decorById(defId);
-    return { ok: true, msg: `${d.name} yerleştirildi (+%${DECOR_BOOST[d.rarity]} büyüme & gelir)` };
+    return { ok: true, msg: t('{name} yerleştirildi (+%{n} büyüme & gelir)', { name: t(d.name), n: DECOR_BOOST[d.rarity] }) };
   }
 
   removeDecor(index: number): { ok: boolean; msg: string } {
     const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
     const p = placed[index];
-    if (!p) return { ok: false, msg: 'Dekor bulunamadı' };
+    if (!p) return { ok: false, msg: t('Dekor bulunamadı') };
     placed.splice(index, 1);
     this.save.decorOwned[p.def] = (this.save.decorOwned[p.def] ?? 0) + 1;
     audio.click();
     this.syncSave();
-    return { ok: true, msg: `${decorById(p.def).name} envantere geri alındı` };
+    return { ok: true, msg: t('{name} envantere geri alındı', { name: t(decorById(p.def).name) }) };
   }
 
   // ---------- akvaryumlar ----------
 
   buyTank(tankId: string): { ok: boolean; msg: string } {
-    const t = tankById(tankId);
-    if (this.save.tanksOwned.includes(tankId)) return { ok: false, msg: 'Bu akvaryuma zaten sahipsin' };
-    if (this.save.level < t.unlockLevel) return { ok: false, msg: `Seviye ${t.unlockLevel} gerekli` };
-    if (t.currency === 'coins') {
-      if (this.save.coins < t.price) return { ok: false, msg: 'Yeterli altın yok' };
-      this.save.coins -= t.price;
+    const tank = tankById(tankId);
+    if (this.save.tanksOwned.includes(tankId)) return { ok: false, msg: t('Bu akvaryuma zaten sahipsin') };
+    if (this.save.level < tank.unlockLevel) return { ok: false, msg: t('Seviye {n} gerekli', { n: tank.unlockLevel }) };
+    if (tank.currency === 'coins') {
+      if (this.save.coins < tank.price) return { ok: false, msg: t('Yeterli altın yok') };
+      this.save.coins -= tank.price;
     } else {
-      if (this.save.pearls < t.price) return { ok: false, msg: 'Yeterli inci yok' };
-      this.save.pearls -= t.price;
+      if (this.save.pearls < tank.price) return { ok: false, msg: t('Yeterli inci yok') };
+      this.save.pearls -= tank.price;
     }
     this.save.tanksOwned.push(tankId);
     this.save.decorPlaced[tankId] = this.save.decorPlaced[tankId] ?? [];
     audio.levelup();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${t.name} artık senin! 🏝️ Envanterden geçiş yapabilirsin.` };
+    return { ok: true, msg: t('{name} artık senin! 🏝️ Envanterden geçiş yapabilirsin.', { name: t(tank.name) }) };
   }
 
   switchTank(tankId: string): { ok: boolean; msg: string } {
-    if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: 'Önce bu akvaryumu satın almalısın' };
-    if (tankId === this.save.activeTank) return { ok: false, msg: 'Zaten bu akvaryumdasın' };
+    if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: t('Önce bu akvaryumu satın almalısın') };
+    if (tankId === this.save.activeTank) return { ok: false, msg: t('Zaten bu akvaryumdasın') };
     // Aktif balıkları uyut, yenilerini uyandır
     for (const f of this.fishes) {
       this.dormant.push(f.toSave());
@@ -1598,7 +1580,7 @@ export class Game {
     this.syncSave();
     this.ui.refreshHUD();
     this.services.ads.maybeShowInterstitial();
-    return { ok: true, msg: `${this.activeTank.name} 🌊` };
+    return { ok: true, msg: `${t(this.activeTank.name)} 🌊` };
   }
 
   tankFishCount(tankId: string): number {
@@ -1640,12 +1622,12 @@ export class Game {
 
   /** Aktif akvaryumdaki bir balığı sahip olunan başka bir akvaryuma taşır. */
   moveFish(f: Fish, tankId: string): { ok: boolean; msg: string } {
-    if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: 'Önce bu akvaryumu satın almalısın' };
-    if (tankId === this.save.activeTank) return { ok: false, msg: 'Balık zaten bu akvaryumda' };
+    if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: t('Önce bu akvaryumu satın almalısın') };
+    if (tankId === this.save.activeTank) return { ok: false, msg: t('Balık zaten bu akvaryumda') };
     const cap = this.capacityFor(tankId);
-    if (this.tankFishCount(tankId) >= cap) return { ok: false, msg: `${tankById(tankId).name} dolu (${cap} balık)` };
+    if (this.tankFishCount(tankId) >= cap) return { ok: false, msg: t('{name} dolu ({cap} balık)', { name: t(tankById(tankId).name), cap }) };
     const idx = this.fishes.indexOf(f);
-    if (idx < 0) return { ok: false, msg: 'Balık bulunamadı' };
+    if (idx < 0) return { ok: false, msg: t('Balık bulunamadı') };
     this.fishes.splice(idx, 1);
     const fs = f.toSave();
     fs.tank = tankId;
@@ -1654,7 +1636,7 @@ export class Game {
     audio.place();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${f.name}, ${tankById(tankId).name} akvaryumuna taşındı 🌊` };
+    return { ok: true, msg: t('{name}, {tank} akvaryumuna taşındı 🌊', { name: f.name, tank: t(tankById(tankId).name) }) };
   }
 
   // ---------- ortak ----------
@@ -1666,7 +1648,7 @@ export class Game {
       this.save.level++;
       this.save.pearls += 3;
       audio.levelup();
-      this.ui.toast(`⭐ Seviye ${this.save.level}! +3 inci, kapasite ${this.capacity} balık`);
+      this.ui.toast(t('⭐ Seviye {n}! +3 inci, kapasite {cap} balık', { n: this.save.level, cap: this.capacity }));
     }
   }
 
@@ -1684,13 +1666,13 @@ export class Game {
   }
 
   visitFriend(code: string): { ok: boolean; msg: string } {
-    if (!this.save.friends.some((f) => f.code === code)) return { ok: false, msg: 'Arkadaş bulunamadı' };
+    if (!this.save.friends.some((f) => f.code === code)) return { ok: false, msg: t('Arkadaş bulunamadı') };
     const today = new Date().toISOString().slice(0, 10);
     if (this.save.friendVisits.day !== today) {
       this.save.friendVisits = { day: today, visited: [], count: 0 };
     }
     if (this.save.friendVisits.visited.includes(code)) {
-      return { ok: false, msg: 'Bu arkadaşı bugün zaten ziyaret ettin.' };
+      return { ok: false, msg: t('Bu arkadaşı bugün zaten ziyaret ettin.') };
     }
     this.save.friendVisits.visited.push(code);
     this.save.friendVisits.count++;
@@ -1702,7 +1684,7 @@ export class Game {
     audio.coin();
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `Akvaryumu ziyaret ettin: +${coins} altın, +${xp} XP 🤝` };
+    return { ok: true, msg: t('Akvaryumu ziyaret ettin: +{coins} altın, +{xp} XP 🤝', { coins, xp }) };
   }
 
   /** Günde bir kez herhangi bir balığı okşayabilirsin: küçük XP ve satış bonusu kazandırır. */
@@ -1715,7 +1697,7 @@ export class Game {
   }
 
   petFish(f: Fish): { ok: boolean; msg: string } {
-    if (!this.canPetToday) return { ok: false, msg: 'Bugün zaten bir balığını okşadın. Yarın tekrar gel! 💕' };
+    if (!this.canPetToday) return { ok: false, msg: t('Bugün zaten bir balığını okşadın. Yarın tekrar gel! 💕') };
     this.save.petDay = new Date().toISOString().slice(0, 10);
     f.hunger = Math.min(1, f.hunger + 0.15);
     f.bonus = Math.min(FISH_BONUS_CAP, f.bonus + Game.PET_REWARD_BONUS);
@@ -1729,7 +1711,7 @@ export class Game {
     }
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: `${f.name} mutlu oldu! +${Game.PET_REWARD_XP} XP, satış değeri arttı 💕` };
+    return { ok: true, msg: t('{name} mutlu oldu! +{n} XP, satış değeri arttı 💕', { name: f.name, n: Game.PET_REWARD_XP }) };
   }
 
   /** Arkadaşa günde bir kez küçük bir yem hediyesi gönderilebilir; karşılığında sen de birkaç yem kazanırsın. */
@@ -1744,13 +1726,13 @@ export class Game {
   }
 
   giftFriend(code: string): { ok: boolean; msg: string } {
-    if (!this.save.friends.some((f) => f.code === code)) return { ok: false, msg: 'Arkadaş bulunamadı' };
+    if (!this.save.friends.some((f) => f.code === code)) return { ok: false, msg: t('Arkadaş bulunamadı') };
     const today = new Date().toISOString().slice(0, 10);
     if (this.save.friendGifts.day !== today) {
       this.save.friendGifts = { day: today, gifted: [] };
     }
     if (this.save.friendGifts.gifted.includes(code)) {
-      return { ok: false, msg: 'Bu arkadaşına bugün zaten hediye gönderdin.' };
+      return { ok: false, msg: t('Bu arkadaşına bugün zaten hediye gönderdin.') };
     }
     this.save.friendGifts.gifted.push(code);
     this.save.feedOwned[Game.GIFT_FEED_ID] = (this.save.feedOwned[Game.GIFT_FEED_ID] ?? 0) + Game.GIFT_FEED_QTY;
@@ -1760,7 +1742,7 @@ export class Game {
     this.ui.refreshHUD();
     return {
       ok: true,
-      msg: `Hediye gönderildi! Karşılığında +${Game.GIFT_FEED_QTY} ${feedById(Game.GIFT_FEED_ID).name} kazandın 🎁`,
+      msg: t('Hediye gönderildi! Karşılığında +{qty} {feed} kazandın 🎁', { qty: Game.GIFT_FEED_QTY, feed: t(feedById(Game.GIFT_FEED_ID).name) }),
     };
   }
 
