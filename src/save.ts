@@ -1,3 +1,6 @@
+import type { Lang } from './i18n';
+import { detectLang } from './i18n';
+
 export interface FishSave {
   sp: string;
   progress: number; // 0..1
@@ -70,6 +73,7 @@ export interface SaveData {
   lastDaily: string;
   tutorialDone: boolean;
   adsRemoved: boolean; // "Reklamları kaldır" IAP'i satın alındı mı
+  lang: Lang;
 }
 
 const KEY = 'reefy-save-v1';
@@ -123,6 +127,7 @@ export function defaultSave(): SaveData {
     lastDaily: '',
     tutorialDone: false,
     adsRemoved: false,
+    lang: detectLang(),
   };
 }
 
@@ -160,6 +165,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (merged.petDay === undefined) merged.petDay = '';
   if (!merged.friendGifts) merged.friendGifts = { day: '', gifted: [] };
   if (!merged.weeklyQuest) merged.weeklyQuest = { day: '', progress: {}, claimed: [] };
+  if (merged.lang !== 'tr' && merged.lang !== 'en') merged.lang = detectLang();
   // Kaydedilmiş serbest metin alanları (localStorage doğrudan düzenlenebilir; UI'daki
   // giriş temizliğine güvenmeyip burada da temizle — HTML injection'a karşı savunma).
   const stripHtml = (v: string) => v.replace(/[<>&"']/g, '').trim();
