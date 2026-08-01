@@ -1,17 +1,18 @@
 # reefy
 
-## Store / Pazarlama Görselleri
+## Store / Marketing Assets
 
-Store listing, feature graphic, ikon, ekran görüntüsü gibi pazarlama görselleri
-**asla bu public repo'ya commit edilmez**. Repo kökündeki `*.png` zaten `.gitignore`
-ile kapsanıyor (bkz. proje kökündeki ekran görüntüleri gibi), ayrıca:
+Marketing assets like store listings, feature graphics, icons, and screenshots
+**are never committed to this public repo**. `*.png` at the repo root is already
+covered by `.gitignore` (e.g. project-root screenshots), and beyond that:
 
-1. Yerel, gitignore'lu kopya: `docs/store-assets-originals/`.
-2. Private yedek repo: `C:\Projects\pictures\reefy\` (private `Eren-Ozcan/pictures`
-   reposunun yerel clone'u) — oraya kopyalanıp o repoda commit+push edilir.
+1. Local, gitignored copy: `docs/store-assets-originals/`.
+2. Private backup repo: `C:\Projects\pictures\reefy\` (a local clone of the
+   private `Eren-Ozcan/pictures` repo) — copied there and committed+pushed in
+   that repo.
 
-## Stüdyo geneli bilgiler
+## Studio-wide info
 
-Google hesabı, Play Console geliştirici hesabı, yilkgames.com/yilkgames_web durumu
-gibi stüdyo geneli (bu oyuna özel olmayan) sorular için `C:\Projects\pictures\STUDIO.md`
-tek kaynak — burada tekrarlanmaz.
+For studio-wide (not specific to this game) questions like the Google account,
+Play Console developer account, or yilkgames.com/yilkgames_web status, the single
+source of truth is `C:\Projects\pictures\STUDIO.md` — not repeated here.
