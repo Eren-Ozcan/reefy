@@ -21,8 +21,12 @@ const OFFLINE_SPEED = 0.5;
 const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsinden
 
 const MAX_DIRT_SPOTS = 6;              // akvaryum başına en fazla temizlenmemiş kir lekesi
-const DIRT_SPAWN_MS = 100_000;         // ortalama bu sürede yeni bir leke oluşur
 const DIRT_PENALTY_MAX = 0.35;         // tamamen kirli akvaryumda üretim/büyüme %35 azalır
+// İlk leke / ikinci leke / sonraki lekeler için gecikme aralıkları (ms): kirlenme sonraki
+// lekelerde yavaşlar ki oyuncuya temizlemek için makul bir pencere kalsın.
+const DIRT_DELAY_1: [number, number] = [120_000, 150_000];
+const DIRT_DELAY_2: [number, number] = [150_000, 180_000];
+const DIRT_DELAY_3: [number, number] = [400_000, 500_000];
 
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
@@ -73,7 +77,7 @@ export class Game {
   private grimeSprite = new Sprite();
   private grimeTex: Texture | null = null;
   private grimeCacheKey = '';
-  private dirtTimer = DIRT_SPAWN_MS * (0.3 + Math.random() * 0.7);
+  private dirtTimer = 0;
 
   private pellets: Pellet[] = [];
   private particles: Particle[] = [];
@@ -222,6 +226,7 @@ export class Game {
     this.save.collection = this.save.collection.filter((id) => knownSpecies.has(id));
 
     this.applyOffline();
+    this.dirtTimer = this.nextDirtDelay(this.save.dirtSpots[this.save.activeTank]?.length ?? 0);
     this.applyDailyGift();
     this.ensureQuestDay();
 
@@ -906,8 +911,8 @@ export class Game {
     // Kir lekeleri: zamanla oluşur, temizlenmedikçe camı bulanıklaştırır
     this.dirtTimer -= dt * 1000;
     if (this.dirtTimer <= 0) {
-      this.dirtTimer = DIRT_SPAWN_MS * (0.6 + Math.random() * 0.8);
       this.maybeSpawnDirt(this.save.activeTank);
+      this.dirtTimer = this.nextDirtDelay(this.save.dirtSpots[this.save.activeTank]?.length ?? 0);
     }
     this.drawDirt(w, h);
     this.drawGrime(w, h, this.dirtLevel(this.save.activeTank));
@@ -977,13 +982,15 @@ export class Game {
     this.offline.grown = grown;
   }
 
-  /** Uzakta geçen sürede sahip olunan tüm akvaryumlara orantılı kir lekesi ekler. */
+  /** Uzakta geçen sürede sahip olunan tüm akvaryumlara, aynı kademeli gecikmelerle kir lekesi ekler. */
   private applyOfflineDirt(elapsed: number): void {
-    const avgSpawns = elapsed / DIRT_SPAWN_MS;
     for (const tid of this.save.tanksOwned) {
       const spots = this.save.dirtSpots[tid] ?? (this.save.dirtSpots[tid] = []);
-      let toAdd = Math.floor(avgSpawns + Math.random());
-      while (toAdd-- > 0 && spots.length < MAX_DIRT_SPOTS) {
+      let remaining = elapsed;
+      while (spots.length < MAX_DIRT_SPOTS) {
+        const delay = this.nextDirtDelay(spots.length);
+        if (delay > remaining) break;
+        remaining -= delay;
         spots.push({
           id: Date.now() + Math.floor(Math.random() * 1000) + spots.length,
           fx: 0.08 + Math.random() * 0.84,
@@ -1189,6 +1196,12 @@ export class Game {
   // ---------- kir / temizlik ----------
 
   /** Aktif akvaryuma, yer varsa yeni bir kir lekesi ekler. */
+  /** Akvaryumdaki mevcut leke sayısına göre bir sonraki lekeye kalan süreyi (ms) rastgele seçer. */
+  private nextDirtDelay(spotCount: number): number {
+    const [min, max] = spotCount <= 0 ? DIRT_DELAY_1 : spotCount === 1 ? DIRT_DELAY_2 : DIRT_DELAY_3;
+    return min + Math.random() * (max - min);
+  }
+
   private maybeSpawnDirt(tankId: string): void {
     const spots = this.save.dirtSpots[tankId] ?? (this.save.dirtSpots[tankId] = []);
     if (spots.length >= MAX_DIRT_SPOTS) return;
