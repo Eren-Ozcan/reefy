@@ -19,6 +19,12 @@ export function fmt(n: number): string {
   return String(n);
 }
 
+/** Firestore'dan gelen arkadaş adı gibi dış kaynaklı metinler innerHTML'e basılmadan önce
+ * kaçışlanmalı — firestore.rules isim içeriğini kısıtlamıyor, sadece tip/uzunluk kontrol ediyor. */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+}
+
 /** Türün id'sinden -1..1 aralığında deterministik bir sapma üretir (fish.ts'teki idJitter ile eşleşir). */
 function idJitter(id: string, salt: number): number {
   let h = 0;
@@ -793,7 +799,7 @@ export class UI {
         <div class="lb">${rows.map((r) => `
           <div class="lb-row ${r.isPlayer ? 'me' : ''}">
             <span class="lb-rank">${r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : '#' + r.rank}</span>
-            <span class="lb-name">${tt(r.name)}</span>
+            <span class="lb-name">${escapeHtml(tt(r.name))}</span>
             <span class="lb-score">🪙 ${fmt(r.score)}</span>
           </div>`).join('')}</div>`;
     } else {
@@ -803,7 +809,7 @@ export class UI {
             const gifted = this.game.hasGiftedFriendToday(f.code);
             return `
             <div class="inv-row">
-              <span class="inv-name">👤 ${tt(f.name)} <span class="lb-code">${f.code}</span></span>
+              <span class="inv-name">👤 ${escapeHtml(tt(f.name))} <span class="lb-code">${escapeHtml(f.code)}</span></span>
               <div class="friend-actions">
                 <button class="tgl" data-visit="${f.code}" ${visited ? 'disabled' : ''}>${visited ? tt('Ziyaret edildi ✓') : tt('Ziyaret Et')}</button>
                 <button class="tgl" data-gift="${f.code}" ${gifted ? 'disabled' : ''}>${gifted ? tt('Hediye gönderildi ✓') : tt('🎁 Hediye Gönder')}</button>
