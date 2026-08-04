@@ -8,6 +8,12 @@ rules_version = '2';
 // - list: kapalı — tüm kodların taranmasını/enumerate edilmesini engeller.
 // - create/update: sadece kendi uid'ine ait dokümanı yazabilir.
 // - delete: kapalı.
+//
+// score alanı istemci tarafından hesaplanıyor (stats.totalEarned) — Cloud Functions
+// olmadan sunucu tarafında "gerçek" olduğu doğrulanamaz. Yine de tek istekte
+// mantıksız bir sayı yazılmasını (bkz. güvenlik testi: score=999999999) engellemek
+// için mutlak bir tavan ve update başına artış sınırı konur (en yüksek başarım
+// hedefi 60.000.000 — bkz. quests.ts a-earn60m).
 service cloud.firestore {
   match /databases/{database}/documents {
     match /players/{code} {
@@ -20,7 +26,9 @@ service cloud.firestore {
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 40
                     && (!('score' in request.resource.data)
-                        || (request.resource.data.score is number && request.resource.data.score >= 0));
+                        || (request.resource.data.score is number
+                            && request.resource.data.score >= 0
+                            && request.resource.data.score <= 200000000));
 
       allow update: if request.auth != null
                     && resource.data.uid == request.auth.uid
@@ -29,7 +37,11 @@ service cloud.firestore {
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 40
                     && (!('score' in request.resource.data)
-                        || (request.resource.data.score is number && request.resource.data.score >= 0));
+                        || (request.resource.data.score is number
+                            && request.resource.data.score >= 0
+                            && request.resource.data.score <= 200000000
+                            && (!('score' in resource.data)
+                                || request.resource.data.score <= resource.data.score + 10000000)));
 
       allow delete: if false;
     }
