@@ -5,8 +5,8 @@ project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/
 include ':capacitor-community-admob'
 project(':capacitor-community-admob').projectDir = new File('../node_modules/@capacitor-community/admob/android')
 
-include ':openforge-capacitor-game-connect'
-project(':openforge-capacitor-game-connect').projectDir = new File('../node_modules/@openforge/capacitor-game-connect/android')
-
 include ':revenuecat-purchases-capacitor'
 project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')
+
+include ':capacitor-game-connect-8'
+project(':capacitor-game-connect-8').projectDir = new File('../node_modules/capacitor-game-connect-8/android')
