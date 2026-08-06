@@ -28,6 +28,8 @@ const DIRT_DELAY_1: [number, number] = [120_000, 150_000];
 const DIRT_DELAY_2: [number, number] = [150_000, 180_000];
 const DIRT_DELAY_3: [number, number] = [400_000, 500_000];
 
+const APP_OPEN_AD_DELAY_MS = 4000; // reklam SDK'sının yüklenmesine fırsat tanımak için açılışta bekleme
+
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
 /** Kazanç raporu satırı: balık başına saatlik üretim (akvaryum+dekor bonuslu) ve satış değeri. */
@@ -263,6 +265,10 @@ export class Game {
       if (document.hidden) this.syncSave();
     });
     window.addEventListener('beforeunload', () => this.syncSave());
+
+    // Açılış reklamı: SDK'nın reklamı önceden yükleyebilmesi için kısa bir gecikmeyle
+    // denenir (interstitial cooldown zaten art arda açılışlarda tekrar basmasını engeller).
+    window.setTimeout(() => this.services.ads.maybeShowInterstitial(), APP_OPEN_AD_DELAY_MS);
   }
 
   // ---------- sahne ----------
@@ -1241,6 +1247,8 @@ export class Game {
     const spots = this.save.dirtSpots[this.save.activeTank]!;
     const s = spots[idx];
     spots.splice(idx, 1);
+    // Akvaryumdaki son leke de temizlendiyse (tank tertemiz oldu) doğal bir mola noktası sayılır.
+    if (spots.length === 0) this.services.ads.maybeShowInterstitial();
     const { w, h } = this.bounds;
     const cx = s.fx * w, cy = s.fy * h;
     for (let k = 0; k < 9; k++) {

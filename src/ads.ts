@@ -23,7 +23,7 @@ const REWARDED_AD_IDS: { android: string; ios: string } = {
  * her zaman burada, kodda kontrol altındadır (reklam ağının kendi callback verisine güvenilmez). */
 export const REWARDED_AD_PEARLS = 5;
 
-const INTERSTITIAL_COOLDOWN_MS = 3 * 60 * 1000; // akvaryum geçişlerinde art arda reklam basmasın
+const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // akvaryum geçişlerinde art arda reklam basmasın
 const REWARDED_COOLDOWN_MS = 30 * 1000;         // yanlışlıkla çift tıklamayı önle
 
 export interface AdsProvider {
