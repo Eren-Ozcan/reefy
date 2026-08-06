@@ -9,7 +9,7 @@
 // Oyun kodu yalnızca bu arayüzleri kullanır; sağlayıcı değişimi tek satırdır.
 
 import { Capacitor } from '@capacitor/core';
-import { CapacitorGameConnect } from '@openforge/capacitor-game-connect';
+import { CapacitorGameConnect } from 'capacitor-game-connect-8';
 import { Purchases, PURCHASES_ERROR_CODE, type PurchasesPackage } from '@revenuecat/purchases-capacitor';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
