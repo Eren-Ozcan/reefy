@@ -9,19 +9,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@capacitor-community/admob": "^5.3.1",
-    "@capacitor/android": "^5.7.8",
-    "@capacitor/core": "^5.7.8",
-    "@openforge/capacitor-game-connect": "^5.0.2",
-    "@revenuecat/purchases-capacitor": "^7.7.1",
+    "@capacitor-community/admob": "^8.0.0",
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@revenuecat/purchases-capacitor": "^13.4.0",
+    "capacitor-game-connect-8": "^8.0.0",
     "firebase": "^12.16.0",
     "pixi.js": "^8.6.6"
   },
   "devDependencies": {
-    "@capacitor/cli": "^5.7.8",
-    "@capacitor/ios": "^5.7.8",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "firebase-tools": "^15.24.0",
     "playwright": "^1.61.1",
+    "sharp": "^0.35.3",
     "typescript": "~5.6.3",
     "vite": "^6.0.7"
   }
