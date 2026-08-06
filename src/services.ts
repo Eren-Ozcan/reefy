@@ -11,11 +11,10 @@
 import { Capacitor } from '@capacitor/core';
 import { CapacitorGameConnect } from 'capacitor-game-connect-8';
 import { Purchases, PURCHASES_ERROR_CODE, type PurchasesPackage } from '@revenuecat/purchases-capacitor';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AdMobAds, StubAds, type AdsProvider } from './ads';
-import { FIREBASE_CONFIG, isFirebaseConfigured } from './firebase-config';
+import { ensureUid, firestore } from './firebase-app';
+import { isFirebaseConfigured } from './firebase-config';
 import { t } from './i18n';
 import type { SaveData } from './save';
 
@@ -339,21 +338,23 @@ export class LocalSocial implements SocialProvider {
  */
 export class FirebaseSocial implements SocialProvider {
   readonly label = t('Firebase — arkadaş kodu doğrulanıyor');
-  private db = getFirestore(initializeApp(FIREBASE_CONFIG));
+  // Uygulama örneği ve anonim oturum cloud-save.ts ile paylaşılır (bkz.
+  // firebase-app.ts) — ikinci bir initializeApp() "app/duplicate-app" verirdi.
+  private db = firestore();
   private ready: Promise<void>;
   private lastScoreWrite = { at: 0, score: -1 };
 
   constructor(save: SaveData) {
-    const auth = getAuth();
-    this.ready = signInAnonymously(auth)
-      .then((cred) =>
-        setDoc(doc(this.db, 'players', save.friendCode), {
+    this.ready = ensureUid()
+      .then((uid) => {
+        if (!uid) return;
+        return setDoc(doc(this.db, 'players', save.friendCode), {
           name: save.playerName,
-          uid: cred.user.uid,
+          uid,
           score: save.stats.totalEarned,
           updatedAt: serverTimestamp(),
-        }),
-      )
+        });
+      })
       .catch(() => {
         /* bağlantı yoksa/başarısızsa sessizce geç — addFriend await sırasında zaten hata verecek */
       });
