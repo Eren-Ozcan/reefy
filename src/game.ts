@@ -263,6 +263,7 @@ export class Game {
 
     this.applyOffline();
     this.dirtTimer = this.nextDirtDelay(this.save.dirtSpots[this.save.activeTank]?.length ?? 0);
+    this.armCleanAd();
     this.applyDailyGift();
     this.ensureQuestDay();
 
@@ -1284,6 +1285,37 @@ export class Game {
   private static readonly CLEAN_REWARD_COINS = 5;
   private static readonly CLEAN_REWARD_XP = 1;
 
+  // ---------- Temizlik reklamı (oturum başına bir kez) ----------
+  //
+  // Reklam, uygulamanın SIFIRDAN açıldığı oturumda, açılışta ekranda duran
+  // lekelerden RASTGELE birinde tetiklenir. İki alan da bilerek kayda
+  // yazılmaz: sayaçların bellekte olması "yalnızca taze açılışta" kuralını
+  // yapısal olarak garanti eder — arka plandan dönmek yeni bir oturum saymaz.
+  //
+  // Önceki sürüm "tanktaki son leke temizlenince" tetikliyordu; kir sürekli
+  // yeniden oluştuğu için bu, tek bir oturumda defalarca tetikleniyordu.
+
+  /** Kaçıncı temizlikte reklam gösterileceği; 0 = bu oturumda artık gösterilmeyecek. */
+  private cleanAdTarget = 0;
+  private cleanAdCount = 0;
+
+  /** Açılışta bir kez: ekrandaki leke sayısına göre rastgele bir hedef seçer. */
+  private armCleanAd(): void {
+    const spots = this.save.dirtSpots[this.save.activeTank]?.length ?? 0;
+    // Açılışta hiç leke yoksa tetikleyecek bir şey de yok; bu oturum atlanır.
+    this.cleanAdTarget = spots > 0 ? 1 + Math.floor(Math.random() * spots) : 0;
+    this.cleanAdCount = 0;
+  }
+
+  /** Her başarılı temizlikte çağrılır; hedefe gelince reklamı bir kez dener. */
+  private countCleanForAd(): void {
+    if (this.cleanAdTarget <= 0) return;
+    this.cleanAdCount++;
+    if (this.cleanAdCount < this.cleanAdTarget) return;
+    this.cleanAdTarget = 0; // oturum başına tek sefer
+    this.services.ads.maybeShowInterstitial();
+  }
+
   /** Arka arkaya temizlenen lekeler için tek bildirim: her leke ayrı toast basmak yerine
    *  kısa bir pencerede biriktirilip toplu gösterilir (üst üste yığılmayı önler). */
   private cleanToastCount = 0;
@@ -1311,8 +1343,7 @@ export class Game {
     const spots = this.save.dirtSpots[this.save.activeTank]!;
     const s = spots[idx];
     spots.splice(idx, 1);
-    // Akvaryumdaki son leke de temizlendiyse (tank tertemiz oldu) doğal bir mola noktası sayılır.
-    if (spots.length === 0) this.services.ads.maybeShowInterstitial();
+    this.countCleanForAd();
     const { w, h } = this.bounds;
     const cx = s.fx * w, cy = s.fy * h;
     for (let k = 0; k < 9; k++) {
