@@ -45,5 +45,36 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // Bulut kaydı (bkz. src/cloud-save.ts). Doküman kimliği oyuncunun Firebase
+    // UID'sidir — platforma özgü bir kimlik DEĞİL, böylece aynı hesap Android
+    // ve iOS'ta aynı kayda ulaşır.
+    //
+    // `rev` monotonik bir sayaçtır ve geriye gitmesi kural düzeyinde
+    // yasaklanır: uzun süre çevrimdışı kalmış (bayat) bir istemci, başka bir
+    // cihazın yazdığı daha yeni kaydı EZEMEZ. Bu garanti istemci mantığına
+    // bırakılmaz — istemci kodu her zaman eski/değiştirilmiş olabilir.
+    match /saves/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.payload is string
+                    && request.resource.data.payload.size() <= 400000
+                    && request.resource.data.rev is int
+                    && request.resource.data.rev > 0
+                    && request.resource.data.schemaVersion is int;
+
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.payload is string
+                    && request.resource.data.payload.size() <= 400000
+                    && request.resource.data.rev is int
+                    && request.resource.data.schemaVersion is int
+                    && request.resource.data.rev > resource.data.rev;
+
+      // Silme kapalı: kazara/kötü niyetli bir istekle ilerleme yok edilemesin.
+      allow delete: if false;
+    }
   }
 }

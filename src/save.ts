@@ -79,6 +79,14 @@ export interface SaveData {
 const KEY = 'reefy-save-v1';
 const START_TANK = 'tank-mercan-koyu';
 
+/**
+ * Kayıt şeması sürümü. Buluttaki kayıt bundan YENİ ise indirilmez: daha eski
+ * bir istemcinin, henüz tanımadığı alanları migrate() ile "eksik" sayıp
+ * silmesini ve sonra bu bozulmuş hali geri yüklemesini engeller (bkz.
+ * cloud-save.ts).
+ */
+export const SAVE_SCHEMA_VERSION = 2;
+
 function makeFriendCode(): string {
   const chars = 'ABCDEFGHJKLMNPRSTUVYZ23456789';
   let c = 'REEF-';
@@ -88,7 +96,7 @@ function makeFriendCode(): string {
 
 export function defaultSave(): SaveData {
   return {
-    v: 2,
+    v: SAVE_SCHEMA_VERSION,
     coins: 300,
     pearls: 5,
     xp: 0,
@@ -182,6 +190,22 @@ export function loadSave(): SaveData {
     return migrate(JSON.parse(raw) as Record<string, unknown>);
   } catch {
     return defaultSave();
+  }
+}
+
+/**
+ * Cihaz dışından (bulut kaydından) gelen ham JSON'u yerel kayıtla AYNI
+ * kapıdan geçirir: migrate() eksik alanları tamamlar, bilinmeyen kalıntıları
+ * güvenli varsayılanlara oturtur ve serbest metin alanlarını temizler. Bozuk
+ * veride null döner — çağıran o zaman yerel kaydı korur.
+ */
+export function parseSave(raw: string): SaveData | null {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return migrate(parsed);
+  } catch {
+    return null;
   }
 }
 
