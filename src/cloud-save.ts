@@ -31,6 +31,11 @@ const DIRTY_KEY = 'reefy-cloud-dirty';
 const UPLOAD_THROTTLE_MS = 60_000; // Firestore günlük yazma kotasını koru (Spark: 20K/gün)
 const AUTH_TIMEOUT_MS = 3000;      // kötü ağda açılışı kilitleme
 const FETCH_TIMEOUT_MS = 4000;
+// setDoc() çevrimdışıyken ÇÖZÜLMEZ: Firestore yazmayı yerel kuyruğa alır ve
+// sözü sunucu onaylayana kadar askıda tutar. Zaman aşımı olmadan upload()
+// içindeki finally hiç çalışmaz, `uploading` kilitli kalır ve bulut kaydı
+// oturum boyunca tamamen ölür — bu yüzden yazma da sınırlandırılıyor.
+const WRITE_TIMEOUT_MS = 8000;
 const MAX_PAYLOAD_BYTES = 400_000; // firestore.rules'daki tavanla aynı
 
 /** Buluta gönderilmeyen alanlar — bkz. dosya başı "ENTITLEMENT" notu. */
@@ -45,10 +50,13 @@ export type CloudSyncResult =
   | 'needs-update'; // buluttaki şema bu istemciden yeni
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
     p.catch(() => null),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
-  ]);
+    new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 function readInt(key: string): number {
@@ -205,16 +213,26 @@ export class CloudSave {
       if (payload.length > MAX_PAYLOAD_BYTES) return false;
 
       const nextRev = this.rev + 1;
-      await setDoc(this.ref(uid), {
-        payload,
-        schemaVersion: SAVE_SCHEMA_VERSION,
-        rev: nextRev,
-        updatedAt: serverTimestamp(),
-        platform: Capacitor.getPlatform(),
-        // Çakışma ekranının payload'ı açmadan özet gösterebilmesi için.
-        summary: { level: save.level, coins: save.coins, collection: save.collection.length },
-      });
+      const written = await withTimeout(
+        setDoc(this.ref(uid), {
+          payload,
+          schemaVersion: SAVE_SCHEMA_VERSION,
+          rev: nextRev,
+          updatedAt: serverTimestamp(),
+          platform: Capacitor.getPlatform(),
+          // Çakışma ekranının payload'ı açmadan özet gösterebilmesi için.
+          summary: { level: save.level, coins: save.coins, collection: save.collection.length },
+        }).then(() => 'ok' as const),
+        WRITE_TIMEOUT_MS,
+      );
+
+      // Zaman aşımına uğrasa bile rev ilerletilir: Firestore yazmayı kuyruğa
+      // almış olabilir ve sonradan sunucuya düşebilir. Aynı rev'i tekrar
+      // denemek kural tarafından reddedilirdi (rev > mevcut olmalı) ve senkron
+      // kalıcı olarak takılırdı. Sayaç ucuz, ilerletmek güvenli.
       this.rev = nextRev;
+      if (written !== 'ok') return false; // dirty korunur, sonra tekrar denenir
+
       this.dirty = false;
       return true;
     } catch {
