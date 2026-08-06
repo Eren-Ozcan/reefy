@@ -4,6 +4,7 @@ import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } 
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
 import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
+import { CloudSave, type CloudSyncResult } from './cloud-save';
 import { Services, createServices } from './services';
 import {
   EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
@@ -94,6 +95,10 @@ export class Game {
   private bubbles: { x: number; y: number; r: number; vy: number; phase: number }[] = [];
   private time = 0;
   offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0, income: 0 };
+
+  readonly cloud = new CloudSave();
+  /** Açılıştaki bulut senkronunun sonucu — UI bilgilendirme için okur. */
+  cloudSync: CloudSyncResult = 'disabled';
 
   constructor() {
     this.save = loadSave();
@@ -186,6 +191,12 @@ export class Game {
   }
 
   async init(host: HTMLElement): Promise<void> {
+    // Bulut senkronunu pixi başlatmasıyla ÇAKIŞTIR ki ağ gecikmesi açılış
+    // süresine eklenmesin. Sonucu aşağıda, kayıt temizliği ve çevrimdışı
+    // hesabı BAŞLAMADAN önce bekliyoruz: buluttan geri yüklenen kayıt da
+    // yerel kayıtla aynı ayıklama/doğrulama adımlarından geçmeli.
+    const cloudSyncPromise = this.cloud.sync(this.save);
+
     await this.app.init({ resizeTo: host, antialias: true, background: 0x2f7f96 });
     host.appendChild(this.app.canvas);
 
@@ -194,6 +205,8 @@ export class Game {
       this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.moodG, this.grimeSprite,
     );
     this.app.stage.addChild(this.world);
+
+    this.cloudSync = await cloudSyncPromise;
 
     // Kayıttaki bilinmeyen dekor kimliklerini ayıkla (sürüm değişikliklerine karşı koruma)
     const known = new Set(DECOR.map((d) => d.id));
@@ -262,7 +275,12 @@ export class Game {
 
     window.setInterval(() => this.syncSave(), 6000);
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) this.syncSave();
+      if (document.hidden) {
+        this.syncSave();
+        // Arka plana alınırken buluta ZORLA yaz: Android/iOS uygulamayı
+        // öldürdüğünde beforeunload çalışmayabilir, visibilitychange çalışır.
+        this.cloud.flush(this.save);
+      }
     });
     window.addEventListener('beforeunload', () => this.syncSave());
 
@@ -1777,6 +1795,10 @@ export class Game {
     this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
     persist(this.save);
     this.services.social.updateScore?.(this.save);
+    // Yerel kayıt her zaman anında yazılır; buluta yazma kotayı korumak için
+    // kısıtlıdır (bkz. cloud-save.ts UPLOAD_THROTTLE_MS).
+    this.cloud.markDirty();
+    this.cloud.maybeUpload(this.save);
   }
 
   resetAll(): void {
