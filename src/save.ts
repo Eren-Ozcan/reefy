@@ -72,6 +72,8 @@ export interface SaveData {
   lastSeen: number;
   lastDaily: string;
   tutorialDone: boolean;
+  feedHintSeen: boolean; // yem modu ipucu ("suya dokunarak yemle") bir kez gösterildi mi
+  editHintSeen: boolean; // dekor düzenleme ipucu bir kez gösterildi mi
   adsRemoved: boolean; // "Reklamları kaldır" IAP'i satın alındı mı
   lang: Lang;
 }
@@ -134,6 +136,8 @@ export function defaultSave(): SaveData {
     lastSeen: Date.now(),
     lastDaily: '',
     tutorialDone: false,
+    feedHintSeen: false,
+    editHintSeen: false,
     adsRemoved: false,
     lang: detectLang(),
   };

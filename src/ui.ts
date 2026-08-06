@@ -2,12 +2,14 @@ import { audio } from './audio';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
+import { SAD_THRESHOLD } from './fish';
 import { INCOME_CAP_HOURS, type FishEarning, type Game } from './game';
 import { ACHIEVEMENTS } from './quests';
-import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species } from './species';
+import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById } from './species';
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
 import { getLang, setLang, t as tt } from './i18n';
+import type { FishSave } from './save';
 
 function hex(c: number): string {
   return '#' + c.toString(16).padStart(6, '0');
@@ -302,9 +304,27 @@ export class UI {
       this.toast(res.msg);
     });
 
+    this.syncBottomInset();
+    window.addEventListener('resize', () => this.syncBottomInset());
+
     this.refreshHUD();
     this.showWelcome();
     this.runTutorial();
+  }
+
+  /** Zemin çizgisinin alt bar'ın üst kenarının bu kadar altına inmesine izin verilir: dekorun
+   *  yalnızca tabanı bar'ın arkasında kalır, üstü tam görünür. Aksi halde arada fazla kum boşluğu oluşuyor. */
+  private static readonly FLOOR_OVERLAP = 28;
+
+  /** Alt bar'ın kapladığı yüksekliği ölçüp sahneye bildirir: zemin çizgisi bunun üstüne alınır,
+   *  böylece dekorlar bar'ın (ve onun yerini alan mod çubuğunun) altında kalmaz. */
+  private syncBottomInset(): void {
+    const bar = this.root.querySelector<HTMLElement>('#bottombar');
+    if (!bar) return;
+    // Mod aktifken alt bar gizli olabilir; ölçüm alınamazsa mevcut inset korunur.
+    const rect = bar.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    this.game.setUiBottomInset(window.innerHeight - rect.top - UI.FLOOR_OVERLAP);
   }
 
   refreshHUD(): void {
@@ -350,16 +370,25 @@ export class UI {
         pop.classList.add('hidden');
         this.showModeChip('');
         this.updateFeedChip(f);
+        // İpucu bir kez gösterildi: bundan sonra çubukta sadece yem adı/stok kalır.
+        if (!this.game.save.feedHintSeen) {
+          this.game.save.feedHintSeen = true;
+          this.game.syncSave();
+        }
         audio.click();
       });
     });
   }
 
-  /** Yem modu etiketini stok durumuyla günceller (her stoktan yiyişte çağrılır). */
+  /** Yem modu etiketini stok durumuyla günceller (her stoktan yiyişte çağrılır).
+   *  "suya dokunarak yemle" ipucu yalnızca ilk kez yem moduna girildiğinde eklenir. */
   updateFeedChip(f: FeedDef): void {
-    const stock = this.game.save.feedOwned[f.id] ?? 0;
-    this.root.querySelector('#mode-label')!.textContent =
-      stock > 0 ? `${f.emoji} ${tt(f.name)} — 🎒 ${tt('{stock} kaldı', { stock })}` : `${f.emoji} ${tt(f.name)} — ${tt('suya dokunarak yemle')}`;
+    const s = this.game.save;
+    const stock = s.feedOwned[f.id] ?? 0;
+    const suffix = stock > 0
+      ? ` — 🎒 ${tt('{stock} kaldı', { stock })}`
+      : s.feedHintSeen ? '' : ` — ${tt('suya dokunarak yemle')}`;
+    this.root.querySelector('#mode-label')!.textContent = `${f.emoji} ${tt(f.name)}${suffix}`;
   }
 
   private showModeChip(label: string): void {
@@ -377,11 +406,18 @@ export class UI {
     this.root.classList.remove('mode-active');
   }
 
-  /** Envanterden çağrılır: dekor düzenleme modunu başlatır. */
+  /** Envanterden çağrılır: dekor düzenleme modunu başlatır.
+   *  Çubukta yalnızca kısa etiket durur; ayrıntılı ipucu ilk girişte tek sefer toast olarak gösterilir
+   *  (uzun metin çubuğu büyütüp dekorun üstünü kapatıyordu). */
   startEditMode(): void {
     this.closePanel();
     this.game.setEditMode(true);
-    this.showModeChip(tt('🛠️ Düzenleme — dekoru sürükle; bıraktığın en öne gelir'));
+    this.showModeChip(tt('🛠️ Dekoru sürükle'));
+    if (!this.game.save.editHintSeen) {
+      this.game.save.editHintSeen = true;
+      this.game.syncSave();
+      this.toast(tt('🛠️ Dekoru sürükleyerek taşı — en son bıraktığın en öne gelir.'));
+    }
   }
 
   /** Pasif gelir butonunu günceller (oyun döngüsünden ~saniyede 2 kez çağrılır). */
@@ -396,16 +432,27 @@ export class UI {
     this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}${tt('/sa')}`;
   }
 
+  /** Ekranda aynı anda duran en fazla bildirim sayısı — fazlası en eskiyi düşürür. */
+  private static readonly MAX_TOASTS = 3;
+
   toast(msg: string): void {
     const t = document.createElement('div');
     t.className = 'toast';
     t.textContent = msg;
     this.toastHost.appendChild(t);
+    // Yığılmayı engelle: sınırın üstündeki en eski bildirimleri erkenden kapatmaya başla.
+    // Kapanmakta olanlar sayıma girmesin diye .dismissed ile işaretlenir.
+    const live = this.toastHost.querySelectorAll<HTMLElement>('.toast:not(.dismissed)');
+    for (let i = 0; i < live.length - UI.MAX_TOASTS; i++) this.dismissToast(live[i]);
     setTimeout(() => t.classList.add('show'), 20);
-    setTimeout(() => {
-      t.classList.remove('show');
-      setTimeout(() => t.remove(), 400);
-    }, 3400);
+    setTimeout(() => this.dismissToast(t), 3400);
+  }
+
+  private dismissToast(el: HTMLElement): void {
+    if (el.classList.contains('dismissed')) return;
+    el.classList.add('dismissed');
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 400);
   }
 
   // ---------- panel çatısı ----------
@@ -660,7 +707,7 @@ export class UI {
                 ? `${tt(fe.sp.name)} • 🪙 ${fmt(fe.perHour)}${tt('/sa')}${fe.sad ? ` • ${tt('😢 aç')}` : ''}`
                 : `${tt(fe.sp.name)} • ${tt('Satış')} 🪙 ${fmt(fe.sellValue)}${fe.sad ? ` • ${tt('😢 aç')}` : ''}`;
               return `
-                <div class="inv-row">
+                <div class="inv-row clickable" data-fish="${i}">
                   <span class="inv-art">${fishSVG(fe.sp, 44)}</span>
                   <span class="inv-name">${fe.name}<small class="inv-sub">${sub}</small></span>
                   ${fe.adult
@@ -752,6 +799,14 @@ export class UI {
         if (!res.ok) audio.error();
         this.toast(res.msg);
         if (res.ok) this.renderInventory('fish');
+      });
+    });
+    el.querySelectorAll<HTMLElement>('.inv-row[data-fish]').forEach((row) => {
+      row.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        const fe = flat[Number(row.dataset.fish)];
+        if (fe.live) this.showFishInfo(fe.live);
+        else if (fe.saved) this.showDormantFishInfo(fe.saved);
       });
     });
     el.querySelector('.edit-mode-btn')?.addEventListener('click', () => {
@@ -1251,6 +1306,68 @@ export class UI {
     }, 500);
   }
 
+  /** Envanterden başka bir akvaryumdaki (uyuyan) balığın profilini açar — showFishInfo'nun canlı Fish gerektirmeyen karşılığı. */
+  private showDormantFishInfo(fs: FishSave): void {
+    audio.click();
+    const sp = speciesById(fs.sp);
+    const bonus = fs.bonus ?? 0;
+    const gain = Math.round(sp.sellPrice * this.game.sellMult * (1 + bonus));
+    const stageName = fs.progress >= 1 ? tt('Yetişkin') : fs.progress >= 0.5 ? tt('Genç') : tt('Yavru');
+    const isSad = fs.hunger < SAD_THRESHOLD;
+    const el = this.panelShell(`${fs.name}`, `
+      <div class="fish-info">
+        <div class="card-art">${fishSVG(sp, 120)}</div>
+        <div class="card-name">${tt(sp.name)} ${rarityChip(sp.rarity)}</div>
+        <div class="name-edit fish-rename">
+          <input id="fish-name-input" value="${fs.name}" maxlength="14" autocomplete="off"/>
+          <button class="tgl" id="fish-name-save">${tt('✏️ Adlandır')}</button>
+        </div>
+        <button class="tgl" id="fish-pet-btn" ${this.game.canPetToday ? '' : 'disabled'}>${this.game.canPetToday ? tt('🤗 Okşa') : tt('🤗 Bugün okşadın')}</button>
+        <p class="card-desc">${tt(sp.desc)}</p>
+        <div class="bar-row"><span>${tt('Büyüme ({stage})', { stage: stageName })}</span>
+          <div class="bar"><div id="fi-grow" style="width:${Math.min(100, fs.progress * 100)}%"></div></div></div>
+        <div class="bar-row"><span>${tt('Tokluk')} ${isSad ? tt('😢 aç!') : ''}</span>
+          <div class="bar"><div id="fi-hunger" class="hunger" style="width:${fs.hunger * 100}%"></div></div></div>
+        <div class="card-meta">${tt('Üretim: 🪙 {n}/saat {state}', { n: RARITY_INCOME[sp.rarity], state: fs.progress >= 1 ? tt('(aktif)') : tt('(yetişkin olunca)') })}</div>
+        ${bonus > 0 ? `<div class="card-meta bonus-line">${tt('✨ Yem bonusu: satış +%{n}', { n: Math.round(bonus * 100) })}</div>` : ''}
+        ${fs.progress >= 1
+          ? `<button class="buy-btn sell">${tt('🪙 {n} karşılığında sat', { n: fmt(gain) })}</button>`
+          : `<p class="growing">${tt('Büyüyor… satmak için yetişkin olmasını bekle 🌱')}</p>`}
+      </div>`);
+    el.querySelector('#fish-name-save')!.addEventListener('click', () => {
+      const input = el.querySelector<HTMLInputElement>('#fish-name-input')!;
+      const name = input.value.replace(/[<>&"']/g, '').trim();
+      if (name.length < 2) { this.toast(tt('İsim en az 2 karakter olmalı')); return; }
+      fs.name = name;
+      input.value = name;
+      el.querySelector('.panel-head h2')!.textContent = name;
+      this.game.syncSave();
+      audio.click();
+      this.toast(tt('İsim güncellendi: {name} 🐟', { name }));
+    });
+    el.querySelector('#fish-pet-btn')?.addEventListener('click', () => {
+      const res = this.game.petDormant(fs);
+      if (!res.ok) audio.error();
+      this.toast(res.msg);
+      if (res.ok) this.closePanel();
+    });
+    const sellBtn = el.querySelector<HTMLButtonElement>('.sell');
+    if (sellBtn) {
+      sellBtn.addEventListener('click', () => {
+        const res = this.game.sellDormant(fs);
+        this.toast(res.msg);
+        this.closePanel();
+      });
+    }
+    this.fishInfoTimer = window.setInterval(() => {
+      const g = el.querySelector<HTMLElement>('#fi-grow');
+      const h = el.querySelector<HTMLElement>('#fi-hunger');
+      if (!g || !h) return;
+      g.style.width = `${Math.min(100, fs.progress * 100)}%`;
+      h.style.width = `${fs.hunger * 100}%`;
+    }, 500);
+  }
+
   private showWelcome(): void {
     const o = this.game.offline;
     if (o.minutes < 3 && !o.dailyGift) return;
@@ -1272,14 +1389,41 @@ export class UI {
     });
   }
 
+  /** İlk açılışta zorunlu, adım adım tutorial: dışarı tıklayarak kapatılamaz, "İleri" ile ilerler. */
   private runTutorial(): void {
     const s = this.game.save;
     if (s.tutorialDone) return;
-    s.tutorialDone = true;
-    this.game.syncSave();
-    setTimeout(() => this.toast(tt('🌊 Reefy\'ye hoş geldin! Bu resif artık senin.')), 1200);
-    setTimeout(() => this.toast(tt('🍤 "Besle"den yem seç, suya dokunarak yemle — kaliteli yem satış fiyatını artırabilir!')), 5200);
-    setTimeout(() => this.toast(tt('🐟 Yetişkin balıklara dokunup satabilir, kazancınla yeni türler alabilirsin.')), 9600);
-    setTimeout(() => this.toast(tt('📋 Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüt!')), 14200);
+    const steps: { title: string; body: string }[] = [
+      { title: tt('🌊 Reefy\'ye hoş geldin!'), body: tt('Bu resif artık senin. Balıklarını büyüt, koleksiyonunu tamamla, kendi resifini kur.') },
+      { title: tt('🍤 Beslemeyi öğren'), body: tt('Alt menüden "Besle"ye dokun, bir yem seç, sonra suya dokunarak yemle. Kaliteli yemler satış fiyatını artırır!') },
+      { title: tt('🐟 Satış yap, büyü'), body: tt('Yetişkin olan balıklara dokunup satabilirsin. Kazandığın altınla yeni türler alıp resifini büyütebilirsin.') },
+      { title: tt('📋 Günlük görevler'), body: tt('Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüterek daha fazla balığa yer aç!') },
+    ];
+    let i = 0;
+    const wrap = document.createElement('div');
+    wrap.className = 'tutorial-backdrop';
+    const render = (): void => {
+      const last = i === steps.length - 1;
+      wrap.innerHTML = `
+        <div class="tutorial-card">
+          <h2>${steps[i].title}</h2>
+          <p>${steps[i].body}</p>
+          <div class="tutorial-dots">${steps.map((_, k) => `<span class="dot ${k === i ? 'active' : ''}"></span>`).join('')}</div>
+          <button class="buy-btn tutorial-next">${last ? tt('Hadi başlayalım! 🎉') : tt('İleri')}</button>
+        </div>`;
+      wrap.querySelector('.tutorial-next')!.addEventListener('click', () => {
+        audio.click();
+        if (last) {
+          s.tutorialDone = true;
+          this.game.syncSave();
+          wrap.remove();
+        } else {
+          i++;
+          render();
+        }
+      });
+    };
+    render();
+    this.root.appendChild(wrap);
   }
 }

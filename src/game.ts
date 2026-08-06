@@ -108,6 +108,27 @@ export class Game {
   get bounds(): Bounds {
     return { w: this.app.screen.width, h: this.app.screen.height };
   }
+
+  /** Alt bar / mod çubuğu gibi kalıcı UI'ın kapladığı yükseklik (CSS px). UI mount olurken ölçüp verir. */
+  private uiBottomInset = 0;
+
+  /** Zemin (kum üstü) çizgisi: dekorlar buraya oturur. Alt UI'ın üstünde kalması için inset kadar yukarıda. */
+  get floorY(): number {
+    return this.app.screen.height - this.uiBottomInset;
+  }
+
+  /** Balıkların yüzebileceği alan: zemin çizgisinin altına inmemeleri için yükseklik floorY ile sınırlanır. */
+  private get swimBounds(): Bounds {
+    return { w: this.app.screen.width, h: this.floorY };
+  }
+
+  /** Alt UI yüksekliği değiştiğinde (mount, ekran döndürme) sahneyi yeni zemin çizgisiyle yeniden kurar. */
+  setUiBottomInset(px: number): void {
+    const next = Math.max(0, Math.round(px));
+    if (next === this.uiBottomInset) return;
+    this.uiBottomInset = next;
+    if (this.app.renderer) this.buildStatic();
+  }
   get activeTank(): TankDef { return tankById(this.save.activeTank); }
 
   /** Belirli bir akvaryumun kapasitesi: seviye tabanı + akvaryum kademesi bonusu. */
@@ -302,11 +323,14 @@ export class Game {
     grad.addColorStop(1, tank.water[2]);
     this.bgG.rect(0, 0, w, h).fill(grad);
 
+    // Kum, zemin çizgisinden başlar ama ekranın gerçek altına kadar uzatılır: alt bar'ın
+    // arkasında da kum görünür, böylece bant yukarı alınınca altta boşluk kalmaz.
+    const fy = this.floorY;
     this.sandG.clear();
-    this.sandG.rect(0, h - 64, w, 64).fill(tank.sand);
-    this.sandG.ellipse(w * 0.5, h - 64, w * 0.6, 14).fill(tank.sand);
+    this.sandG.rect(0, fy - 64, w, h - fy + 64).fill(tank.sand);
+    this.sandG.ellipse(w * 0.5, fy - 64, w * 0.6, 14).fill(tank.sand);
     for (let i = 0; i < 70; i++) {
-      this.sandG.circle(Math.random() * w, h - 58 + Math.random() * 52, 1 + Math.random() * 2).fill(tank.sandDots);
+      this.sandG.circle(Math.random() * w, fy - 58 + Math.random() * (h - fy + 52), 1 + Math.random() * 2).fill(tank.sandDots);
     }
 
     // Arka plan silüet bitkileri (derinlik hissi)
@@ -315,13 +339,13 @@ export class Game {
       const bx = w * (0.1 + i * 0.26);
       const bh = 60 + (i % 2) * 40;
       this.ambientG
-        .moveTo(bx, h - 60)
-        .quadraticCurveTo(bx - 14, h - 60 - bh * 0.6, bx - 4, h - 60 - bh)
-        .quadraticCurveTo(bx + 10, h - 60 - bh * 0.5, bx, h - 60)
+        .moveTo(bx, fy - 60)
+        .quadraticCurveTo(bx - 14, fy - 60 - bh * 0.6, bx - 4, fy - 60 - bh)
+        .quadraticCurveTo(bx + 10, fy - 60 - bh * 0.5, bx, fy - 60)
         .fill({ color: tank.water[2], alpha: 0.5 });
     }
 
-    this.drawBiomeScenery(w, h);
+    this.drawBiomeScenery(w, h, fy);
 
     // Işık huzmeleri — biyoma göre renk, yoğunluk ve sayı
     const RAY_CFG: Record<Biome, { color: number; alpha: number; count: number }> = {
@@ -367,7 +391,9 @@ export class Game {
   }
 
   /** Her biyomun kendine özgü, BELİRGİN sahnesi; yerleşim akvaryum kimliğinden türetilen tohumla değişir. */
-  private drawBiomeScenery(w: number, h: number): void {
+  /** floorY: zemin çizgisi. Arka plan siluetleri gerçek yüksekliği (h) kullanmaya devam eder,
+   *  zemine oturan öğeler ise floorY'ye göre yerleşir ki alt bar'ın altında kalmasınlar. */
+  private drawBiomeScenery(w: number, h: number, floorY: number): void {
     const tank = this.activeTank;
     const g = this.biomeG;
     g.clear();
@@ -380,7 +406,7 @@ export class Game {
       seed = (seed * 1103515245 + 12345) >>> 0;
       return (seed >>> 8) / 16777216;
     };
-    const floor = h - 60;
+    const floor = floorY - 60;
 
     switch (tank.biome) {
       case 'tropik': {
@@ -587,7 +613,7 @@ export class Game {
   // ---------- dekor çizimi ----------
 
   private drawDecor(): void {
-    const { w, h } = this.bounds;
+    const { w } = this.bounds;
     const g = this.decorAnimG;
     g.clear();
     const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
@@ -595,7 +621,7 @@ export class Game {
       const p = placed[i];
       const d = decorById(p.def);
       const cx = p.fx * w;
-      const baseY = h - 58;
+      const baseY = this.floorY - 58;
       // Düzenleme modu: sürüklenebilir parçaları vurgula
       if (this.editMode) {
         const half = 46 * d.scale;
@@ -604,7 +630,7 @@ export class Game {
           .fill({ color: active ? 0xffd23e : 0xffffff, alpha: active ? 0.18 : 0.08 })
           .stroke({ width: 2, color: active ? 0xffd23e : 0xffffff, alpha: active ? 0.9 : 0.4 });
       }
-      this.drawDecorItem(g, d, cx, h - 58);
+      this.drawDecorItem(g, d, cx, baseY);
     }
   }
 
@@ -851,7 +877,7 @@ export class Game {
     // Yem taneleri
     for (const p of this.pellets) {
       p.age += dt;
-      const floorY = h - 70;
+      const floorY = this.floorY - 70;
       if (p.y < floorY) {
         p.y = Math.min(floorY, p.y + p.vy * dt);
         p.x += Math.sin(this.time * 2 + p.sway) * 12 * dt;
@@ -879,7 +905,7 @@ export class Game {
         if (ti >= 0) target = { x: this.pellets[ti].x, y: this.pellets[ti].y };
       }
 
-      const grown = f.update(dt, this.time, this.bounds, target, gm);
+      const grown = f.update(dt, this.time, this.swimBounds, target, gm);
 
       if (target && ti >= 0 && ti < this.pellets.length) {
         if (Math.hypot(this.pellets[ti].x - f.x, this.pellets[ti].y - f.y) < 16) {
@@ -1152,7 +1178,7 @@ export class Game {
   // ---------- oyuncu eylemleri ----------
 
   private spawnFish(fs: FishSave): Fish {
-    const f = new Fish(fs, speciesById(fs.sp), this.bounds);
+    const f = new Fish(fs, speciesById(fs.sp), this.swimBounds);
     f.root.on('pointertap', () => {
       if (this.inputMode !== 'normal') return; // yem/düzenleme modunda balık kartı açılmaz
       this.ui.showFishInfo(f);
@@ -1205,8 +1231,8 @@ export class Game {
 
   /** Verilen noktadaki en üstteki dekorun dizinini döndürür (yoksa -1). */
   private decorAt(x: number, y: number): number {
-    const { w, h } = this.bounds;
-    const baseY = h - 58;
+    const { w } = this.bounds;
+    const baseY = this.floorY - 58;
     const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
     for (let i = placed.length - 1; i >= 0; i--) {
       const d = decorById(placed[i].def);
@@ -1258,6 +1284,26 @@ export class Game {
   private static readonly CLEAN_REWARD_COINS = 5;
   private static readonly CLEAN_REWARD_XP = 1;
 
+  /** Arka arkaya temizlenen lekeler için tek bildirim: her leke ayrı toast basmak yerine
+   *  kısa bir pencerede biriktirilip toplu gösterilir (üst üste yığılmayı önler). */
+  private cleanToastCount = 0;
+  private cleanToastTimer: number | null = null;
+  private static readonly CLEAN_TOAST_WINDOW_MS = 700;
+
+  private queueCleanToast(): void {
+    this.cleanToastCount++;
+    if (this.cleanToastTimer !== null) clearTimeout(this.cleanToastTimer);
+    this.cleanToastTimer = window.setTimeout(() => {
+      const n = this.cleanToastCount;
+      const coins = n * Game.CLEAN_REWARD_COINS;
+      this.cleanToastCount = 0;
+      this.cleanToastTimer = null;
+      this.ui.toast(n === 1
+        ? t('🧹 Leke temizlendi! +{n} altın', { n: coins })
+        : t('🧹 {spots} leke temizlendi! +{n} altın', { spots: n, n: coins }));
+    }, Game.CLEAN_TOAST_WINDOW_MS);
+  }
+
   /** Dokunulan noktadaki kir lekesini temizler (varsa); parçacık efekti ve ses çalar. */
   private cleanDirtAt(x: number, y: number): void {
     const idx = this.dirtAt(x, y);
@@ -1289,7 +1335,7 @@ export class Game {
       this.save.cleanRewardCount++;
       this.save.coins += Game.CLEAN_REWARD_COINS;
       this.addXp(Game.CLEAN_REWARD_XP);
-      this.ui.toast(t('🧹 Leke temizlendi! +{n} altın', { n: Game.CLEAN_REWARD_COINS }));
+      this.queueCleanToast();
     }
 
     this.syncSave();
@@ -1379,10 +1425,9 @@ export class Game {
         this.ui.refreshHUD();
       }
     }
-    const { h } = this.bounds;
     this.pellets.push({
       x,
-      y: Math.min(y, h - 90),
+      y: Math.min(y, this.floorY - 90),
       vy: 30 + Math.random() * 20,
       sway: Math.random() * Math.PI * 2,
       age: 0,
@@ -1751,6 +1796,19 @@ export class Game {
     this.syncSave();
     this.ui.refreshHUD();
     return { ok: true, msg: t('{name} mutlu oldu! +{n} XP, satış değeri arttı 💕', { name: f.name, n: Game.PET_REWARD_XP }) };
+  }
+
+  /** Başka bir akvaryumdaki (uyuyan) balığı okşar — sahne dışı olduğu için parçacık efekti yok. */
+  petDormant(fs: FishSave): { ok: boolean; msg: string } {
+    if (!this.canPetToday) return { ok: false, msg: t('Bugün zaten bir balığını okşadın. Yarın tekrar gel! 💕') };
+    this.save.petDay = new Date().toISOString().slice(0, 10);
+    fs.hunger = Math.min(1, fs.hunger + 0.15);
+    fs.bonus = Math.min(FISH_BONUS_CAP, (fs.bonus ?? 0) + Game.PET_REWARD_BONUS);
+    this.addXp(Game.PET_REWARD_XP);
+    audio.plop();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: t('{name} mutlu oldu! +{n} XP, satış değeri arttı 💕', { name: fs.name, n: Game.PET_REWARD_XP }) };
   }
 
   /** Arkadaşa günde bir kez küçük bir yem hediyesi gönderilebilir; karşılığında sen de birkaç yem kazanırsın. */

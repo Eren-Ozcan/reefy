@@ -538,6 +538,7 @@ const EN: Record<string, string> = {
   'Başarım henüz tamamlanmadı.': 'Achievement not completed yet.',
   '{name}: +{coins} altın, +{pearls} inci': '{name}: +{coins} coins, +{pearls} pearls',
   '🧹 Leke temizlendi! +{n} altın': '🧹 Dirt cleaned! +{n} coins',
+  '🧹 {spots} leke temizlendi! +{n} altın': '🧹 {spots} dirt spots cleaned! +{n} coins',
   'Yeterli altın yok ({name}: {cost} 🪙/tane)': 'Not enough coins ({name}: {cost} 🪙 each)',
   'Bilinmeyen paket': 'Unknown pack',
   'Yeterli altın yok': 'Not enough coins',
@@ -623,7 +624,8 @@ const EN: Record<string, string> = {
   '{cost}/tane': '{cost} each',
   '{stock} kaldı': '{stock} left',
   'suya dokunarak yemle': 'feed by tapping the water',
-  '🛠️ Düzenleme — dekoru sürükle; bıraktığın en öne gelir': '🛠️ Edit mode — drag decorations; the last one you drop comes to the front',
+  '🛠️ Dekoru sürükle': '🛠️ Drag decorations',
+  '🛠️ Dekoru sürükleyerek taşı — en son bıraktığın en öne gelir.': '🛠️ Drag a decoration to move it — the last one you drop comes to the front.',
   '🐟 Balık': '🐟 Fish', '🥚 Yumurta': '🥚 Eggs', '🍤 Yem': '🍤 Feed', '🪸 Dekor': '🪸 Decor',
   '🏝️ Akvaryum': '🏝️ Tank', '💎 İnci': '💎 Pearls',
   'Satış: 🪙 {price} • {min} dk': 'Sale: 🪙 {price} • {min} min',
@@ -721,10 +723,21 @@ const EN: Record<string, string> = {
   '🎁 Günlük hediyen: <b>+{coins} altın, +{pearls} inci</b>': '🎁 Your daily gift: <b>+{coins} coins, +{pearls} pearls</b>',
   '🌊 Tekrar hoş geldin!': '🌊 Welcome back!',
   'Akvaryuma dal 🐠': 'Dive into your tank 🐠',
-  'Reefy\'ye hoş geldin! Bu resif artık senin.': 'Welcome to Reefy! This reef is now yours.',
-  '🍤 "Besle"den yem seç, suya dokunarak yemle — kaliteli yem satış fiyatını artırabilir!': '🍤 Pick a feed from "Feed", then tap the water to feed — quality feed can boost sale price!',
-  '🐟 Yetişkin balıklara dokunup satabilir, kazancınla yeni türler alabilirsin.': '🐟 Tap adult fish to sell them, and use your earnings to buy new species.',
-  '📋 Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüt!': '📋 Complete daily quests, place decorations, and grow your tank!',
+  // ---- ui.ts: ilk açılış tutorial'ı (zorunlu, adım adım) ----
+  '🌊 Reefy\'ye hoş geldin!': '🌊 Welcome to Reefy!',
+  'Bu resif artık senin. Balıklarını büyüt, koleksiyonunu tamamla, kendi resifini kur.':
+    'This reef is now yours. Grow your fish, complete your collection, and build your own reef.',
+  '🍤 Beslemeyi öğren': '🍤 Learn to feed',
+  'Alt menüden "Besle"ye dokun, bir yem seç, sonra suya dokunarak yemle. Kaliteli yemler satış fiyatını artırır!':
+    'Tap "Feed" in the bottom menu, pick a feed, then tap the water to feed. Quality feed boosts sale price!',
+  '🐟 Satış yap, büyü': '🐟 Sell and grow',
+  'Yetişkin olan balıklara dokunup satabilirsin. Kazandığın altınla yeni türler alıp resifini büyütebilirsin.':
+    'Tap adult fish to sell them, then use your earnings to buy new species and grow your reef.',
+  '📋 Günlük görevler': '📋 Daily quests',
+  'Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüterek daha fazla balığa yer aç!':
+    'Complete daily quests, place decorations, and grow your tank to make room for more fish!',
+  'İleri': 'Next',
+  'Hadi başlayalım! 🎉': "Let's dive in! 🎉",
 
   // ---- ui.ts: panel başlıkları ----
   '🛒 Mağaza': '🛒 Shop', '🎒 Envanter': '🎒 Inventory', '🏆 Sosyal': '🏆 Social', '☰ Menü': '☰ Menu',
