@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7FE3E8"/>
+      <stop offset="100%" stop-color="#3AA6B6"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFC670"/>
+      <stop offset="100%" stop-color="#FF8A3D"/>
+    </linearGradient>
+    <linearGradient id="finGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF7A1F"/>
+      <stop offset="100%" stop-color="#FFA347"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bgGrad)"/>
+
+  <circle cx="190" cy="230" r="22" fill="#FFFFFF" opacity="0.25"/>
+  <circle cx="250" cy="170" r="13" fill="#FFFFFF" opacity="0.25"/>
+  <circle cx="850" cy="800" r="26" fill="#FFFFFF" opacity="0.2"/>
+  <circle cx="800" cy="870" r="14" fill="#FFFFFF" opacity="0.2"/>
+
+  <path d="M 300 512 L 150 345 Q 220 512 150 679 Z" fill="url(#finGrad)"/>
+
+  <path d="M 520 350 Q 600 240 685 345 Q 610 385 520 350 Z" fill="url(#finGrad)"/>
+
+  <ellipse cx="580" cy="512" rx="245" ry="168" fill="url(#bodyGrad)"/>
+
+  <ellipse cx="615" cy="585" rx="140" ry="72" fill="#FFE7BE" opacity="0.65"/>
+
+  <path d="M 470 600 Q 435 685 525 668 Q 505 625 470 600 Z" fill="#FF7A1F" opacity="0.85"/>
+
+  <circle cx="730" cy="465" r="48" fill="#FFFFFF"/>
+  <circle cx="745" cy="465" r="25" fill="#26313A"/>
+  <circle cx="754" cy="454" r="9" fill="#FFFFFF"/>
+</svg>
