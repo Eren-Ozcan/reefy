@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "778208134304",
+    "project_id": "reefy-67ac5",
+    "storage_bucket": "reefy-67ac5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:778208134304:android:a876b64b1c1cf2b40775c5",
+        "android_client_info": {
+          "package_name": "com.yilkgames.reefy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "778208134304-dgurk81q65q3scu8p2rr7ub42lg94tm2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yilkgames.reefy",
+            "certificate_hash": "99e821da9fac42966d5cfb9524a334f5ad357faf"
+          }
+        },
+        {
+          "client_id": "778208134304-q3q974hifqr49e7mqv216pp6glpm5bpg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yilkgames.reefy",
+            "certificate_hash": "38374df290c3110377340a20dcab260054de7390"
+          }
+        },
+        {
+          "client_id": "778208134304-33oiprskpm2pink31fk3vqa1ja1tk3ej.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5dBYND9svPBiZl2eLDq3891v2Mw1ft1Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "778208134304-33oiprskpm2pink31fk3vqa1ja1tk3ej.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

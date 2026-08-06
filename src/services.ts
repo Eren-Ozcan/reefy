@@ -242,6 +242,9 @@ export interface SocialProvider {
   friendScores(save: SaveData): Promise<Record<string, number>>;
   /** Oyuncunun kendi skorunu arkadaşlarının görebilmesi için sağlayıcıya bildirir (fire-and-forget). */
   updateScore?(save: SaveData): void;
+  /** Oyuncu dokümanını (arkadaş kodu -> ad/skor) yayımlar. Bulut senkronu
+   *  friendCode'u değiştirebildiği için MUTLAKA senkron sonrası çağrılır. */
+  publishPlayer?(): Promise<void>;
 }
 
 /** Ziyaret/hediye ödülleri arkadaş başına günlük verildiği için kod kodu spam'iyle
@@ -344,20 +347,30 @@ export class FirebaseSocial implements SocialProvider {
   private ready: Promise<void>;
   private lastScoreWrite = { at: 0, score: -1 };
 
-  constructor(save: SaveData) {
-    this.ready = ensureUid()
-      .then((uid) => {
-        if (!uid) return;
-        return setDoc(doc(this.db, 'players', save.friendCode), {
-          name: save.playerName,
-          uid,
-          score: save.stats.totalEarned,
-          updatedAt: serverTimestamp(),
-        });
-      })
-      .catch(() => {
-        /* bağlantı yoksa/başarısızsa sessizce geç — addFriend await sırasında zaten hata verecek */
+  constructor(private save: SaveData) {
+    // Oyuncu dokümanı BURADA yazılmaz. Bulut kaydı geri yüklenirse friendCode
+    // değişebilir (buluttaki kayıt kendi kodunu getirir) ve burada yazılmış
+    // doküman eski kodla ortada kalırdı — arkadaşların gördüğü kod ile
+    // oyuncunun kendi kodu ayrışırdı. Bunun yerine publishPlayer() bulut
+    // senkronu bittikten sonra game.ts tarafından çağrılır.
+    this.ready = ensureUid().then(() => undefined).catch(() => undefined);
+  }
+
+  /** Oyuncu dokümanını (arkadaş kodu → ad/skor) yazar. Bulut senkronu
+   *  tamamlandıktan SONRA çağrılmalı; bkz. constructor'daki gerekçe. */
+  async publishPlayer(): Promise<void> {
+    const uid = await ensureUid();
+    if (!uid) return;
+    try {
+      await setDoc(doc(this.db, 'players', this.save.friendCode), {
+        name: this.save.playerName,
+        uid,
+        score: this.save.stats.totalEarned,
+        updatedAt: serverTimestamp(),
       });
+    } catch {
+      /* bağlantı yoksa sessizce geç — bir sonraki açılışta tekrar denenir */
+    }
   }
 
   leaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {

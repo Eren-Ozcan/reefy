@@ -11,6 +11,7 @@ apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
     implementation project(':capacitor-community-admob')
     implementation project(':capacitor-community-safe-area')
+    implementation project(':capacitor-firebase-authentication')
     implementation project(':revenuecat-purchases-capacitor')
     implementation project(':capacitor-game-connect-8')
 

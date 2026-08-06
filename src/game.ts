@@ -228,6 +228,10 @@ export class Game {
     this.app.stage.addChild(this.world);
 
     this.cloudSync = await cloudSyncPromise;
+    // Oyuncu dokümanı ancak SENKRON SONRASI yayımlanır: buluttan geri yüklenen
+    // kayıt kendi friendCode'unu getirir; önce yazılsaydı arkadaşların gördüğü
+    // kod ile oyuncunun kodu ayrışırdı (bkz. services.ts publishPlayer).
+    void this.services.social.publishPlayer?.();
 
     // Kayıttaki bilinmeyen dekor kimliklerini ayıkla (sürüm değişikliklerine karşı koruma)
     const known = new Set(DECOR.map((d) => d.id));
