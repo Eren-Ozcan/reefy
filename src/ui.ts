@@ -240,6 +240,11 @@ export class UI {
   private toastHost!: HTMLElement;
   private fishInfoTimer: number | null = null;
   private friendScoresCache: Record<string, number> = {};
+  /**
+   * Akvaryum ekranında geri tuşuna basıldığında "çıkmak için tekrar bas"
+   * uyarısının geçerli olduğu ana kadar (epoch ms). Bkz. handleBack.
+   */
+  private exitArmedUntil = 0;
 
   constructor(game: Game) {
     this.game = game;
@@ -459,6 +464,32 @@ export class UI {
     el.classList.add('dismissed');
     el.classList.remove('show');
     setTimeout(() => el.remove(), 400);
+  }
+
+  /**
+   * Android geri tuşu/hareketi.
+   *
+   * Bu davranış eskiden hiç yoktu: geri tuşunu yakalayan eklenti kurulu
+   * olmadığı için oyuncu bir panelin (mağaza, envanter, görevler…) ortasındayken
+   * geri yapınca panel kapanmak yerine oyundan tamamen çıkıyordu.
+   *
+   * Açık panel varsa yalnızca onu kapatır — paneller zaten ✕ ve arka plana
+   * dokunuşla kapanabildiği için bu mevcut davranışla tutarlı. Panel yoksa
+   * akvaryumdayız; kazara çıkışı önlemek için iki kez basılmasını ister.
+   *
+   * @returns uygulamadan çıkılması gerekiyorsa true
+   */
+  handleBack(): boolean {
+    if (this.panelHost.childElementCount > 0) {
+      audio.click();
+      this.closePanel();
+      return false;
+    }
+    const now = Date.now();
+    if (now < this.exitArmedUntil) return true;
+    this.exitArmedUntil = now + 2000;
+    this.toast(tt('Çıkmak için tekrar geri tuşuna bas'));
+    return false;
   }
 
   // ---------- panel çatısı ----------

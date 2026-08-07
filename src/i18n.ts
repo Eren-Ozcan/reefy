@@ -619,6 +619,7 @@ const EN: Record<string, string> = {
   'Akvaryum değiştir': 'Switch tank', 'Bitti ✓': 'Done ✓',
   'Sv': 'Lv',
   'Kirli — camı temizlemek için dokun': 'Dirty — tap to clean the glass',
+  'Çıkmak için tekrar geri tuşuna bas': 'Press back again to exit',
   'Ücretsiz': 'Free',
   '{n} stokta': '{n} in stock',
   '{cost}/tane': '{cost} each',
