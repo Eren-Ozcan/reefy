@@ -81,6 +81,11 @@ export interface SaveData {
 const KEY = 'reefy-save-v1';
 const START_TANK = 'tank-mercan-koyu';
 
+/** Yeni kaydın başlangıç değerleri — hasProgress() bunlarla karşılaştırır. */
+export const START_COINS = 300;
+export const START_PEARLS = 5;
+export const START_FISH_COUNT = 2;
+
 /**
  * Kayıt şeması sürümü. Buluttaki kayıt bundan YENİ ise indirilmez: daha eski
  * bir istemcinin, henüz tanımadığı alanları migrate() ile "eksik" sayıp
@@ -99,8 +104,8 @@ function makeFriendCode(): string {
 export function defaultSave(): SaveData {
   return {
     v: SAVE_SCHEMA_VERSION,
-    coins: 300,
-    pearls: 5,
+    coins: START_COINS,
+    pearls: START_PEARLS,
     xp: 0,
     level: 1,
     playerName: 'Misafir-' + Math.floor(1000 + Math.random() * 9000),
@@ -141,6 +146,146 @@ export function defaultSave(): SaveData {
     adsRemoved: false,
     lang: detectLang(),
   };
+}
+
+/**
+ * Bu kayıtta oyuncunun EMEĞİ var mı — bulut çakışmasında "yerel tarafı feda
+ * etmek güvenli mi" sorusunun tek yanıtı (bkz. cloud-save.ts hızlı yol).
+ *
+ * Neden `dirty` bayrağı ya da varsayılanla derin karşılaştırma değil: kayıt,
+ * oyuncu hiçbir şey yapmasa bile oyuna girdikten saniyeler sonra "değişmiş"
+ * sayılır (lastSeen, biriken gelir, kendiliğinden çıkan kir lekeleri, ilk
+ * açılışta kurulan gün sayacı). Bu yüzden yeni kurulmuş bir cihaz, hesabını
+ * bağladığında bir tarafı bomboş olan "hangi ilerleme?" ekranını görüyordu.
+ *
+ * YÖN ÖNEMLİ: yanlışlıkla "ilerleme yok" demek oyuncunun oyununu sessizce
+ * siler; yanlışlıkla "ilerleme var" demek yalnızca bugünkü davranışa —
+ * kullanıcıya soran çakışma ekranına — düşürür. Bu yüzden kuşkuda kalınan her
+ * alan ilerleme SAYILIR.
+ *
+ * Bilerek DIŞARIDA bırakılanlar (oyuncunun eylemi olmadan da değişirler ya da
+ * geri yüklenirken kaybı önemsizdir):
+ * - `lastSeen`, `incomePot`, `dirtSpots`, balıkların `progress`/`hunger` değeri
+ *   — hepsi zamanla kendiliğinden ilerler
+ * - `tutorialDone` — giriş karuseli ENGELLEYİCİDİR: oyuna giren herkes onu
+ *   kapatmak zorunda, ayarlara ancak öyle ulaşılıyor. İlerleme sayılsaydı hızlı
+ *   yol tam da var olma sebebi olan durumda (yeni cihaz, hesabını bağlıyor)
+ *   hiç çalışmazdı — emülatörde birebir böyle oldu
+ * - Yalnızca açılış balıklarından oluşan `collection` — aşağıdaki nota bak
+ * - `lastDaily` ve 1 değerindeki `streak`/`bestStreak` — ilk açılışta hediye
+ *   VERİLMEDEN kurulur (bkz. game.ts applyDailyGift); 1'den büyüğü gerçek
+ *   dönüşü gösterir, o sayılır
+ * - `quests.day` / `weeklyQuest.day` — görev günü açılışta kendiliğinden kurulur
+ * - `music`/`sfx`/`lang` ayarları ve `feedHintSeen`/`editHintSeen` ipuçları —
+ *   ilerleme değil, arayüz durumu
+ * - `friendCode`, varsayılan `playerName` — rastgele üretilirler
+ * - `adsRemoved` — zaten buluttan hiç geri yüklenmez, cihazdaki değer korunur
+ */
+export function hasProgress(s: SaveData): boolean {
+  const st = s.stats;
+  if (st.totalSold > 0 || st.totalEarned > 0 || st.totalFed > 0) return true;
+  if (st.eggsHatched > 0 || st.decorPlacedCount > 0 || st.totalCleaned > 0) return true;
+
+  if (s.level > 1 || s.xp > 0) return true;
+  if (s.coins !== START_COINS || s.pearls !== START_PEARLS) return true;
+  if (s.fishes.length !== START_FISH_COUNT) return true;
+
+  // Koleksiyon: yalnızca AÇILIŞ BALIKLARININ DIŞINDAKİ türler sayılır. İkisi de
+  // yarı büyümüş başlar ve oyuncu hiçbir şey yapmasa bile birkaç dakika içinde
+  // yetişkinliğe ulaşıp koleksiyona girer (emülatörde birebir gözlendi) —
+  // koleksiyonun dolu olması tek başına emek göstermez.
+  const starting = new Set(defaultSave().fishes.map((f) => f.sp));
+  if (s.collection.some((id) => !starting.has(id))) return true;
+
+  if (s.achievementsClaimed.length > 0) return true;
+  if (s.tanksOwned.length > 1) return true;
+  if (Object.keys(s.feedOwned).length > 0) return true;
+  if (Object.keys(s.decorOwned).length > 0) return true;
+  if (Object.values(s.decorPlaced).some((list) => list.length > 0)) return true;
+
+  if (s.friends.length > 0) return true;
+  if (s.friendVisits.count > 0 || s.friendVisits.visited.length > 0) return true;
+  if (s.friendGifts.gifted.length > 0) return true;
+
+  for (const q of [s.quests, s.weeklyQuest]) {
+    if (q.claimed.length > 0) return true;
+    if (Object.values(q.progress).some((n) => n > 0)) return true;
+  }
+
+  if (s.pityCounter > 0) return true;
+  if (s.streak > 1 || s.bestStreak > 1) return true;
+  if (s.cleanRewardCount > 0) return true;
+  if (s.petDay !== '') return true;
+  if (!isDefaultPlayerName(s.playerName)) return true;
+
+  return false;
+}
+
+/** Varsayılan ad `Misafir-1234` biçimindedir; başka her ad oyuncunun seçimidir. */
+function isDefaultPlayerName(name: string): boolean {
+  return /^Misafir-\d{4}$/.test(name);
+}
+
+/**
+ * Parmak izine GİRMEYEN alanlar. İkiye ayrılırlar ve ikisi de aynı kapıya
+ * çıkar — bu alanlar farklı diye oyuncuya "hangi ilerleme?" diye sorulamaz:
+ * - kendiliğinden değişenler (`lastSeen`, biriken gelir, kir lekeleri)
+ * - cihaza ait arayüz durumu ve ayarlar (dil, ses, görülmüş ipuçları)
+ * `adsRemoved` zaten buluta hiç gitmez (bkz. cloud-save.ts ENTITLEMENT_KEYS),
+ * bu yüzden karşılaştırmada da yok sayılır.
+ */
+const FINGERPRINT_IGNORED = [
+  'lastSeen', 'incomePot', 'dirtSpots',
+  'music', 'sfx', 'lang', 'tutorialDone', 'feedHintSeen', 'editHintSeen',
+  'adsRemoved',
+] as const satisfies readonly (keyof SaveData)[];
+
+/** Kanonik biçimde "hiç yok" ile eşdeğer sayılan değerler — aşağıdaki nota bak. */
+const BLANK_FORMS = new Set(['{}', '[]', '0', 'false', '""', 'null']);
+
+/**
+ * Değeri sırası ve "boşluğu" normalleştirilmiş bir metne çevirir:
+ * - nesne anahtarları sıralanır (aynı içerik, farklı yazma sırası aynı metin)
+ * - diziler de sıralanır: bu şemadaki hiçbir dizinin sırası oyuncu için anlam
+ *   taşımaz, üstelik `fishes` her syncSave'de SAHNEDEN yeniden kurulduğu için
+ *   sıra cihazdan cihaza zaten değişir
+ * - sıfır/boş değerli alanlar hiç yokmuş gibi elenir: bir yemi bitirince
+ *   `{yem: 0}` kalır, öteki cihazda o anahtar hiç yoktur — aynı kayıttır
+ */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return '[' + v.map(canonical).sort().join(',') + ']';
+  if (v && typeof v === 'object') {
+    const parts = Object.entries(v as Record<string, unknown>)
+      .map(([k, x]) => [k, canonical(x)] as const)
+      .filter(([, c]) => !BLANK_FORMS.has(c))
+      .map(([k, c]) => k + ':' + c)
+      .sort();
+    return '{' + parts.join(',') + '}';
+  }
+  return JSON.stringify(v) ?? 'null';
+}
+
+/**
+ * Kaydın oyuncu için ANLAMLI olan kısmının parmak izi: iki kaydın "aslında
+ * aynı ilerleme" olup olmadığı buradan anlaşılır (bkz. cloud-save.ts). İki
+ * cihaz sırayla senkron olunca çakışma ekranının iki sütunu birebir aynı
+ * veriyi gösterebiliyordu; oyuncuya aynı şeyi seçtirmek hatadır.
+ *
+ * Ham JSON karşılaştırması İŞE YARAMAZ: kayıt oyuncu hiçbir şey yapmasa bile
+ * saniyeler içinde değişir — hasProgress()'teki listenin aynısı.
+ *
+ * YÖN ÖNEMLİ ve burada hasProgress()'in TERSİdir: "aynı" demek soruyu tümden
+ * atlatır, bu yüzden kuşkuda kalınan her alan FARK sayılmalıdır. Bu yüzden
+ * aşağısı bir izin listesi değil: SaveData'ya yarın eklenecek bir alan
+ * kendiliğinden karşılaştırmaya girer, dışarıda kalanlar tek tek sayılıdır.
+ */
+export function progressFingerprint(s: SaveData): string {
+  const cmp: Record<string, unknown> = { ...s };
+  for (const k of FINGERPRINT_IGNORED) delete cmp[k];
+  // Balığın büyümesi ve açlığı zamanla kendiliğinden ilerler; balığı oyuncu
+  // gözünde tanımlayan şey türü, adı, hangi akvaryumda olduğu ve yem bonusudur.
+  cmp.fishes = s.fishes.map((f) => ({ sp: f.sp, name: f.name, seed: f.seed, tank: f.tank, bonus: f.bonus ?? 0 }));
+  return canonical(cmp);
 }
 
 /** v1 -> v2 geçişi: eski kayıtlar balıklarını ve parasını korur. */
