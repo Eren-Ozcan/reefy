@@ -6,35 +6,34 @@
 
 The main flow is verified on a real account (see Done). What is left:
 
-- [ ] **Cross-device restore has not been proven.** Everything was tested on a
-      single emulator, so "cloud → this device" was always the *same* device.
-      Play on device A while linked, then link the same account on device B and
-      confirm B picks up A's progress.
-- [ ] **Conflict screen may be noisy on a fresh install.** It shows up even
-      when the local save is an untouched default, because the save counts as
-      "changed" a few seconds after entering the game and the code never picks
-      a side on its own. Consider a fast path: if the local save is still the
-      default, restore from the cloud directly instead of asking.
+- [ ] **The two-devices-live rev race was never exercised.** Both directions are
+      now proven (see Done), but always with the other device idle. Two devices
+      writing inside the same window — A at rev 7 while B is still on 5 — is
+      still untested.
 - [ ] **Orphaned anonymous users.** The auth bug below created a new anonymous
       user on every launch, so `saves/` has a few stray documents. Harmless,
       but worth clearing out before launch so the collection is not misleading.
+      The emulator runs added more: a document under a first-pass test account
+      on top of the account the final run used.
 
 ### Cloud save — remaining platforms
 
-Cloud save currently exists **only in reefy**. The shared design (Firestore
-`saves/{uid}`, monotonic `rev` instead of device clocks, no automatic merging,
-entitlements never restored from the cloud) is meant to be reused.
+The shared design (Firestore `saves/{uid}`, monotonic `rev` instead of device
+clocks, no automatic merging, entitlements never restored from the cloud) has
+been ported to both sibling games:
 
-- [ ] **Çengel Bulmaca** — reuses the existing Firebase project and the lazy
-      auth setup in `src/referral.ts`. Extra work: the save is spread across
-      ~13 `cengel-` prefixed localStorage keys (one per puzzle, one per hint
-      day) and has to be collected through an allowlist; date-keyed entries
-      need pruning or the document grows forever.
-- [ ] **Little Grand Hotel** — highest effort. Godot has no official Firebase
-      SDK, so Firestore has to be reached over REST with `HTTPRequest`. Play
-      Games Saved Games was ruled out because it is Android-only and would not
-      survive an iOS release. Its `_validate_save_dict()` is already hardened by
-      the fuzzer, so cloud payloads get validation for free.
+- [x] **Çengel Bulmaca** — reuses the existing Firebase project and the lazy
+      auth setup in `src/referral.ts`. The save is spread across ~13 `cengel-`
+      prefixed localStorage keys and is collected through an allowlist;
+      date-keyed hint entries are pruned to a one-week window.
+- [ ] **Little Grand Hotel** — Firestore over REST with `HTTPRequest` (Godot has
+      no official Firebase SDK); storage, conflict modal and rules are done.
+      **Still missing: Google account linking is not wired.** `cloud_save.gd`
+      exposes `set_google_id_token_provider()` but nothing ever calls it, so
+      `is_account_linking_available()` is always false and the save is anonymous
+      and device-bound — it survives a restart but not a reinstall or a new
+      device. Also needs the Play app-signing SHA-1 once the first bundle is
+      uploaded, or Google sign-in fails only in store builds.
 
 ### iOS
 
@@ -48,6 +47,76 @@ entitlements never restored from the cloud) is meant to be reused.
       fall through to the "store not configured" path.
 
 ## Done
+
+### Cloud save — phase 3: the fresh-install fast path (2026-08-07)
+- [x] `hasProgress()` (`src/save.ts`) — decides whether the local save holds
+      anything the player earned. Deliberately substance-based, not the `dirty`
+      flag and not a deep-equality check against the default: the save counts as
+      "changed" within seconds of entering the game (`lastSeen`, accrued income,
+      dirt spots, the day-1 streak marker), which is exactly why a brand-new
+      device saw a chooser with one empty side
+- [x] `CloudSave.sync()` takes the conflict branch only when the local save
+      actually holds progress; otherwise it restores from the cloud directly.
+      The direction is deliberate — a wrong "no progress" would silently delete
+      the player's game, a wrong "has progress" only falls back to asking
+- [x] First test setup in this repo (vitest + jsdom, `npm test`): every signal
+      that counts as progress and every field deliberately ignored is covered
+      one by one, plus the `sync()` decision table against a faked Firestore
+      (82 tests). The ignored-field half matters most: if one of them starts
+      counting as progress by accident, the fast path silently stops working
+
+### Cloud save — two-emulator run, and the two bugs it found (2026-08-07)
+Two Android 14 emulators, same Google account, real Firestore. What the run
+proved, and what only a real device could have shown:
+- [x] **Fresh device restores automatically.** Device B, installed clean and
+      never played, linked the account and picked up A's exact state — 145
+      coins, 5/7 fish, all five fish — with no chooser in sight
+- [x] **A genuine conflict still asks.** When both sides held real progress the
+      chooser appeared with both columns filled; nothing was merged, and picking
+      "this device" pushed the local save up
+- [x] **`hasProgress()` was wrong twice, and the emulator proved it.** A brand-new
+      install showed the chooser with an empty side, because two fields counted
+      as progress that no player earned: `tutorialDone` (the intro carousel
+      blocks the screen — you cannot reach Settings without dismissing it) and
+      `collection` (both starting fish reach adulthood on their own within
+      minutes). The device save that exposed this is now a regression test
+- [x] **Mid-session restores silently dropped fish** — a pre-existing bug the
+      fast path made routine. `syncSave()` rebuilds `save.fishes` from the
+      *scene*, and `location.reload()` fires `beforeunload` → `syncSave()`, so
+      the just-downloaded fish were overwritten by the stale scene's fish and
+      could then be uploaded over the other device's. Restores now freeze that
+      rebuild (`Game.freezeForRestore`)
+- [x] **The first version of that fix was also wrong**, and the same run caught
+      it: freezing *all* of `syncSave()` also froze `persist()`, which is the
+      only thing that writes the restored save to disk — so the reload read the
+      old save back and the restore vanished. The freeze now stops the
+      scene-derived rebuild and the cloud write, never the local write
+
+### Cloud save — B → A, and the timeout that hid it (2026-08-08)
+- [x] **Device B → device A is proven.** Collected an income pot on B
+      (145 → 228 coins), backgrounded it, cold-started A: the chooser appeared
+      with both sides real (cloud 228 / this device 145), and picking the cloud
+      side left A on 228 coins with all 5 fish
+- [x] **The startup sync was dying on a 54 ms margin.** B's progress never
+      reached A across four attempts. The cause was not the sync logic:
+      `ensureUid()` measured **2946 ms** on a cold start against a **3000 ms**
+      budget, so whether the sync ran at all was a coin flip. On the losing side
+      it returned `disabled` and did nothing — no restore, no chooser, no error.
+      Startup sync runs once per session, so a miss was permanent for that launch
+- [x] **One timer was doing two jobs.** `AUTH_TIMEOUT_MS` was both "how long may
+      the sync take" and "how long may startup wait" — and it was tuned for the
+      second, which silently capped the first. Split: the sync now gets a
+      generous budget (15 s), while `Game.CLOUD_STARTUP_GRACE_MS` (3 s) caps only
+      the wait. Overrun no longer cancels anything — the game opens and
+      `handleLateCloudSync()` applies the result when it lands (restore →
+      freeze + reload, conflict → chooser)
+- [x] Covered by tests (128 total, was 123): late restore persists and reloads,
+      a late restore cannot be overwritten by the stale scene, late conflict
+      opens the chooser without reloading, late `in-sync` leaves the game alone.
+      Mutation-checked — dropping the freeze from the late path fails 2 of them
+- [ ] Not verified on device: the *late* branch itself. The fixed build resolved
+      auth inside the 3 s grace, so the conflict came through the normal path.
+      The late path is only covered by tests so far
 
 ### Cloud save — phase 1: storage pipeline (2026-08-07)
 - [x] Shared Firebase app and identity seam (`src/firebase-app.ts`) — the rest

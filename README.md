@@ -28,7 +28,13 @@ A cozy aquarium game for Android and iOS. Collect fish, decorate tanks, feed and
 npm install
 npm run dev        # run in the browser at localhost (Vite dev server)
 npm run build      # type-check + production build
+npm test           # unit tests (vitest, jsdom)
 ```
+
+Tests cover the parts that fail silently rather than loudly: what the cloud save
+decides to keep or discard (`src/cloud-save.test.ts`) and which fields count as
+player progress (`src/save.test.ts`). Firestore is faked there — no network, no
+emulator needed.
 
 ### Mobile builds
 
