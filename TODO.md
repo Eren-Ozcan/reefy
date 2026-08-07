@@ -2,38 +2,22 @@
 
 ## Pending
 
-### Cloud save — end-to-end verification (blocked on a Google account)
+### Cloud save — leftovers after the end-to-end run
 
-Everything is wired and the failure paths are verified, but a *successful*
-sign-in has never actually happened: the emulator used for testing has no
-Google account, and adding one means entering real credentials. Do this on a
-device (or add an account to the emulator) and report which step breaks.
+The main flow is verified on a real account (see Done). What is left:
 
-Build a release APK with `cd android && ./gradlew assembleRelease` — the
-keystore password is read from `android/keystore.properties` automatically.
-The debug signature is registered too, so `assembleDebug` works as well and
-keeps the verbose Capacitor logs that release builds strip.
-
-- [ ] **Linking works** — Settings → Link → account picker appears → pick an
-      account. Expected: "Your account is linked…" toast and the row changing
-      from `Link` to `Linked: <name>`. If the picker never appears or sign-in
-      fails, it is a signature/config problem — capture `adb logcat`.
-- [ ] **Data actually reaches the cloud** — play a minute, then background the
-      app (that forces a write). Check that `saves/{uid}` exists in Firestore,
-      `rev` increments, and `summary` matches what is on screen.
-- [ ] **Reinstall restores progress** — this is the whole point of the feature.
-      Play while linked → background the app → uninstall → reinstall → link the
-      *same* account. Expected: the conflict screen appears, picking ☁️ Cloud
-      restarts the app and brings the progress back.
-- [ ] **Conflict screen is correct** — the cloud figures match what was left
-      behind, the relative time makes sense, and picking 📱 This device does
-      *not* delete the cloud copy.
-
-Note on the third item: the conflict screen shows up even on a fresh install
-rather than restoring silently. That is deliberate — the local save counts as
-"changed" a few seconds after entering the game, and the code never picks a
-side on its own when both have data. If it turns out to feel noisy in practice,
-add a fast path that detects an untouched default save and restores directly.
+- [ ] **Cross-device restore has not been proven.** Everything was tested on a
+      single emulator, so "cloud → this device" was always the *same* device.
+      Play on device A while linked, then link the same account on device B and
+      confirm B picks up A's progress.
+- [ ] **Conflict screen may be noisy on a fresh install.** It shows up even
+      when the local save is an untouched default, because the save counts as
+      "changed" a few seconds after entering the game and the code never picks
+      a side on its own. Consider a fast path: if the local save is still the
+      default, restore from the cloud directly instead of asking.
+- [ ] **Orphaned anonymous users.** The auth bug below created a new anonymous
+      user on every launch, so `saves/` has a few stray documents. Harmless,
+      but worth clearing out before launch so the collection is not misleading.
 
 ### Cloud save — remaining platforms
 
@@ -94,6 +78,25 @@ entitlements never restored from the cloud) is meant to be reused.
       from the one their friends see
 - [x] Firebase config: Android app registered, three SHA-1s (app signing,
       upload, debug), Google provider enabled, `google-services.json` in place
+
+### Cloud save — end-to-end verification on a real account (2026-08-07)
+- [x] Linking works: Settings → Link → account picker → `Linked: <account>`
+- [x] Data reaches Firestore: `saves/{uid}` with the payload as a string,
+      `rev` incrementing, `schemaVersion`, a `summary` matching the HUD and a
+      server-side `updatedAt`
+- [x] Entitlement stripping holds — `adsRemoved` is absent from the stored
+      payload, so a restored save can never hand out the ad-free version
+- [x] Conflict screen renders with real figures on both sides and the relative
+      time is correct; picking a side works and the unpicked save survives
+- [x] Two bugs found and fixed that made the feature unusable — see
+      `fix(auth): oturumu her açılışta kaybeden iki hatayı düzelt`. Neither was
+      reachable without a real account, which is why they survived the earlier
+      "everything is wired" pass:
+      - Credential Manager only returns accounts that already authorized *this
+        app*, so the picker never opened on a first sign-in
+      - `signInAnonymously()` ran before Firebase restored the persisted
+        session, minting a fresh anonymous user on every launch and orphaning
+        the linked account
 
 ### Ads (2026-08-07)
 - [x] Interstitial cooldown raised 3 → 10 min; app-open trigger added
