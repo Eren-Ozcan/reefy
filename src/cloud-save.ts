@@ -13,6 +13,12 @@
 //   yani buluttaki sürüm kendiliğinden yedek olarak kalır. Faz 2'de kullanıcıya
 //   seçim sunulacak; resolveKeepLocal/resolveKeepCloud o iş için hazır.
 //
+// * AYNI KAYIT ÇAKIŞMA SAYILMAZ. rev sayacı "kim sonra yazdı"yı bilir, "ne
+//   yazdı"yı bilmez; iki cihaz sırayla senkron olunca iki sütunu birebir aynı
+//   olan bir seçim ekranı çıkabiliyordu. sync() karar vermeden önce iki tarafın
+//   içeriğini karşılaştırır (bkz. save.ts progressFingerprint) ve aynılarsa
+//   soru sormadan sessizce çözer.
+//
 // * ENTITLEMENT (satın alma hakkı) BULUTTAN GELMEZ. `adsRemoved` yüklenirken
 //   payload'dan çıkarılır, indirilirken yerel/mağaza değeri korunur. Aksi
 //   halde bir kayıt paylaşımı ücretsiz reklamsız sürüm anlamına gelirdi.
@@ -23,13 +29,24 @@
 import { Capacitor } from '@capacitor/core';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ensureUid, firestore } from './firebase-app';
-import { parseSave, SAVE_SCHEMA_VERSION, type SaveData } from './save';
+import { hasProgress, parseSave, progressFingerprint, SAVE_SCHEMA_VERSION, type SaveData } from './save';
 
 const REV_KEY = 'reefy-cloud-rev';
 const DIRTY_KEY = 'reefy-cloud-dirty';
 
 const UPLOAD_THROTTLE_MS = 60_000; // Firestore günlük yazma kotasını koru (Spark: 20K/gün)
-const AUTH_TIMEOUT_MS = 3000;      // kötü ağda açılışı kilitleme
+// ensureUid() soğuk açılışta initializeApp'i çalıştırır ve Auth'un kalıcı
+// oturumu IndexedDB'den geri yüklemesini bekler (bkz. firebase-app.ts
+// waitForRestoredUser). Android 14 emülatöründe ÖLÇÜLDÜ: 2946 ms — eski 3000 ms
+// bütçesinin 54 ms altı. Yani sınırda salınıyordu ve aşan her açılışta senkron
+// 'disabled' dönüp SESSİZCE hiçbir şey yapmıyordu; iki cihazlı testte "B'nin
+// ilerlemesi A'ya hiç gelmiyor" olarak göründü.
+//
+// Süre CÖMERT tutulur, çünkü zaman aşımının bedeli ağır: açılış senkronu oturum
+// başına BİR KEZ çalışır, kaçırılırsa oyuncu ne geri yükleme ne çakışma ekranı
+// görür. Buradaki değer artık AÇILIŞI BEKLETMİYOR — game.ts açılışı yalnızca
+// CLOUD_STARTUP_GRACE_MS kadar bekletir, sonucu geç gelirse sonradan işler.
+const AUTH_TIMEOUT_MS = 15_000;
 const FETCH_TIMEOUT_MS = 4000;
 // setDoc() çevrimdışıyken ÇÖZÜLMEZ: Firestore yazmayı yerel kuyruğa alır ve
 // sözü sunucu onaylayana kadar askıda tutar. Zaman aşımı olmadan upload()
@@ -188,13 +205,51 @@ export class CloudSave {
 
     // Bulut ilerideyken yerelde de gönderilmemiş değişiklik varsa gerçek
     // çakışma: karar kullanıcınındır, buluta yazma.
-    if (this.dirty) {
+    //
+    // HIZLI YOL: "gönderilmemiş değişiklik" her zaman bir ilerleme demek
+    // değildir — oyuna girildikten saniyeler sonra kayıt kendiliğinden
+    // değişmiş sayılır (bkz. save.ts hasProgress). Yerelde feda edilecek bir
+    // emek yoksa soracak bir şey de yoktur: bir tarafı boş olan çakışma
+    // ekranını göstermek yerine doğrudan buluttakini geri yükle. Yeni kurulan
+    // cihazda ve hesap bağlandıktan hemen sonra beklenen davranış budur.
+    if (this.dirty && hasProgress(save)) {
+      // AYNI KAYDIN İKİ KOPYASI ÇAKIŞMA DEĞİLDİR. rev sayacı yalnızca "kim
+      // sonra yazdı"yı bilir, "ne yazdı"yı bilmez: A cihazı yazmaya devam
+      // ederken B buluttan geri yüklerse, B'nin bir sonraki senkronunda bulut
+      // ileride ve yerel "gönderilmemiş" görünür — oysa iki taraf birebir aynı
+      // ilerlemedir. İki sütunu aynı olan bir seçim ekranı oyuncuya hangi
+      // düğmeye bassa aynı oyunu verir ve ekrana olan güvenini bitirir.
+      if (this.matchesLocal(save, payload)) {
+        // Geri YÜKLEME yapılmaz — bilerek: yerel taraf, karşılaştırmanın dışında
+        // tuttuğumuz alanlarda (biriken gelir, balıkların büyümesi) daha ileride
+        // olabilir ve bunları buluttakiyle ezmenin hiçbir kazancı yok. Yalnızca
+        // bulutun sayacı benimsenir ki aynı çakışma her senkronda tekrarlanmasın.
+        // `dirty` korunur: yereldeki sürüklenme bir sonraki kısıtlı yüklemeyle
+        // (rev = cloudRev + 1) kendiliğinden buluta gider.
+        this.rev = cloudRev;
+        return 'in-sync';
+      }
       this.blocked = true;
       this.pendingCloud = { rev: cloudRev, payload, summary };
       return 'conflict';
     }
 
     return this.applyCloud(save, cloudRev, payload) ? 'restored' : 'disabled';
+  }
+
+  /**
+   * Buluttaki paket ile yerel kayıt oyuncu gözünde AYNI mı? Karşılaştırma
+   * payload metni üzerinden değil, iki tarafı da aynı kapıdan (parseSave ->
+   * migrate) geçirip parmak izlerinden yapılır; metin karşılaştırması alan
+   * sırası ve kendiliğinden değişen alanlar yüzünden neredeyse hiç tutmaz.
+   *
+   * Kuşkuda kalınırsa (paket okunamadı) FARKLI sayılır: sormak güvenlidir,
+   * yanlış otomatik karar değildir — dosyanın geri kalanıyla aynı yön.
+   */
+  private matchesLocal(save: SaveData, payload: string): boolean {
+    const cloud = parseSave(payload);
+    if (!cloud) return false;
+    return progressFingerprint(cloud) === progressFingerprint(save);
   }
 
   /** Buluttaki kaydı yerel duruma uygular. Bozuk veride yerel korunur. */
