@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "778208134304-5l844s1403s8em6fd6nvd198o46nepob.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yilkgames.reefy",
+            "certificate_hash": "c9690f212a158af84a3babcc3780615ca04e4673"
+          }
+        },
+        {
           "client_id": "778208134304-dgurk81q65q3scu8p2rr7ub42lg94tm2.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
