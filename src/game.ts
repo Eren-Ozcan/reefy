@@ -31,6 +31,16 @@ const DIRT_DELAY_3: [number, number] = [400_000, 500_000];
 
 const APP_OPEN_AD_DELAY_MS = 4000; // reklam SDK'sının yüklenmesine fırsat tanımak için açılışta bekleme
 
+/** İki rengi karıştırır (a=0 -> base, a=1 -> over). Yarı saydam katmanları önceden
+ *  hesaplamak için: arkaplan düz renk olduğu sürece sonuç gerçek alfa karışımıyla aynıdır. */
+function blend(base: number, over: number, a: number): number {
+  const br = (base >> 16) & 255, bg = (base >> 8) & 255, bb = base & 255;
+  const or = (over >> 16) & 255, og = (over >> 8) & 255, ob = over & 255;
+  return (Math.round(br + (or - br) * a) << 16)
+    | (Math.round(bg + (og - bg) * a) << 8)
+    | Math.round(bb + (ob - bb) * a);
+}
+
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
 /** Kazanç raporu satırı: balık başına saatlik üretim (akvaryum+dekor bonuslu) ve satış değeri. */
@@ -60,12 +70,9 @@ export class Game {
   private world = new Container();
   private bgG = new Graphics();
   private sandG = new Graphics();
-  private ambientG = new Graphics();
-  private biomeG = new Graphics();
-  private biomeAnimG = new Graphics();
-  private moodG = new Graphics();
-  /** Biyoma özgü hareketli sahne öğeleri (kar, küre, buzdağı, kristal, saz...) */
-  private animItems: { kind: string; x: number; y: number; r: number; phase: number; s: number }[] = [];
+  /** Kum taneciği ve ışık havuzları — kum şekline maskelenir, suya taşmaz. */
+  private sandFxG = new Graphics();
+  private sandMaskG = new Graphics();
   private decorAnimG = new Graphics();
   private rays: Graphics[] = [];
   private rayLayer = new Container();
@@ -117,9 +124,35 @@ export class Game {
     return this.app.screen.height - this.uiBottomInset;
   }
 
-  /** Balıkların yüzebileceği alan: zemin çizgisinin altına inmemeleri için yükseklik floorY ile sınırlanır. */
+  /** Kum bandının üst kenarının taban çizgisi. Gerçek yüzey buna göre eğrilir (bkz. sandSurfaceY). */
+  get sandTopY(): number {
+    return this.floorY - 96;
+  }
+
+  /** Kum yüzeyinin verilen x'teki gerçek yüksekliği. buildStatic'teki quadratic eğrilerin
+   *  analitik karşılığıdır — dekorlar düz bir çizgiye değil, kumun kendi formuna oturur. */
+  sandSurfaceY(x: number): number {
+    const w = this.app.screen.width || 1;
+    const top = this.sandTopY;
+    const u = Math.min(1, Math.max(0, x / w));
+    switch (this.activeTank.floor) {
+      case 'mound': return top - 76 * u * (1 - u);
+      case 'dip': return top + 52 * u * (1 - u);
+      case 'wave': {
+        if (u <= 0.5) {
+          const t = u * 2;
+          return top - 56 * t * (1 - t) - 4 * t * t;
+        }
+        const t = u * 2 - 1;
+        return top - 4 * (1 - t) * (1 - t) + 40 * t * (1 - t) - 11 * t * t;
+      }
+      default: return top;
+    }
+  }
+
+  /** Balıkların yüzebileceği alan: kuma girmemeleri için yükseklik kum çizgisiyle sınırlanır. */
   private get swimBounds(): Bounds {
-    return { w: this.app.screen.width, h: this.floorY };
+    return { w: this.app.screen.width, h: this.sandTopY };
   }
 
   /** Alt UI yüksekliği değiştiğinde (mount, ekran döndürme) sahneyi yeni zemin çizgisiyle yeniden kurar. */
@@ -222,9 +255,10 @@ export class Game {
     host.appendChild(this.app.canvas);
 
     this.world.addChild(
-      this.bgG, this.rayLayer, this.biomeG, this.biomeAnimG, this.ambientG, this.decorAnimG, this.sandG,
-      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.moodG, this.grimeSprite,
+      this.bgG, this.rayLayer, this.decorAnimG, this.sandG, this.sandFxG, this.sandMaskG,
+      this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.grimeSprite,
     );
+    this.sandFxG.mask = this.sandMaskG;
     this.app.stage.addChild(this.world);
 
     this.cloudSync = await cloudSyncPromise;
@@ -320,297 +354,111 @@ export class Game {
   private buildStatic(): void {
     const { w, h } = this.bounds;
     const tank = this.activeTank;
+    const sandTop = this.sandTopY;
 
+    // Su: arkaplan katmanının üzerine yarı saydam su gradyanı biner. Arkaplan düz bir renk
+    // olduğu için karışım burada önceden hesaplanır — sonuç birebir aynı, alfa gradyanına gerek kalmaz.
     this.bgG.clear();
     const grad = new FillGradient(0, 0, 0, h);
-    grad.addColorStop(0, tank.water[0]);
-    grad.addColorStop(0.55, tank.water[1]);
-    grad.addColorStop(1, tank.water[2]);
+    grad.addColorStop(0, blend(tank.backdrop, tank.water[0], 0.42));
+    grad.addColorStop(0.55, blend(tank.backdrop, tank.water[1], 0.80));
+    grad.addColorStop(1, blend(tank.backdrop, tank.water[2], 0.96));
     this.bgG.rect(0, 0, w, h).fill(grad);
 
-    // Kum, zemin çizgisinden başlar ama ekranın gerçek altına kadar uzatılır: alt bar'ın
-    // arkasında da kum görünür, böylece bant yukarı alınınca altta boşluk kalmaz.
-    const fy = this.floorY;
-    this.sandG.clear();
-    this.sandG.rect(0, fy - 64, w, h - fy + 64).fill(tank.sand);
-    this.sandG.ellipse(w * 0.5, fy - 64, w * 0.6, 14).fill(tank.sand);
-    for (let i = 0; i < 70; i++) {
-      this.sandG.circle(Math.random() * w, fy - 58 + Math.random() * (h - fy + 52), 1 + Math.random() * 2).fill(tank.sandDots);
-    }
-
-    // Arka plan silüet bitkileri (derinlik hissi)
-    this.ambientG.clear();
-    for (let i = 0; i < 4; i++) {
-      const bx = w * (0.1 + i * 0.26);
-      const bh = 60 + (i % 2) * 40;
-      this.ambientG
-        .moveTo(bx, fy - 60)
-        .quadraticCurveTo(bx - 14, fy - 60 - bh * 0.6, bx - 4, fy - 60 - bh)
-        .quadraticCurveTo(bx + 10, fy - 60 - bh * 0.5, bx, fy - 60)
-        .fill({ color: tank.water[2], alpha: 0.5 });
-    }
-
-    this.drawBiomeScenery(w, h, fy);
-
-    // Işık huzmeleri — biyoma göre renk, yoğunluk ve sayı
-    const RAY_CFG: Record<Biome, { color: number; alpha: number; count: number }> = {
-      tropik:    { color: 0xffffff, alpha: 0.07, count: 4 },
-      lagun:     { color: 0xfff8d0, alpha: 0.09, count: 5 },
-      derin:     { color: 0x9fc8ff, alpha: 0.025, count: 2 },
-      magara:    { color: 0xcfe8ff, alpha: 0.1, count: 1 },
-      kutup:     { color: 0xffffff, alpha: 0.11, count: 5 },
-      gunbatimi: { color: 0xffb060, alpha: 0.12, count: 4 },
-      mistik:    { color: 0xc9a0ff, alpha: 0.06, count: 3 },
-    };
-    const rc = RAY_CFG[tank.biome];
-    this.rayLayer.removeChildren();
-    this.rays = [];
-    for (let i = 0; i < rc.count; i++) {
-      const g = new Graphics();
-      const rx = w * ((i + 0.5) / rc.count) - 20;
-      g.moveTo(rx, -20)
-        .lineTo(rx + 34, -20)
-        .lineTo(rx + 150, h * 0.85)
-        .lineTo(rx - 60, h * 0.85)
-        .closePath()
-        .fill({ color: rc.color, alpha: rc.alpha });
-      g.blendMode = 'add';
-      this.rays.push(g);
-      this.rayLayer.addChild(g);
-    }
-
-    // Atmosfer tonu — tüm sahnenin üzerine biyom rengi
-    const MOOD: Record<Biome, { color: number; alpha: number }> = {
-      tropik:    { color: 0x000000, alpha: 0 },
-      lagun:     { color: 0x8affe0, alpha: 0.05 },
-      derin:     { color: 0x0a1430, alpha: 0.24 },
-      magara:    { color: 0x141024, alpha: 0.22 },
-      kutup:     { color: 0xdff2ff, alpha: 0.1 },
-      gunbatimi: { color: 0xff8a40, alpha: 0.12 },
-      mistik:    { color: 0x3a2a6e, alpha: 0.16 },
-    };
-    const mood = MOOD[tank.biome];
-    this.moodG.clear();
-    if (mood.alpha > 0) this.moodG.rect(0, 0, w, h).fill({ color: mood.color, alpha: mood.alpha });
-    this.moodG.eventMode = 'none';
-  }
-
-  /** Her biyomun kendine özgü, BELİRGİN sahnesi; yerleşim akvaryum kimliğinden türetilen tohumla değişir. */
-  /** floorY: zemin çizgisi. Arka plan siluetleri gerçek yüksekliği (h) kullanmaya devam eder,
-   *  zemine oturan öğeler ise floorY'ye göre yerleşir ki alt bar'ın altında kalmasınlar. */
-  private drawBiomeScenery(w: number, h: number, floorY: number): void {
-    const tank = this.activeTank;
-    const g = this.biomeG;
-    g.clear();
-    this.animItems = [];
-
-    // Akvaryum kimliğinden deterministik rastgelelik
+    // Akvaryum kimliğinden türetilen sabit tohum: aynı akvaryum her açılışta aynı görünür.
     let seed = 0;
     for (const ch of tank.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
     const rnd = () => {
       seed = (seed * 1103515245 + 12345) >>> 0;
       return (seed >>> 8) / 16777216;
     };
-    const floor = floorY - 60;
 
-    switch (tank.biome) {
-      case 'tropik': {
-        // Sağda büyük resif duvarı + önde iri mercan kümeleri
-        g.moveTo(w, h).lineTo(w, h * 0.45)
-          .quadraticCurveTo(w * 0.86, h * 0.5, w * 0.84, h * 0.68)
-          .quadraticCurveTo(w * 0.9, h * 0.85, w * 0.86, h).closePath()
-          .fill({ color: 0xd97a72, alpha: 0.5 });
-        for (let i = 0; i < 3; i++) {
-          const cx = w * (0.12 + rnd() * 0.6);
-          const col = [0xf4756a, 0xe86a92, 0xf09048][i % 3];
-          for (let k = 0; k < 7; k++) {
-            g.circle(cx - 34 + k * 12, floor - 10 - Math.sin(k * 1.9) * 12, 13 + (k % 3) * 5)
-              .fill({ color: col, alpha: 0.85 });
-          }
-          // mercan üstünde anemon püskülleri
-          for (let a = 0; a < 5; a++) {
-            g.moveTo(cx - 10 + a * 5, floor - 34)
-              .lineTo(cx - 12 + a * 6, floor - 52 - rnd() * 8)
-              .stroke({ width: 4, color: 0xffc0b0, alpha: 0.9, cap: 'round' });
-          }
+    // ---------- ışık huzmeleri ----------
+    // Karenin üstündeki sanal bir kaynaktan yelpaze gibi açılır ve kuma DEĞMEDEN söner.
+    // Sert bir kesim çizgisi bırakmaması önemli: kum formu aşağı indiğinde o çizgi açıkta kalıyordu.
+    const originX = w * (0.40 + rnd() * 0.20);
+    const originY = -h * 0.6;
+    const hits: { x: number; r: number; a: number }[] = [];
+    this.rayLayer.removeChildren();
+    this.rays = [];
+    for (let i = 0; i < tank.rayCount; i++) {
+      const spread = (i + 0.5) / tank.rayCount - 0.5;
+      const ang = spread * 0.30 + (rnd() - 0.5) * 0.05;
+      const tan = Math.tan(ang);
+      const halfTop = w * (0.008 + rnd() * 0.009);
+      const halfBot = halfTop * (2.1 + rnd() * 1.5);
+      const endY = sandTop - 10 - rnd() * 26;
+      const xTop = originX + (0 - originY) * tan;
+      const xBot = originX + (endY - originY) * tan;
+      const a = tank.rayAlpha * (1.05 + rnd() * 0.5);
+
+      const g = new Graphics();
+      // Dikey sönüm, sabit alfalı ince dilimlerle kurulur (gradyan alfası yerine —
+      // her Pixi sürümünde aynı davranır ve bantlaşma bu dilim sayısında görünmez).
+      const SEG = 18;
+      for (const [wm, am] of [[1.75, 0.30], [1.0, 1.0]]) {
+        for (let s = 0; s < SEG; s++) {
+          const t0 = s / SEG, t1 = (s + 1) / SEG, tm = (t0 + t1) / 2;
+          const fade = tm < 0.45 ? 1 - tm * 0.84 : Math.max(0, (1 - tm) / 0.55) * 0.62;
+          if (fade <= 0.001) continue;
+          const y0 = t0 * endY, y1 = t1 * endY;
+          const x0 = xTop + (xBot - xTop) * t0, x1 = xTop + (xBot - xTop) * t1;
+          const h0 = (halfTop + (halfBot - halfTop) * t0) * wm;
+          const h1 = (halfTop + (halfBot - halfTop) * t1) * wm;
+          g.moveTo(x0 - h0, y0).lineTo(x0 + h0, y0).lineTo(x1 + h1, y1).lineTo(x1 - h1, y1)
+            .closePath().fill({ color: 0xffffff, alpha: a * am * fade });
         }
-        for (let i = 0; i < 6; i++) {
-          const sx = w * rnd();
-          g.moveTo(sx - 8, floor + 16).quadraticCurveTo(sx, floor - 2, sx + 8, floor + 16)
-            .closePath().fill({ color: 0xfff2e0, alpha: 0.9 });
-        }
-        break;
       }
-      case 'lagun': {
-        // Yüzeyde büyük nilüfer yaprakları + uzun sazlar (hareketli) + iri yuvarlak kayalar
-        for (let i = 0; i < 4; i++) {
-          const lx = w * (0.1 + rnd() * 0.8);
-          g.ellipse(lx, 22, 42 + rnd() * 20, 12).fill({ color: 0x3f9764, alpha: 0.85 });
-          g.moveTo(lx, 22).lineTo(lx + 34, 14).lineTo(lx + 30, 26).closePath()
-            .fill({ color: tank.water[0], alpha: 0.9 });
-        }
-        for (let i = 0; i < 8; i++) {
-          this.animItems.push({ kind: 'reed', x: w * rnd(), y: floor, r: 60 + rnd() * 70, phase: rnd() * 6, s: 1 });
-        }
-        for (let i = 0; i < 3; i++) {
-          const bx = w * (0.1 + rnd() * 0.8);
-          g.ellipse(bx, floor - 12, 34 + rnd() * 18, 22).fill({ color: 0x8fa78f, alpha: 0.8 });
-          g.ellipse(bx - 10, floor - 26, 16, 9).fill({ color: 0xa8c0a0, alpha: 0.8 });
-        }
-        break;
-      }
-      case 'derin': {
-        // Dev yarık duvarları (koyu, opak) + hareketli deniz karı + parlayan derin canlı gözleri
-        g.moveTo(0, h).lineTo(0, h * 0.1).lineTo(w * 0.08, h * 0.3).lineTo(w * 0.05, h * 0.45)
-          .lineTo(w * 0.17, h * 0.62).lineTo(w * 0.12, h * 0.8).lineTo(w * 0.2, h).closePath()
-          .fill({ color: 0x0a1322, alpha: 0.9 });
-        g.moveTo(w, h).lineTo(w, h * 0.05).lineTo(w * 0.9, h * 0.28).lineTo(w * 0.94, h * 0.42)
-          .lineTo(w * 0.82, h * 0.6).lineTo(w * 0.88, h * 0.78).lineTo(w * 0.8, h).closePath()
-          .fill({ color: 0x0a1322, alpha: 0.9 });
-        for (let i = 0; i < 3; i++) {
-          const ex = i % 2 === 0 ? w * 0.08 : w * 0.9;
-          const ey = h * (0.3 + rnd() * 0.4);
-          g.circle(ex, ey, 3).fill({ color: 0x7fe8c9, alpha: 0.9 });
-          g.circle(ex + 10, ey + 2, 3).fill({ color: 0x7fe8c9, alpha: 0.9 });
-        }
-        for (let i = 0; i < 30; i++) {
-          this.animItems.push({ kind: 'snow', x: w * rnd(), y: h * rnd(), r: 1 + rnd() * 1.6, phase: rnd() * 6, s: 6 + rnd() * 10 });
-        }
-        break;
-      }
-      case 'magara': {
-        // Kalın sarkıt/dikit kümeleri + nabız atan kristal kümeleri
-        for (let i = 0; i < 8; i++) {
-          const sx = w * (0.04 + rnd() * 0.92);
-          const sl = 60 + rnd() * 110;
-          g.moveTo(sx - 20 - rnd() * 8, 0).lineTo(sx, sl).lineTo(sx + 20 + rnd() * 8, 0).closePath()
-            .fill({ color: 0x131022, alpha: 0.92 });
-        }
-        for (let i = 0; i < 4; i++) {
-          const sx = w * (0.08 + rnd() * 0.84);
-          const sl = 40 + rnd() * 50;
-          g.moveTo(sx - 18, floor + 4).lineTo(sx, floor - sl).lineTo(sx + 18, floor + 4).closePath()
-            .fill({ color: 0x131022, alpha: 0.9 });
-        }
-        for (let i = 0; i < 5; i++) {
-          const cx = w * (0.06 + rnd() * 0.88);
-          const cy = floor - 4 - rnd() * 26;
-          this.animItems.push({ kind: 'crystal', x: cx, y: cy, r: 10 + rnd() * 8, phase: rnd() * 6, s: 1 });
-        }
-        break;
-      }
-      case 'kutup': {
-        // Kalın buz tavanı + sallanan büyük buzdağı + buz kırığı zemin
-        g.rect(0, 0, w, 34).fill({ color: 0xf4fbff, alpha: 0.85 });
-        for (let i = 0; i < 6; i++) {
-          const ix = (w / 6) * i + rnd() * 20;
-          const iw2 = 70 + rnd() * 70;
-          g.moveTo(ix, 32).lineTo(ix + iw2, 32).lineTo(ix + iw2 * 0.7, 66 + rnd() * 40)
-            .lineTo(ix + iw2 * 0.25, 56 + rnd() * 30).closePath()
-            .fill({ color: 0xe8f6ff, alpha: 0.75 });
-        }
-        this.animItems.push({ kind: 'iceberg', x: w * (0.25 + rnd() * 0.5), y: 90, r: 70 + rnd() * 40, phase: rnd() * 6, s: 1 });
-        for (let i = 0; i < 7; i++) {
-          const cx = w * rnd();
-          g.moveTo(cx - 14, floor + 4).lineTo(cx, floor - 22 - rnd() * 18).lineTo(cx + 14, floor + 4).closePath()
-            .fill({ color: 0xffffff, alpha: 0.85 });
-        }
-        break;
-      }
-      case 'gunbatimi': {
-        // Kocaman güneş + ufuk çizgisi + siluet martılar + koyu mor bitki siluetleri
-        const sx = w * 0.65;
-        g.circle(sx, 74, 110).fill({ color: 0xffc070, alpha: 0.25 });
-        g.circle(sx, 74, 66).fill({ color: 0xffb860, alpha: 0.4 });
-        g.circle(sx, 74, 38).fill({ color: 0xfff0c8, alpha: 0.9 });
-        for (let i = 0; i < 5; i++) {
-          g.rect(0, 110 + i * 22, w, 6 - i).fill({ color: 0xff9a50, alpha: 0.22 - i * 0.03 });
-        }
-        for (let i = 0; i < 3; i++) {
-          const mx = w * (0.1 + rnd() * 0.5);
-          const my = 40 + rnd() * 40;
-          g.moveTo(mx - 10, my).quadraticCurveTo(mx - 4, my - 7, mx, my)
-            .quadraticCurveTo(mx + 4, my - 7, mx + 10, my)
-            .stroke({ width: 2.5, color: 0x6e3a52, alpha: 0.8 });
-        }
-        for (let i = 0; i < 6; i++) {
-          const px = w * rnd();
-          const ph = 40 + rnd() * 60;
-          g.moveTo(px, floor).quadraticCurveTo(px - 8, floor - ph * 0.6, px + 4, floor - ph)
-            .stroke({ width: 5, color: 0x5c2e46, alpha: 0.85, cap: 'round' });
-        }
-        break;
-      }
-      case 'mistik': {
-        // Opak antik tapınak kapısı + yıkık sütunlar + gezinen büyük ışık küreleri
-        const ax = w * (0.3 + rnd() * 0.4);
-        g.rect(ax - 70, floor - 130, 22, 130).fill({ color: 0x232a4e, alpha: 0.95 });
-        g.rect(ax + 48, floor - 130, 22, 130).fill({ color: 0x232a4e, alpha: 0.95 });
-        g.rect(ax - 84, floor - 148, 168, 22).fill({ color: 0x2a3258, alpha: 0.95 });
-        g.circle(ax, floor - 96, 15).fill({ color: 0x9fe8ff, alpha: 0.35 });
-        for (let i = 0; i < 3; i++) {
-          const cx = w * (0.06 + rnd() * 0.88);
-          const ch2 = 34 + rnd() * 44;
-          g.rect(cx - 9, floor - ch2, 18, ch2).fill({ color: 0x232a4e, alpha: 0.85 });
-          g.rect(cx - 13, floor - ch2 - 7, 26, 7).fill({ color: 0x2a3258, alpha: 0.85 });
-        }
-        for (let i = 0; i < 6; i++) {
-          this.animItems.push({ kind: 'orb', x: w * rnd(), y: h * (0.15 + rnd() * 0.55), r: 5 + rnd() * 6, phase: rnd() * 6, s: 10 + rnd() * 14 });
-        }
-        break;
-      }
+      g.blendMode = 'add';
+      this.rays.push(g);
+      this.rayLayer.addChild(g);
+      hits.push({ x: originX + (sandTop - originY) * tan, r: halfBot * 7, a });
     }
-  }
 
-  /** Hareketli biyom öğeleri — her karede çizilir. */
-  private drawBiomeAnim(dt: number, w: number, h: number): void {
-    const g = this.biomeAnimG;
-    g.clear();
-    const t = this.time;
-    for (const it of this.animItems) {
-      switch (it.kind) {
-        case 'snow': {
-          it.y += it.s * dt;
-          if (it.y > h) { it.y = -4; it.x = w * Math.random(); }
-          const dx = Math.sin(t * 0.6 + it.phase) * 10;
-          g.circle(it.x + dx, it.y, it.r).fill({ color: 0xdfe8f0, alpha: 0.3 });
-          break;
-        }
-        case 'orb': {
-          const ox = it.x + Math.sin(t * 0.4 + it.phase) * it.s * 2;
-          const oy = it.y + Math.cos(t * 0.3 + it.phase) * it.s;
-          const pulse = 0.5 + 0.3 * Math.sin(t * 1.5 + it.phase);
-          g.circle(ox, oy, it.r * 2.2).fill({ color: 0x9fe8ff, alpha: 0.12 * pulse });
-          g.circle(ox, oy, it.r).fill({ color: 0xd8f6ff, alpha: 0.55 * pulse + 0.25 });
-          break;
-        }
-        case 'crystal': {
-          const pulse = 0.6 + 0.4 * Math.sin(t * 1.8 + it.phase);
-          g.circle(it.x, it.y - 4, it.r * 2).fill({ color: 0x9fd8ff, alpha: 0.14 * pulse });
-          g.moveTo(it.x, it.y - it.r * 1.6).lineTo(it.x + it.r * 0.7, it.y)
-            .lineTo(it.x, it.y + it.r * 0.5).lineTo(it.x - it.r * 0.7, it.y).closePath()
-            .fill({ color: 0xa8e0ff, alpha: 0.55 + 0.35 * pulse });
-          break;
-        }
-        case 'iceberg': {
-          const by = it.y + Math.sin(t * 0.5 + it.phase) * 6;
-          g.moveTo(it.x - it.r, by).lineTo(it.x - it.r * 0.4, by - 34)
-            .lineTo(it.x + it.r * 0.25, by - 46).lineTo(it.x + it.r, by - 8)
-            .lineTo(it.x + it.r * 0.7, by + 30).lineTo(it.x - it.r * 0.6, by + 24).closePath()
-            .fill({ color: 0xf0faff, alpha: 0.85 });
-          g.moveTo(it.x - it.r * 0.4, by - 34).lineTo(it.x + it.r * 0.25, by - 46)
-            .lineTo(it.x + it.r * 0.15, by).lineTo(it.x - it.r * 0.3, by).closePath()
-            .fill({ color: 0xcfe8f8, alpha: 0.7 });
-          break;
-        }
-        case 'reed': {
-          const sway = Math.sin(t * 0.9 + it.phase) * 10;
-          g.moveTo(it.x, it.y)
-            .quadraticCurveTo(it.x + sway * 0.4, it.y - it.r * 0.6, it.x + sway, it.y - it.r)
-            .stroke({ width: 4, color: 0x2f7a52, alpha: 0.85, cap: 'round' });
-          g.ellipse(it.x + sway, it.y - it.r, 4, 12).fill({ color: 0x3f9764, alpha: 0.9 });
-          break;
-        }
+    // ---------- kum ----------
+    // Üst kenarın formu akvaryuma göre değişir; kumun ÜSTÜNDE hiçbir nesne yoktur.
+    const drawSandPath = (g: Graphics) => {
+      g.moveTo(0, sandTop);
+      if (tank.floor === 'mound') {
+        g.quadraticCurveTo(w * 0.5, sandTop - 38, w, sandTop);
+      } else if (tank.floor === 'dip') {
+        g.quadraticCurveTo(w * 0.5, sandTop + 26, w, sandTop);
+      } else if (tank.floor === 'wave') {
+        g.quadraticCurveTo(w * 0.25, sandTop - 28, w * 0.5, sandTop - 4);
+        g.quadraticCurveTo(w * 0.75, sandTop + 20, w, sandTop - 11);
+      } else {
+        g.lineTo(w, sandTop);
+      }
+      g.lineTo(w, h).lineTo(0, h).closePath();
+    };
+
+    // Kendi içinde üstten aydınlık, dipte koyu: ışığın kuma vurduğu hissini verir.
+    const sandGrad = new FillGradient(0, sandTop - 40, 0, h);
+    sandGrad.addColorStop(0, blend(tank.sand, 0xffffff, 0.13));
+    sandGrad.addColorStop(0.4, tank.sand);
+    sandGrad.addColorStop(1, blend(tank.sand, 0x000000, 0.14));
+    this.sandG.clear();
+    drawSandPath(this.sandG);
+    this.sandG.fill(sandGrad);
+
+    // Tanecik ve ışık havuzları kum şekline maskelenir ki suya taşmasınlar.
+    this.sandMaskG.clear();
+    drawSandPath(this.sandMaskG);
+    this.sandMaskG.fill(0xffffff);
+
+    this.sandFxG.clear();
+    for (let i = 0; i < 70; i++) {
+      this.sandFxG.circle(rnd() * w, sandTop - 30 + rnd() * (h - sandTop + 30), 0.8 + rnd() * 1.3)
+        .fill({ color: tank.sandDots, alpha: 0.75 });
+    }
+    // Huzmelerin kuma düşürdüğü yumuşak ışık havuzları — iç içe elipslerle sönümlenir.
+    const RINGS = 8;
+    for (const p of hits) {
+      const pa = Math.min(0.30, p.a * 3.4);
+      for (let k = RINGS; k >= 1; k--) {
+        const f = k / RINGS;
+        this.sandFxG.ellipse(p.x, sandTop + 14, p.r * f, 40 * f)
+          .fill({ color: 0xffffff, alpha: pa / RINGS });
       }
     }
   }
@@ -626,7 +474,7 @@ export class Game {
       const p = placed[i];
       const d = decorById(p.def);
       const cx = p.fx * w;
-      const baseY = this.floorY - 58;
+      const baseY = this.sandSurfaceY(cx) + 6;
       // Düzenleme modu: sürüklenebilir parçaları vurgula
       if (this.editMode) {
         const half = 46 * d.scale;
@@ -868,7 +716,6 @@ export class Game {
     }
 
     this.drawDecor();
-    this.drawBiomeAnim(dt, w, h);
 
     // Kabarcıklar
     this.bubbleG.clear();
@@ -882,7 +729,7 @@ export class Game {
     // Yem taneleri
     for (const p of this.pellets) {
       p.age += dt;
-      const floorY = this.floorY - 70;
+      const floorY = this.sandTopY - 6;
       if (p.y < floorY) {
         p.y = Math.min(floorY, p.y + p.vy * dt);
         p.x += Math.sin(this.time * 2 + p.sway) * 12 * dt;
@@ -1237,11 +1084,11 @@ export class Game {
   /** Verilen noktadaki en üstteki dekorun dizinini döndürür (yoksa -1). */
   private decorAt(x: number, y: number): number {
     const { w } = this.bounds;
-    const baseY = this.floorY - 58;
     const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
     for (let i = placed.length - 1; i >= 0; i--) {
       const d = decorById(placed[i].def);
       const cx = placed[i].fx * w;
+      const baseY = this.sandSurfaceY(cx) + 6;
       const half = 46 * d.scale;
       if (x >= cx - half && x <= cx + half && y >= baseY - 110 * d.scale && y <= baseY + 14) return i;
     }
@@ -1462,7 +1309,7 @@ export class Game {
     }
     this.pellets.push({
       x,
-      y: Math.min(y, this.floorY - 90),
+      y: Math.min(y, this.sandTopY - 26),
       vy: 30 + Math.random() * 20,
       sway: Math.random() * Math.PI * 2,
       age: 0,
