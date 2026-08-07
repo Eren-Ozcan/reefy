@@ -41,6 +41,15 @@ const MAX_PAYLOAD_BYTES = 400_000; // firestore.rules'daki tavanla aynı
 /** Buluta gönderilmeyen alanlar — bkz. dosya başı "ENTITLEMENT" notu. */
 const ENTITLEMENT_KEYS = ['adsRemoved'] as const;
 
+/** Çakışma ekranının payload'ı açmadan gösterebildiği özet. */
+export interface CloudSummary {
+  level: number;
+  coins: number;
+  collection: number;
+  /** Sunucu damgası (ms). Cihaz saatinden bağımsızdır; 0 = bilinmiyor. */
+  updatedAtMs: number;
+}
+
 export type CloudSyncResult =
   | 'disabled'      // yapılandırma yok / ağ yok / zaman aşımı — sessizce yerel devam
   | 'in-sync'       // yerel en az bulut kadar güncel
@@ -93,11 +102,31 @@ export class CloudSave {
   private uploading = false;
   /** Çakışma çözülene dek yazmalar durur; buluttaki sürüm yedek olarak korunur. */
   private blocked = false;
-  private pendingCloud: { rev: number; payload: string } | null = null;
+  private pendingCloud: { rev: number; payload: string; summary: CloudSummary } | null = null;
 
-  /** Çözülmemiş bir çakışma var mı (Faz 2'de UI bunu sorar). */
+  /** Çözülmemiş bir çakışma var mı. */
   get hasConflict(): boolean {
     return this.blocked && this.pendingCloud !== null;
+  }
+
+  /** Çakışma ekranının göstereceği buluttaki kaydın özeti. */
+  get conflictSummary(): CloudSummary | null {
+    return this.pendingCloud?.summary ?? null;
+  }
+
+  /**
+   * Oturum başka bir hesaba geçtiğinde çağrılır. rev sayacı CİHAZDA tutulur ve
+   * eski hesaba aitti; yeni hesap için anlamsızdır. Sıfırlanmazsa yerel sayaç
+   * buluttakinden büyük görünüp "yerel güncel" sanılabilir ve diğer hesabın
+   * ilerlemesi sessizce ezilirdi. Sıfırlayıp dirty işaretleyince bir sonraki
+   * sync() iki tarafı da görüp kullanıcıya seçtirir.
+   */
+  resetForNewAccount(): void {
+    this.rev = 0;
+    this.dirty = true;
+    this.blocked = false;
+    this.pendingCloud = null;
+    this.lastUpload = 0;
   }
 
   private ref(uid: string) {
@@ -126,10 +155,24 @@ export class CloudSave {
       return ok ? 'uploaded' : 'disabled';
     }
 
-    const data = snap.data() as { payload?: unknown; rev?: unknown; schemaVersion?: unknown };
+    const data = snap.data() as {
+      payload?: unknown;
+      rev?: unknown;
+      schemaVersion?: unknown;
+      updatedAt?: { toMillis?: () => number };
+      summary?: { level?: unknown; coins?: unknown; collection?: unknown };
+    };
     const cloudRev = typeof data.rev === 'number' ? data.rev : 0;
     const payload = typeof data.payload === 'string' ? data.payload : null;
     const cloudSchema = typeof data.schemaVersion === 'number' ? data.schemaVersion : 0;
+    const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    const summary: CloudSummary = {
+      level: num(data.summary?.level),
+      coins: num(data.summary?.coins),
+      collection: num(data.summary?.collection),
+      // Sunucu damgası; henüz yazılmamışsa (yerel önbellek) 0 kalır.
+      updatedAtMs: typeof data.updatedAt?.toMillis === 'function' ? data.updatedAt.toMillis() : 0,
+    };
 
     // Daha yeni bir istemcinin yazdığı kayıt: migrate() bilmediği alanları
     // eleyip veriyi bozacağı için hiç dokunma.
@@ -147,7 +190,7 @@ export class CloudSave {
     // çakışma: karar kullanıcınındır, buluta yazma.
     if (this.dirty) {
       this.blocked = true;
-      this.pendingCloud = { rev: cloudRev, payload };
+      this.pendingCloud = { rev: cloudRev, payload, summary };
       return 'conflict';
     }
 

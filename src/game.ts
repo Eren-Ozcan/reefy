@@ -1884,6 +1884,20 @@ export class Game {
   eggList(): EggTier[] { return EGGS; }
   tankList(): TankDef[] { return TANKS; }
 
+  /**
+   * Hesap değiştikten sonra (bkz. firebase-app.ts linkWithGoogle -> switched)
+   * bulut kaydını yeni hesap için baştan karşılaştırır.
+   *
+   * rev sayacı cihazda tutulduğu ve eski hesaba ait olduğu için önce
+   * sıfırlanır; aksi halde yeni hesabın buluttaki ilerlemesi "eski" sanılıp
+   * sessizce ezilebilirdi.
+   */
+  async resyncCloudForNewAccount(): Promise<CloudSyncResult> {
+    this.cloud.resetForNewAccount();
+    this.cloudSync = await this.cloud.sync(this.save);
+    return this.cloudSync;
+  }
+
   syncSave(): void {
     this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
     persist(this.save);
