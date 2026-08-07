@@ -23,10 +23,12 @@ import {
   GoogleAuthProvider,
   getAuth,
   linkWithCredential,
+  onAuthStateChanged,
   signInAnonymously,
   signInWithCredential,
   type Auth,
   type AuthCredential,
+  type User,
 } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { FIREBASE_CONFIG, isFirebaseConfigured } from './firebase-config';
@@ -68,14 +70,45 @@ export function firebaseAuth(): Auth {
  * yapıldıysa bulut kaydı o oturum boyunca ölü kalmasın, ağ gelince bir
  * sonraki çağrı yeniden denesin.
  */
+/**
+ * Firebase'in diskteki kalıcı oturumu geri yüklemesini bekler.
+ *
+ * onAuthStateChanged ilk bildirimini ancak bu geri yükleme bittikten sonra
+ * yapar; o ana kadar `auth.currentUser` null'dur ve "oturum yok" sanılır.
+ */
+function waitForRestoredUser(auth: Auth): Promise<User | null> {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        unsubscribe();
+        resolve(user);
+      },
+      () => {
+        unsubscribe();
+        resolve(null);
+      },
+    );
+  });
+}
+
 export function ensureUid(): Promise<string | null> {
   if (!isFirebaseConfigured()) return Promise.resolve(null);
-  uidPromise ??= signInAnonymously(firebaseAuth())
-    .then((cred) => cred.user.uid)
-    .catch(() => {
-      uidPromise = null;
-      return null;
-    });
+  uidPromise ??= (async () => {
+    const auth = firebaseAuth();
+    // KRİTİK: signInAnonymously()'yi doğrudan çağırmak, kalıcı oturum diskten
+    // geri yüklenmeden önce çalıştığı için HER AÇILIŞTA YENİ bir anonim
+    // kullanıcı yaratıyordu; bağlanmış Google hesabı öksüz kalıyor ve bulut
+    // kaydı geri dönen oyuncuda hiç çalışmıyordu (emülatörde yakalandı).
+    // Önce mevcut oturumun geri yüklenmesini bekle.
+    const restored = await waitForRestoredUser(auth);
+    if (restored) return restored.uid;
+    const cred = await signInAnonymously(auth);
+    return cred.user.uid;
+  })().catch(() => {
+    uidPromise = null;
+    return null;
+  });
   return uidPromise;
 }
 
@@ -118,6 +151,34 @@ export type LinkResult =
  * Buradaki anonim kullanıcı yetim kalır (silinmez) — üzerindeki yerel kayıt
  * zaten cihazda duruyor ve çakışma akışı devreye girerse kullanıcıya sorulur.
  */
+/**
+ * Google kimlik bilgisini alır.
+ *
+ * Android'de eklenti öntanımlı olarak Credential Manager'ı kullanır; bu API
+ * yalnızca cihazda BU UYGULAMAYA daha önce yetki vermiş hesapları döndürür.
+ * Dolayısıyla ilk girişte hesap cihazda ekli olsa bile "No matching
+ * credentials" ile boş döner ve hesap seçici hiç açılmaz. Bu yüzden modern
+ * akış önce denenir, boş dönerse klasik seçiciye düşülür — aksi halde hiçbir
+ * oyuncu hesabını ilk kez bağlayamazdı.
+ */
+async function requestGoogleIdToken(): Promise<string | null> {
+  try {
+    const res = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+    if (res.credential?.idToken) return res.credential.idToken;
+  } catch {
+    /* yedek akışa düş */
+  }
+  try {
+    const res = await FirebaseAuthentication.signInWithGoogle({
+      skipNativeAuth: true,
+      useCredentialManager: false,
+    });
+    return res.credential?.idToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function linkWithGoogle(): Promise<LinkResult> {
   if (!isAccountLinkingAvailable()) {
     return { ok: false, msg: t('Hesap bağlama mobil sürümde kullanılabilir.') };
@@ -127,8 +188,7 @@ export async function linkWithGoogle(): Promise<LinkResult> {
 
     // skipNativeAuth: yalnızca hesap seçici + kimlik bilgisi; oturumu JS SDK açar
     // (bkz. capacitor.config.ts'teki gerekçe).
-    const res = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
-    const idToken = res.credential?.idToken;
+    const idToken = await requestGoogleIdToken();
     if (!idToken) return { ok: false, msg: t('Google girişi tamamlanmadı.') };
 
     const credential: AuthCredential = GoogleAuthProvider.credential(idToken);
