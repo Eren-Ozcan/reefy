@@ -103,7 +103,13 @@ export interface IAPPack {
   pearls: number;
   coins?: number;
   bonus: string;
-  priceLabel: string; // gerçek fiyat mağaza API'sinden gelir; bu etiket tanıtım amaçlı
+  /**
+   * Mağazaya ulaşılamadığında gösterilecek YEDEK etiket. Gerçek fiyat
+   * IAPProvider.loadPrices() ile mağazadan çekilir ve oyuncunun ülkesine/para
+   * birimine göre gelir; buradaki değer yalnızca web önizlemesinde ve mağaza
+   * cevap vermediğinde görünür.
+   */
+  priceLabel: string;
   emoji: string;
   removesAds?: boolean; // true ise inci/altın değil, kalıcı "reklamları kaldır" hakkı verir
 }
@@ -112,16 +118,23 @@ export interface IAPPack {
 // olarak alt çizgi kullanır (tire desteklenmiyor) — bu id'ler RevenueCat/Play
 // Billing'de mağazadaki ürün kimlikleriyle birebir eşleşmeli.
 export const IAP_PACKS: IAPPack[] = [
-  { id: 'pearls_s',  name: 'Avuç İnci',      pearls: 60,   bonus: '',          priceLabel: '₺39,99',  emoji: '🫧' },
-  { id: 'pearls_m',  name: 'Kese İnci',      pearls: 170,  bonus: '+%15 bonus', priceLabel: '₺99,99',  emoji: '👛' },
-  { id: 'pearls_l',  name: 'Sandık İnci',    pearls: 450,  bonus: '+%25 bonus', priceLabel: '₺229,99', emoji: '🧰' },
-  { id: 'pearls_xl', name: 'Hazine İnci',    pearls: 1000, bonus: '+%40 bonus', priceLabel: '₺449,99', emoji: '💎' },
-  { id: 'starter',   name: 'Başlangıç Paketi', pearls: 80, coins: 5000, bonus: '+5.000 altın', priceLabel: '₺49,99', emoji: '🎁' },
-  { id: 'remove_ads', name: 'Reklamları Kaldır', pearls: 0, bonus: 'Geçiş reklamlarını kalıcı olarak kaldırır', priceLabel: '₺79,99', emoji: '🚫', removesAds: true },
+  { id: 'pearls_s',  name: 'Avuç İnci',      pearls: 60,   bonus: '',          priceLabel: '$2.99',  emoji: '🫧' },
+  { id: 'pearls_m',  name: 'Kese İnci',      pearls: 170,  bonus: '+%15 bonus', priceLabel: '$6.99',  emoji: '👛' },
+  { id: 'pearls_l',  name: 'Sandık İnci',    pearls: 450,  bonus: '+%25 bonus', priceLabel: '$14.99', emoji: '🧰' },
+  { id: 'pearls_xl', name: 'Hazine İnci',    pearls: 1000, bonus: '+%40 bonus', priceLabel: '$29.99', emoji: '💎' },
+  { id: 'starter',   name: 'Başlangıç Paketi', pearls: 80, coins: 5000, bonus: '+5.000 altın', priceLabel: '$3.99', emoji: '🎁' },
+  { id: 'remove_ads', name: 'Reklamları Kaldır', pearls: 0, bonus: 'Geçiş reklamlarını kalıcı olarak kaldırır', priceLabel: '$5.99', emoji: '🚫', removesAds: true },
 ];
 
 export interface IAPProvider {
   packs(): IAPPack[];
+  /**
+   * Mağazadan yerelleştirilmiş fiyatları çeker. Başarılı olursa packs() bundan
+   * sonra oyuncunun kendi para biriminde fiyat döndürür (₺, €, ₹ — Play/App Store
+   * ne diyorsa). Çağrılmazsa ya da mağazaya ulaşılamazsa IAP_PACKS'teki yedek
+   * etiket görünmeye devam eder; yani asla boş fiyat gösterilmez.
+   */
+  loadPrices(): Promise<void>;
   /** Satın alma akışı. Web sürümünde bilgilendirme döner; native pakette mağazaya bağlanır. */
   purchase(packId: string): Promise<{ ok: boolean; msg: string; grantPearls?: number; grantCoins?: number; grantRemovesAds?: boolean }>;
   readonly storeLabel: string;
@@ -130,6 +143,7 @@ export interface IAPProvider {
 export class StubIAP implements IAPProvider {
   readonly storeLabel = t('Web önizleme');
   packs(): IAPPack[] { return IAP_PACKS; }
+  loadPrices(): Promise<void> { return Promise.resolve(); }
   purchase(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
@@ -175,6 +189,8 @@ export class RevenueCatIAP implements IAPProvider {
   readonly storeLabel: string;
   private configured = false;
   private offeringsPromise: ReturnType<typeof Purchases.getOfferings> | null = null;
+  /** packId -> mağazanın verdiği yerelleştirilmiş fiyat metni (ör. "₺39,99", "$2.99") */
+  private livePrices: Record<string, string> = {};
 
   constructor(appUserId: string) {
     this.storeLabel = Capacitor.getPlatform() === 'ios' ? 'App Store' : 'Google Play';
@@ -185,7 +201,32 @@ export class RevenueCatIAP implements IAPProvider {
     });
   }
 
-  packs(): IAPPack[] { return IAP_PACKS; }
+  /**
+   * Mağazadan fiyat geldiyse onu kullanır. Miktarlar (inci/altın) bilerek
+   * IAP_PACKS'te kalır — mağazadan yalnızca FİYAT alınır, verilecek miktar
+   * hiçbir zaman dışarıdan gelmez.
+   */
+  packs(): IAPPack[] {
+    return IAP_PACKS.map((p) => {
+      const live = this.livePrices[p.id];
+      return live ? { ...p, priceLabel: live } : p;
+    });
+  }
+
+  async loadPrices(): Promise<void> {
+    if (!this.configured) return;
+    try {
+      this.offeringsPromise ??= Purchases.getOfferings();
+      const current = (await this.offeringsPromise).current;
+      if (!current) return;
+      for (const pkg of current.availablePackages) {
+        const price = pkg.product?.priceString;
+        if (price) this.livePrices[pkg.identifier] = price;
+      }
+    } catch {
+      /* fiyat çekilemedi — yedek etiketler kalır, mağaza yine de açılır */
+    }
+  }
 
   private async findStorePackage(packId: string): Promise<PurchasesPackage | null> {
     if (!this.offeringsPromise) this.offeringsPromise = Purchases.getOfferings();

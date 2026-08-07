@@ -245,6 +245,8 @@ export class UI {
    * uyarısının geçerli olduğu ana kadar (epoch ms). Bkz. handleBack.
    */
   private exitArmedUntil = 0;
+  /** Mağaza fiyatları bir kez çekildi mi (bkz. renderShop 'pearls' dalı) */
+  private pricesLoaded = false;
 
   constructor(game: Game) {
     this.game = game;
@@ -664,6 +666,16 @@ export class UI {
     this.bindShopTabs(el);
     const bodyEl = el.querySelector<HTMLElement>('.panel-body')!;
     if (keepScroll > 0) bodyEl.scrollTop = keepScroll;
+    // İnci sekmesindeki fiyatlar oyuncunun kendi para biriminde olmalı. Mağaza
+    // cevabı BEKLENMEZ — panel yedek etiketlerle hemen açılır, fiyatlar gelince
+    // sekme hâlâ açıksa tazelenir. Bir kez yüklenir; sekmeler arasında gidip
+    // gelmek yeniden istek yapmaz.
+    if (tab === 'pearls' && !this.pricesLoaded) {
+      void this.game.services.iap.loadPrices().then(() => {
+        this.pricesLoaded = true;
+        if (this.panelHost.contains(el)) this.renderShop('pearls', bodyEl.scrollTop);
+      });
+    }
 
     el.querySelectorAll<HTMLButtonElement>('.buy-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
