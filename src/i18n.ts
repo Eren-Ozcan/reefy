@@ -690,6 +690,30 @@ const EN: Record<string, string> = {
   '✅ +%5 satış bonusu': '✅ +5% sale bonus',
   '👤 Oyuncu adı': '👤 Player name', 'Kaydet': 'Save',
   '🎮 Hesap': '🎮 Account', 'Giriş yap': 'Sign in',
+  // Bulut kaydı (ayarlar satırı + hesap bağlama + çakışma ekranı)
+  '☁️ Bulut kaydı': '☁️ Cloud save', 'Bağla': 'Link', 'Bağlı': 'Linked',
+  'Bağlı: {who}': 'Linked: {who}', 'Mobil sürümde': 'On mobile',
+  'Google hesabına bağlanılıyor…': 'Connecting to your Google account…',
+  'Hesap bağlama mobil sürümde kullanılabilir.': 'Account linking is available in the mobile version.',
+  'Google girişi tamamlanmadı.': 'Google sign-in was not completed.',
+  'Google girişi başarısız oldu, daha sonra tekrar dene.': 'Google sign-in failed, please try again later.',
+  'Hesabın bağlandı — ilerlemen artık diğer cihazlarında da açılabilir. ☁️':
+    'Your account is linked — your progress can now be opened on your other devices. ☁️',
+  'Bu hesabın kayıtlı bir ilerlemesi var, ona geçildi.':
+    'This account already has saved progress, switched to it.',
+  'Giriş yapıldı.': 'Signed in.',
+  'İlerlemen geri yüklendi, yeniden başlatılıyor…': 'Your progress was restored, restarting…',
+  '☁️ İki ilerleme bulundu': '☁️ Two progressions found',
+  'Bu hesapta başka bir cihazda da oynamışsın. Hangisiyle devam etmek istersin? Seçmediğin kayıt silinmez, buluttaki yerinde kalır.':
+    'You have also played on another device with this account. Which one do you want to continue with? The one you do not pick is not deleted, it stays in the cloud.',
+  'Bulut': 'Cloud', 'Bu cihaz': 'This device', 'Bunu kullan': 'Use this one',
+  'Seviye {n}': 'Level {n}', '{n} altın': '{n} coins', '{n} tür': '{n} species',
+  'şu an': 'just now', 'az önce': 'moments ago', 'bilinmiyor': 'unknown',
+  '{n} dakika önce': '{n} minutes ago', '{n} saat önce': '{n} hours ago', '{n} gün önce': '{n} days ago',
+  'Buluttaki ilerleme yükleniyor…': 'Loading the progress from the cloud…',
+  'Bu cihazdaki ilerleme buluta yazıldı.': 'The progress on this device was written to the cloud.',
+  'Kayıt okunamadı, bu cihazdaki ilerleme korundu.':
+    'The save could not be read, the progress on this device was kept.',
   '🎵 Müzik': '🎵 Music', 'Açık': 'On', 'Kapalı': 'Off',
   '🔊 Ses Efektleri': '🔊 Sound Effects',
   '📤 Arkadaşlarına anlat': '📤 Tell your friends', 'Paylaş': 'Share',

@@ -9,6 +9,7 @@ import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Speci
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
 import { getLang, setLang, t as tt } from './i18n';
+import { isAccountLinkingAvailable, isLinked, linkedLabel, linkWithGoogle } from './firebase-app';
 import type { FishSave } from './save';
 
 function hex(c: number): string {
@@ -308,8 +309,13 @@ export class UI {
     window.addEventListener('resize', () => this.syncBottomInset());
 
     this.refreshHUD();
-    this.showWelcome();
-    this.runTutorial();
+    // Çakışma her şeyin önüne geçer: oyuncu hangi ilerlemeyle devam edeceğini
+    // seçmeden oynamaya başlarsa, seçmediği taraf üstüne yazılmış olabilir.
+    if (this.game.cloudSync === 'conflict') this.showCloudConflict();
+    else {
+      this.showWelcome();
+      this.runTutorial();
+    }
   }
 
   /** Zemin çizgisinin alt bar'ın üst kenarının bu kadar altına inmesine izin verilir: dekorun
@@ -1138,6 +1144,7 @@ export class UI {
         <span class="name-edit"><input id="name-input" value="${s.playerName}" maxlength="16"/><button class="tgl" id="name-save">${tt('Kaydet')}</button></span></div>
       <div class="set-row"><span>${tt('🎮 Hesap')}</span>
         <button class="tgl" id="auth-btn">${identity ? this.game.services.auth.platformLabel : tt('Giriş yap')}</button></div>
+      <div class="set-row"><span>${tt('☁️ Bulut kaydı')}</span>${this.cloudRowHTML()}</div>
       <hr/>
       <div class="set-row"><span>${tt('🌐 dil / language')}</span>
         <span class="lang-toggle">
@@ -1170,6 +1177,7 @@ export class UI {
     el.querySelector('#auth-btn')!.addEventListener('click', () => {
       void this.game.services.auth.signIn().then((res) => this.toast(res.msg));
     });
+    el.querySelector('#cloud-btn')?.addEventListener('click', () => void this.onLinkCloud());
     el.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const l = btn.dataset.lang as 'tr' | 'en';
@@ -1200,6 +1208,104 @@ export class UI {
         }
       });
     });
+  }
+
+  // ---------- bulut kaydı ----------
+
+  private cloudRowHTML(): string {
+    if (!isAccountLinkingAvailable()) {
+      return `<span class="set-note">${tt('Mobil sürümde')}</span>`;
+    }
+    if (isLinked()) {
+      const who = linkedLabel();
+      return `<span class="set-note ok">${who ? tt('Bağlı: {who}', { who }) : tt('Bağlı')}</span>`;
+    }
+    return `<button class="tgl" id="cloud-btn">${tt('Bağla')}</button>`;
+  }
+
+  /**
+   * "Bağla" akışı. switched=true dönerse seçilen hesabın zaten bir kaydı var
+   * demektir; o hesabın ilerlemesiyle bu cihazdakini karşılaştırmak için bulut
+   * senkronu baştan çalıştırılır ve çakışma çıkarsa karar kullanıcıya bırakılır.
+   */
+  private async onLinkCloud(): Promise<void> {
+    this.toast(tt('Google hesabına bağlanılıyor…'));
+    const res = await linkWithGoogle();
+    if (!res.ok) { audio.error(); this.toast(res.msg); return; }
+
+    audio.click();
+    this.toast(res.msg);
+
+    if (!res.switched) { this.renderSettings(); return; }
+
+    const outcome = await this.game.resyncCloudForNewAccount();
+    if (outcome === 'conflict') { this.showCloudConflict(); return; }
+    if (outcome === 'restored') {
+      // Sahne mevcut kayıttan kurulduğu için geri yükleme sonrası yeniden
+      // başlatmak, yarı güncellenmiş bir durumla oynamaktan güvenli.
+      this.toast(tt('İlerlemen geri yüklendi, yeniden başlatılıyor…'));
+      setTimeout(() => location.reload(), 1200);
+      return;
+    }
+    this.renderSettings();
+  }
+
+  /** İki ilerlemeyi yan yana koyup seçtirir. Otomatik birleştirme YAPILMAZ:
+   *  iki ekonomiyi harmanlamak dengeyi bozar ve istismara açar. */
+  showCloudConflict(): void {
+    const c = this.game.cloud.conflictSummary;
+    if (!c) return;
+    const s = this.game.save;
+    const when = c.updatedAtMs > 0 ? this.agoLabel(c.updatedAtMs) : tt('bilinmiyor');
+
+    const el = this.panelShell(tt('☁️ İki ilerleme bulundu'), `
+      <p class="card-desc">${tt('Bu hesapta başka bir cihazda da oynamışsın. Hangisiyle devam etmek istersin? Seçmediğin kayıt silinmez, buluttaki yerinde kalır.')}</p>
+      <div class="conflict-grid">
+        <div class="conflict-card">
+          <h3>☁️ ${tt('Bulut')}</h3>
+          <p>${tt('Seviye {n}', { n: c.level })}</p>
+          <p>${tt('{n} altın', { n: c.coins })}</p>
+          <p>${tt('{n} tür', { n: c.collection })}</p>
+          <p class="muted">${when}</p>
+          <button class="buy-btn" id="keep-cloud">${tt('Bunu kullan')}</button>
+        </div>
+        <div class="conflict-card">
+          <h3>📱 ${tt('Bu cihaz')}</h3>
+          <p>${tt('Seviye {n}', { n: s.level })}</p>
+          <p>${tt('{n} altın', { n: s.coins })}</p>
+          <p>${tt('{n} tür', { n: s.collection.length })}</p>
+          <p class="muted">${tt('şu an')}</p>
+          <button class="buy-btn" id="keep-local">${tt('Bunu kullan')}</button>
+        </div>
+      </div>
+    `);
+
+    el.querySelector('#keep-cloud')!.addEventListener('click', () => {
+      audio.click();
+      if (this.game.cloud.resolveKeepCloud(this.game.save)) {
+        this.toast(tt('Buluttaki ilerleme yükleniyor…'));
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        this.toast(tt('Kayıt okunamadı, bu cihazdaki ilerleme korundu.'));
+        this.closePanel();
+      }
+    });
+    el.querySelector('#keep-local')!.addEventListener('click', () => {
+      audio.click();
+      void this.game.cloud.resolveKeepLocal(this.game.save).then(() => {
+        this.toast(tt('Bu cihazdaki ilerleme buluta yazıldı.'));
+      });
+      this.closePanel();
+    });
+  }
+
+  private agoLabel(ms: number): string {
+    const mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
+    if (mins < 1) return tt('az önce');
+    if (mins < 60) return tt('{n} dakika önce', { n: mins });
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return tt('{n} saat önce', { n: hours });
+    return tt('{n} gün önce', { n: Math.round(hours / 24) });
   }
 
   // ---------- modallar ----------
