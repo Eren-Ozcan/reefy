@@ -5,7 +5,7 @@
 // Google AdMob'a bağlanır. Oyun kodu yalnızca AdsProvider arayüzünü kullanır.
 
 import { Capacitor } from '@capacitor/core';
-import { AdMob, RewardAdPluginEvents } from '@capacitor-community/admob';
+import { AdMob, AdmobConsentStatus, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { t } from './i18n';
 import type { SaveData } from './save';
 
@@ -26,9 +26,39 @@ export const REWARDED_AD_PEARLS = 5;
 const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // akvaryum geçişlerinde art arda reklam basmasın
 const REWARDED_COOLDOWN_MS = 30 * 1000;         // yanlışlıkla çift tıklamayı önle
 
+/** Soğuma sayacının diskteki yeri. Yalnızca bellekte tutulduğunda oyuncu uygulamayı
+ *  kapatıp açtığında sıfırlanıyordu; her soğuk açılış yeni bir reklam hakkı doğuruyordu.
+ *  Kayıt dosyasından (SaveData) bilerek ayrı: bu oyun ilerlemesi değil, silinmesi
+ *  zararsız bir yan bilgi. */
+const INTERSTITIAL_TS_KEY = 'reefy.ads.lastInterstitial';
+
+function loadLastInterstitial(): number {
+  try {
+    const raw = Number(localStorage.getItem(INTERSTITIAL_TS_KEY));
+    // Gelecekteki bir zaman damgası (cihaz saati geri alınmış) kalıcı kilide yol
+    // açmasın: geçersiz say, sıfırdan başlat.
+    return Number.isFinite(raw) && raw > 0 && raw <= Date.now() ? raw : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveLastInterstitial(ts: number): void {
+  try {
+    localStorage.setItem(INTERSTITIAL_TS_KEY, String(ts));
+  } catch {
+    /* özel mod / kota — reklam sayacı uğruna oyun akışı bozulmasın */
+  }
+}
+
 export interface AdsProvider {
-  /** Doğal bir mola noktasında (örn. akvaryum değişimi) çağrılır; sessizce no-op olabilir
-   * (soğuma süresi dolmadıysa, reklam hazır değilse veya "reklamları kaldır" satın alındıysa). */
+  /** Oyunun İÇİNDEKİ doğal bir mola noktasında (akvaryum değişimi, akvaryumun tamamen
+   * temizlenmesi) çağrılır; sessizce no-op olabilir (soğuma süresi dolmadıysa, reklam
+   * hazır değilse veya "reklamları kaldır" satın alındıysa).
+   *
+   * Uygulama açılışından ÇAĞIRILMAZ: AdMob açılışta/öne gelişte geçiş reklamını
+   * yasaklıyor, o senaryonun izin verilen formatı ayrı bir "App Open" birimi —
+   * kullandığımız @capacitor-community/admob sürümünde o format yok. */
   maybeShowInterstitial(): void;
   /** Oyuncunun bilerek başlattığı ödüllü reklam akışı. */
   showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }>;
@@ -47,7 +77,7 @@ export class StubAds implements AdsProvider {
 export class AdMobAds implements AdsProvider {
   private ready = false;
   private interstitialReady = false;
-  private lastInterstitial = 0;
+  private lastInterstitial = loadLastInterstitial();
   private lastRewarded = 0;
 
   constructor(private save: SaveData) {
@@ -58,8 +88,27 @@ export class AdMobAds implements AdsProvider {
     return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
   }
 
+  /** GDPR/UMP onam akışı: AB/İngiltere trafiğinde reklam isteği ATILMADAN ÖNCE
+   *  onam sorulmak zorunda. Onam alınamazsa (ya da SDK hata verirse) reklamsız
+   *  devam edilir — oyunun açılışı hiçbir koşulda buna takılmaz. */
+  private async requestConsent(): Promise<boolean> {
+    try {
+      let info = await AdMob.requestConsentInfo();
+      if (info.status === AdmobConsentStatus.REQUIRED && info.isConsentFormAvailable) {
+        info = await AdMob.showConsentForm();
+      }
+      return info.canRequestAds;
+    } catch {
+      return false;
+    }
+  }
+
   private async setup(): Promise<void> {
     try {
+      if (!(await this.requestConsent())) {
+        this.ready = false;
+        return;
+      }
       await AdMob.initialize({});
       this.ready = true;
       if (!this.save.adsRemoved) void this.loadInterstitial();
@@ -82,6 +131,7 @@ export class AdMobAds implements AdsProvider {
     const now = Date.now();
     if (now - this.lastInterstitial < INTERSTITIAL_COOLDOWN_MS) return;
     this.lastInterstitial = now;
+    saveLastInterstitial(now);
     this.interstitialReady = false;
     void AdMob.showInterstitial()
       .catch(() => {})
