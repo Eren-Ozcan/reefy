@@ -316,6 +316,9 @@ export class UI {
     window.addEventListener('resize', () => this.syncBottomInset());
 
     this.refreshHUD();
+    // Geç gelen senkron için ÖNCE abone ol, sonra kontrol et: sonuç bu iki satır
+    // arasında düşerse abonelik kaçar ve çakışma hiç gösterilmez.
+    this.game.onLateConflict = () => this.showCloudConflict();
     // Çakışma her şeyin önüne geçer: oyuncu hangi ilerlemeyle devam edeceğini
     // seçmeden oynamaya başlarsa, seçmediği taraf üstüne yazılmış olabilir.
     if (this.game.cloudSync === 'conflict') this.showCloudConflict();
@@ -1326,6 +1329,9 @@ export class UI {
     el.querySelector('#keep-cloud')!.addEventListener('click', () => {
       audio.click();
       if (this.game.cloud.resolveKeepCloud(this.game.save)) {
+        // Sahne hâlâ eski kaydın balıklarını tutuyor; yeniden yükleme öncesi
+        // hiçbir yazma geçmemeli (bkz. Game.freezeForRestore).
+        this.game.freezeForRestore();
         this.toast(tt('Buluttaki ilerleme yükleniyor…'));
         setTimeout(() => location.reload(), 1000);
       } else {

@@ -104,6 +104,17 @@ export class Game {
   readonly cloud = new CloudSave();
   /** Açılıştaki bulut senkronunun sonucu — UI bilgilendirme için okur. */
   cloudSync: CloudSyncResult = 'disabled';
+  /**
+   * Açılış senkronunun kaç ms bekletebileceği. Senkronun KENDİ bütçesi değildir
+   * (o çok daha uzun, bkz. cloud-save.ts): bu yalnızca "oyuncuyu ne kadar
+   * bekletiriz" sorusunun cevabı. Aşılırsa oyun açılır, sonuç geç gelince
+   * handleLateCloudSync() işler.
+   */
+  static readonly CLOUD_STARTUP_GRACE_MS = 3000;
+  /** Mühleti aşan senkron 'conflict' getirirse UI'ın çakışma ekranını açması için. */
+  onLateConflict?: () => void;
+  /** Buluttan geri yükleme sonrası yeniden yükleme bekleniyor — bkz. freezeForRestore(). */
+  private frozen = false;
 
   constructor() {
     this.save = loadSave();
@@ -259,10 +270,26 @@ export class Game {
     this.sandFxG.mask = this.sandMaskG;
     this.app.stage.addChild(this.world);
 
-    this.cloudSync = await cloudSyncPromise;
+    // Açılış senkronu için KISA bir mühlet. Senkronun kendi bütçesi bundan çok
+    // daha cömerttir (bkz. cloud-save.ts AUTH_TIMEOUT_MS): oyuncuyu bekletmekle
+    // senkronu öldürmek aynı şey değil. Eskiden tek bir 3 sn'lik süre iki işi
+    // birden yapıyordu ve süre aşılınca senkron kalıcı olarak iptal oluyordu —
+    // ölçümde ensureUid 2946 ms sürdü, yani sınırın hemen altındaydı.
+    const PENDING = Symbol('pending');
+    const raced = await Promise.race([
+      cloudSyncPromise,
+      new Promise<typeof PENDING>((r) => setTimeout(() => r(PENDING), Game.CLOUD_STARTUP_GRACE_MS)),
+    ]);
+    if (raced === PENDING) void cloudSyncPromise.then((res) => this.handleLateCloudSync(res));
+    else this.cloudSync = raced;
+
     // Oyuncu dokümanı ancak SENKRON SONRASI yayımlanır: buluttan geri yüklenen
     // kayıt kendi friendCode'unu getirir; önce yazılsaydı arkadaşların gördüğü
     // kod ile oyuncunun kodu ayrışırdı (bkz. services.ts publishPlayer).
+    //
+    // Senkron mühleti aşıp geç gelirse burada ESKİ kod yayımlanır; ama geç gelen
+    // bir geri yükleme sayfayı yeniden yüklediği için bir sonraki açılışta doğru
+    // kodla yeniden yayımlanır — sapma geçicidir ve kendini düzeltir.
     void this.services.social.publishPlayer?.();
 
     // Kayıttaki bilinmeyen dekor kimliklerini ayıkla (sürüm değişikliklerine karşı koruma)
@@ -1740,16 +1767,68 @@ export class Game {
    * sıfırlanır; aksi halde yeni hesabın buluttaki ilerlemesi "eski" sanılıp
    * sessizce ezilebilirdi.
    */
+  /**
+   * Buluttan kayıt uygulandıktan sonra, sayfa yeniden yüklenene dek YEREL
+   * YAZMALARI DURDURUR.
+   *
+   * Gerekçesi syncSave()'in ilk satırı: balık listesi kayıttan değil SAHNEDEN
+   * yeniden kurulur. Oturum ortasında yapılan bir geri yüklemede sahne hâlâ
+   * ESKİ kaydın balıklarını tutuyor olur; tek bir syncSave() çağrısı yeni
+   * indirilen balıkları eskileriyle ezer. location.reload() beforeunload'ı
+   * tetiklediği için bu çağrı KAÇINILMAZDIR — emülatörde birebir yaşandı:
+   * altın ve koleksiyon indi, 5 balık 2'ye düştü. Üstelik aynı fonksiyon
+   * markDirty()+maybeUpload() çağırdığından ezilmiş liste buluta da yazılıp
+   * diğer cihazın balıklarını silebilirdi.
+   */
+  freezeForRestore(): void {
+    this.frozen = true;
+    // İndirilen kaydı HEMEN diske yaz: applyCloud yalnızca bellekteki nesneyi
+    // değiştirir ve yeniden yükleme diskten okur — yazılmazsa geri yükleme
+    // sessizce kaybolur (emülatörde birebir yaşandı).
+    persist(this.save);
+  }
+
+  /**
+   * Açılış mühletini (CLOUD_STARTUP_GRACE_MS) AŞTIKTAN sonra gelen senkron
+   * sonucu. Oyun bu noktada çoktan oynanabilir durumdadır.
+   *
+   * Eskiden böyle bir yol yoktu: mühlet aşılınca sonuç 'disabled' sayılıp
+   * atılıyordu ve açılış senkronu oturum başına bir kez çalıştığı için oyuncu
+   * ilerlemesini BİR DAHA hiç görmüyordu.
+   */
+  private handleLateCloudSync(res: CloudSyncResult): void {
+    this.cloudSync = res;
+    if (res === 'restored') {
+      // Sahne eski kayıttan kuruldu. Yeniden yükleme hem doğru sahneyi kurar
+      // hem de init()'teki ayıklama/doğrulama adımlarını indirilen kayda
+      // uygular — geç gelen veri o adımları atlamış olmamalı.
+      this.freezeForRestore();
+      location.reload();
+      return;
+    }
+    if (res === 'conflict') this.onLateConflict?.();
+  }
+
   async resyncCloudForNewAccount(): Promise<CloudSyncResult> {
     this.cloud.resetForNewAccount();
     this.cloudSync = await this.cloud.sync(this.save);
+    // Geri yükleme uygulandı: sahne artık bayat, hiçbir şey yazılmamalı.
+    if (this.cloudSync === 'restored') this.freezeForRestore();
     return this.cloudSync;
   }
 
   syncSave(): void {
-    this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
+    // Geri yükleme sonrası sahne BAYATTIR (hâlâ eski kaydın balıklarını tutar),
+    // bu yüzden balık listesi ondan yeniden kurulmaz. persist() yine de çalışır:
+    // indirilen kaydı diske yazan TEK yer burasıdır, yeniden yükleme onu okur.
+    if (!this.frozen) {
+      this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
+    }
     persist(this.save);
     this.services.social.updateScore?.(this.save);
+    // Dondurulmuşken buluta yazma: veri zaten buluttan geldi, rev'i boşuna
+    // ilerletmek diğer cihazı gereksiz yere "geride" gösterir.
+    if (this.frozen) return;
     // Yerel kayıt her zaman anında yazılır; buluta yazma kotayı korumak için
     // kısıtlıdır (bkz. cloud-save.ts UPLOAD_THROTTLE_MS).
     this.cloud.markDirty();
