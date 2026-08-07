@@ -29,8 +29,6 @@ const DIRT_DELAY_1: [number, number] = [120_000, 150_000];
 const DIRT_DELAY_2: [number, number] = [150_000, 180_000];
 const DIRT_DELAY_3: [number, number] = [400_000, 500_000];
 
-const APP_OPEN_AD_DELAY_MS = 4000; // reklam SDK'sının yüklenmesine fırsat tanımak için açılışta bekleme
-
 /** İki rengi karıştırır (a=0 -> base, a=1 -> over). Yarı saydam katmanları önceden
  *  hesaplamak için: arkaplan düz renk olduğu sürece sonuç gerçek alfa karışımıyla aynıdır. */
 function blend(base: number, over: number, a: number): number {
@@ -344,9 +342,10 @@ export class Game {
     });
     window.addEventListener('beforeunload', () => this.syncSave());
 
-    // Açılış reklamı: SDK'nın reklamı önceden yükleyebilmesi için kısa bir gecikmeyle
-    // denenir (interstitial cooldown zaten art arda açılışlarda tekrar basmasını engeller).
-    window.setTimeout(() => this.services.ads.maybeShowInterstitial(), APP_OPEN_AD_DELAY_MS);
+    // Burada BİLEREK açılış reklamı yok: AdMob uygulama açılışında geçiş
+    // (interstitial) reklamı göstermeyi yasaklıyor ve bu "izin verilmeyen
+    // uygulama" kategorisinde. Reklam yalnızca oyunun içindeki doğal molalarda
+    // çıkar (akvaryum değişimi, akvaryumun tamamen temizlenmesi).
   }
 
   // ---------- sahne ----------
@@ -1138,32 +1137,32 @@ export class Game {
 
   // ---------- Temizlik reklamı (oturum başına bir kez) ----------
   //
-  // Reklam, uygulamanın SIFIRDAN açıldığı oturumda, açılışta ekranda duran
-  // lekelerden RASTGELE birinde tetiklenir. İki alan da bilerek kayda
-  // yazılmaz: sayaçların bellekte olması "yalnızca taze açılışta" kuralını
-  // yapısal olarak garanti eder — arka plandan dönmek yeni bir oturum saymaz.
+  // Temizlik reklamı yalnızca AKVARYUM TAMAMEN TEMİZLENDİĞİNDE çıkar: bu,
+  // oyuncunun başladığı işi bitirdiği doğal mola noktasıdır. Önceki sürüm
+  // rastgele bir leke sayısında tetikliyordu; bu, oyuncu daha temizliğin
+  // ORTASINDAYKEN reklam basmak demekti ve Google Play'in "Better Ads
+  // Experiences" politikasının doğrudan yasakladığı durum bu.
   //
-  // Önceki sürüm "tanktaki son leke temizlenince" tetikliyordu; kir sürekli
-  // yeniden oluştuğu için bu, tek bir oturumda defalarca tetikleniyordu.
+  // Alan bilerek kayda yazılmaz: bellekte olması "yalnızca taze açılışta bir
+  // kez" kuralını yapısal olarak garanti eder — arka plandan dönmek yeni bir
+  // oturum saymaz. Bu sınır olmadan, kir sürekli yeniden oluştuğu için tek bir
+  // oturumda defalarca tetiklenirdi.
 
-  /** Kaçıncı temizlikte reklam gösterileceği; 0 = bu oturumda artık gösterilmeyecek. */
-  private cleanAdTarget = 0;
-  private cleanAdCount = 0;
+  /** Bu oturumda "tamamen temizlendi" reklamı hâlâ gösterilebilir mi. */
+  private cleanAdArmed = false;
 
-  /** Açılışta bir kez: ekrandaki leke sayısına göre rastgele bir hedef seçer. */
+  /** Açılışta bir kez: ekranda leke varsa bu oturum için hakkı açar. */
   private armCleanAd(): void {
     const spots = this.save.dirtSpots[this.save.activeTank]?.length ?? 0;
-    // Açılışta hiç leke yoksa tetikleyecek bir şey de yok; bu oturum atlanır.
-    this.cleanAdTarget = spots > 0 ? 1 + Math.floor(Math.random() * spots) : 0;
-    this.cleanAdCount = 0;
+    // Açılışta hiç leke yoksa temizlenecek bir şey de yok; bu oturum atlanır.
+    this.cleanAdArmed = spots > 0;
   }
 
-  /** Her başarılı temizlikte çağrılır; hedefe gelince reklamı bir kez dener. */
+  /** Her başarılı temizlikten SONRA çağrılır; akvaryumda leke kalmadıysa dener. */
   private countCleanForAd(): void {
-    if (this.cleanAdTarget <= 0) return;
-    this.cleanAdCount++;
-    if (this.cleanAdCount < this.cleanAdTarget) return;
-    this.cleanAdTarget = 0; // oturum başına tek sefer
+    if (!this.cleanAdArmed) return;
+    if ((this.save.dirtSpots[this.save.activeTank]?.length ?? 0) > 0) return;
+    this.cleanAdArmed = false; // oturum başına tek sefer
     this.services.ads.maybeShowInterstitial();
   }
 
@@ -1194,7 +1193,6 @@ export class Game {
     const spots = this.save.dirtSpots[this.save.activeTank]!;
     const s = spots[idx];
     spots.splice(idx, 1);
-    this.countCleanForAd();
     const { w, h } = this.bounds;
     const cx = s.fx * w, cy = s.fy * h;
     for (let k = 0; k < 9; k++) {
@@ -1222,6 +1220,9 @@ export class Game {
 
     this.syncSave();
     this.ui.refreshHUD();
+    // Reklam denemesi bu fonksiyonun EN SONUNDA: parçacık, ses, altın ve HUD
+    // güncellemesi önce uygulanır, reklam oyuncunun ödülünün üstüne binmesin.
+    this.countCleanForAd();
   }
 
   /** Aktif akvaryumdaki kir lekelerini çizer. */
