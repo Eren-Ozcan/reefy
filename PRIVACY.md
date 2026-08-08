@@ -1,5 +1,10 @@
 # Privacy Policy — Reefy
 
+> **This file is not the published policy.** The policy registered with Google
+> Play, and the only one kept up to date, is <https://yilkgames.com/privacy-policy/>.
+> This file stays here as the game-specific source that feeds that page — keep it
+> accurate, but publish nothing from it.
+
 _Last updated: 8 August 2026_
 
 Reefy is published by Yilk Games. This policy describes this game specifically;
