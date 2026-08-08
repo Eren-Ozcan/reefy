@@ -16,6 +16,28 @@ The main flow is verified on a real account (see Done). What is left:
       The emulator runs added more: a document under a first-pass test account
       on top of the account the final run used.
 
+### Privacy policy and Data Safety
+
+- [x] `PRIVACY.md` written (2026-08-08). The game had none at all. It covers the
+      automatic anonymous player ID, what the cloud save copies (and that the
+      ad-free entitlement deliberately is not restored), optional Google
+      linking, and the `players/{code}` record — the display name and score
+      behind a friend code are readable by anyone signed in who has that code,
+      which is the one genuinely public thing in the game and needs saying out
+      loud, since the name is free text the player types
+- [x] The studio-wide policy at <https://yilkgames.com/privacy-policy/> was
+      updated to match. It had claimed "Reefy does not show ads" and described
+      sign-in as Play Games Services for a leaderboard — both stale
+- [ ] **Play Console Data Safety form** — not filled for this game yet. When it
+      is: App activity (the save payload) collected/not shared; Personal info →
+      email + name, optional, only for players who link; Device or other IDs for
+      both ads and the anonymous UID; and answer Yes to "users can request
+      deletion" with the contact address, because there is no in-app delete
+- [ ] **No in-app "delete my cloud save" affordance.** Deletion goes through
+      email today, which satisfies Play but is a poor experience — and
+      `firestore.rules` denies `delete` on both collections, so honouring such a
+      request means doing it from the console
+
 ### Cloud save — remaining platforms
 
 The shared design (Firestore `saves/{uid}`, monotonic `rev` instead of device
