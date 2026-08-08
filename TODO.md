@@ -28,11 +28,22 @@ The main flow is verified on a real account (see Done). What is left:
 - [x] The studio-wide policy at <https://yilkgames.com/privacy-policy/> was
       updated to match. It had claimed "Reefy does not show ads" and described
       sign-in as Play Games Services for a leaderboard — both stale
-- [ ] **Play Console Data Safety form** — not filled for this game yet. When it
-      is: App activity (the save payload) collected/not shared; Personal info →
-      email + name, optional, only for players who link; Device or other IDs for
-      both ads and the anonymous UID; and answer Yes to "users can request
-      deletion" with the contact address, because there is no in-app delete
+- [x] **Play Console Data Safety form — done (2026-08-08).** Declared: the save
+      payload as App activity → other user-generated content (required, not
+      shared); email + name as Personal info, **optional**, only for players who
+      link; the anonymous player ID as Personal info → **User IDs** (required)
+      rather than Device IDs, because Play scopes device identifiers to the
+      device and an auth UID is an account identifier; the advertising ID as
+      Device or other IDs (required, shared, advertising); approximate location
+      (shared, advertising); and purchase history (optional, **shared** — this
+      game routes purchases through RevenueCat, unlike Little Grand Hotel).
+      Name carries a second purpose here that the sibling games do not need —
+      app functionality — because of the friend-code display name
+- [x] Declaring OAuth forced a second requirement: Play demands a **mandatory
+      account deletion URL** on the store listing, and the privacy policy does
+      not qualify (it must name the app, show the steps prominently, and state
+      what is kept and for how long). <https://yilkgames.com/account-deletion/>
+      was written for it; `#data-only` is the data-without-account variant
 - [ ] **No in-app "delete my cloud save" affordance.** Deletion goes through
       email today, which satisfies Play but is a poor experience — and
       `firestore.rules` denies `delete` on both collections, so honouring such a
