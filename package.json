@@ -19,7 +19,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "icons": "node tools/generate-icons.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
