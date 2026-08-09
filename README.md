@@ -24,6 +24,8 @@ A cozy aquarium game for Android and iOS. Collect fish, decorate tanks, feed and
 
 ## Development
 
+Requires Node 20+.
+
 ```bash
 npm install
 npm run dev        # run in the browser at localhost (Vite dev server)
