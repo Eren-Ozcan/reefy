@@ -36,9 +36,10 @@ npm test           # unit tests (vitest, jsdom)
 ```
 
 Tests cover the parts that fail silently rather than loudly: what the cloud save
-decides to keep or discard (`src/cloud-save.test.ts`) and which fields count as
-player progress (`src/save.test.ts`). Firestore is faked there — no network, no
-emulator needed.
+decides to keep or discard (`src/cloud-save.test.ts`), which fields count as
+player progress (`src/save.test.ts`), and the scene/cloud-restore race that
+once dropped fish mid-session (`src/game-sync.test.ts`). Firestore is faked
+there — no network, no emulator needed.
 
 ### Mobile builds
 
