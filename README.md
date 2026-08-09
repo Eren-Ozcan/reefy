@@ -2,6 +2,8 @@
 
 A cozy aquarium game for Android and iOS. Collect fish, decorate tanks, feed and care for your reef, and complete quests — all rendered in 2D with PixiJS and shipped as a native mobile app via Capacitor.
 
+See [`TODO.md`](TODO.md) for the current roadmap and known gaps.
+
 ## Features
 
 - **Fish & species system** — collect different species, each with its own look and behavior (`src/species.ts`, `src/fish.ts`)
