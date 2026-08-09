@@ -12,7 +12,7 @@ See [`TODO.md`](TODO.md) for the current roadmap and known gaps.
 - **Decorations** — customize tanks with decor items (`src/decor.ts`)
 - **Quests** — goal-driven progression (`src/quests.ts`)
 - **Offline saves** — progress is persisted locally (`src/save.ts`)
-- **Google Play Games integration** via `@openforge/capacitor-game-connect` (`src/services.ts`)
+- **Google Play Games integration** via `capacitor-game-connect-8` (`src/services.ts`)
 - **In-app purchases** via RevenueCat (`@revenuecat/purchases-capacitor`, `src/services.ts`) — falls back to a stub in the web preview
 - **Ads** via AdMob (`@capacitor-community/admob`, `src/ads.ts`) — interstitial on tank switches (rate-limited) and an opt-in rewarded ad for free pearls; purchasable "remove ads" IAP disables the interstitial. Falls back to a stub in the web preview
 - **Sound & music** (`src/audio.ts`)
