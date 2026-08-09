@@ -20,7 +20,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "icons": "node tools/generate-icons.mjs"
+    "icons": "node tools/generate-icons.mjs",
+    "smoke": "node test-reefy.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
