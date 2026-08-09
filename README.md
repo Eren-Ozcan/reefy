@@ -19,7 +19,7 @@ A cozy aquarium game for Android and iOS. Collect fish, decorate tanks, feed and
 
 - [PixiJS 8](https://pixijs.com/) for 2D rendering
 - TypeScript + Vite
-- [Capacitor 5](https://capacitorjs.com/) for the Android and iOS shells
+- [Capacitor 8](https://capacitorjs.com/) for the Android and iOS shells
 - Playwright for automated smoke testing (`test-reefy.mjs`)
 
 ## Development
