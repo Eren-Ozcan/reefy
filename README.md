@@ -33,6 +33,9 @@ npm install
 npm run dev        # run in the browser at localhost (Vite dev server)
 npm run build      # type-check + production build
 npm test           # unit tests (vitest, jsdom)
+npm run typecheck  # tsc only, no build
+npm run smoke      # Playwright screenshot walkthrough against a running dev server
+npm run icons      # regenerate app icons from tools/icon-src/*.svg
 ```
 
 Tests cover the parts that fail silently rather than loudly: what the cloud save
