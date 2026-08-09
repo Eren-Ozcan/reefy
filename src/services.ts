@@ -48,7 +48,7 @@ export class LocalAuth implements AuthProvider {
 
 /**
  * Native (Capacitor) paketlerde Apple Game Center (iOS) / Google Play Games (Android)
- * üzerinden gerçek giriş. @openforge/capacitor-game-connect eklentisini kullanır;
+ * üzerinden gerçek giriş. capacitor-game-connect-8 eklentisini kullanır;
  * eklentinin signIn() API'si her iki platformda da aynıdır, sadece etiket ve
  * PlayerIdentity.platform alanı ayrışır.
  *
