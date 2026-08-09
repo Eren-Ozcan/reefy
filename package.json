@@ -4,6 +4,13 @@
   "version": "0.2.0",
   "description": "A cozy aquarium game for Android and iOS — collect fish, decorate tanks, and care for your reef.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Eren-Ozcan/reefy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Eren-Ozcan/reefy/issues"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
