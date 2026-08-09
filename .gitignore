@@ -2,6 +2,9 @@ node_modules/
 dist/
 *.local
 .DS_Store
+Thumbs.db
+.vscode/
+*.log
 *.png
 
 # Private/local-only store & marketing assets (mirrored to private Eren-Ozcan/pictures repo)
