@@ -11,6 +11,9 @@
   "bugs": {
     "url": "https://github.com/Eren-Ozcan/reefy/issues"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
