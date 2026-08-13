@@ -1,12 +1,12 @@
-// Platform servisleri soyutlama katmanı.
+// Platform services abstraction layer.
 //
-// Web/geliştirme ortamında yerel (local) sağlayıcılar çalışır.
-// Capacitor ile paketlerken bu arayüzlerin native karşılıkları bağlanır:
-//   - Auth   -> Google Play Games Services / Apple Game Center (bağlandı, bkz. NativeGameAuth)
-//   - IAP    -> Google Play Billing / Apple StoreKit (örn. RevenueCat üzerinden)
-//   - Social -> arkadaş kodu doğrulaması ve arkadaş skorları Firebase/Firestore ile
-//              (bağlandı, bkz. FirebaseSocial); liderlik tablosundaki botlar hâlâ simüle
-// Oyun kodu yalnızca bu arayüzleri kullanır; sağlayıcı değişimi tek satırdır.
+// On web/dev, local providers run.
+// When packaged with Capacitor, the native counterparts of these interfaces are wired in:
+//   - Auth   -> Google Play Games Services / Apple Game Center (wired up, see NativeGameAuth)
+//   - IAP    -> Google Play Billing / Apple StoreKit (e.g. via RevenueCat)
+//   - Social -> friend code verification and friend scores via Firebase/Firestore
+//              (wired up, see FirebaseSocial); leaderboard bots are still simulated
+// Game code only uses these interfaces; swapping providers is a one-line change.
 
 import { Capacitor } from '@capacitor/core';
 import { CapacitorGameConnect } from 'capacitor-game-connect-8';
@@ -18,7 +18,7 @@ import { isFirebaseConfigured } from './firebase-config';
 import { t } from './i18n';
 import type { SaveData } from './save';
 
-// ---------- Kimlik / giriş ----------
+// ---------- Identity / sign-in ----------
 
 export interface PlayerIdentity {
   id: string;
@@ -47,21 +47,23 @@ export class LocalAuth implements AuthProvider {
 }
 
 /**
- * Native (Capacitor) paketlerde Apple Game Center (iOS) / Google Play Games (Android)
- * üzerinden gerçek giriş. capacitor-game-connect-8 eklentisini kullanır;
- * eklentinin signIn() API'si her iki platformda da aynıdır, sadece etiket ve
- * PlayerIdentity.platform alanı ayrışır.
+ * Real sign-in via Apple Game Center (iOS) / Google Play Games (Android) in
+ * native (Capacitor) builds. Uses the capacitor-game-connect-8 plugin;
+ * the plugin's signIn() API is identical on both platforms, only the label
+ * and the PlayerIdentity.platform field differ.
  *
- * Kurulum notları:
- *   - iOS: Xcode'da hedef uygulamaya "Game Center" capability'si eklenmeli
- *     (ios/App/App/App.entitlements zaten eklendi, capability'yi
- *     Xcode > Signing & Capabilities'ten açman pbxproj'a doğru şekilde bağlar)
- *     ve App Store Connect > Özellikler sekmesinden Game Center etkinleştirilmelidir.
- *   - Android: android/app/src/main/res/values/strings.xml içindeki
- *     game_services_project_id yer tutucusu, Play Console > Play Games Services
- *     ile alınan gerçek proje ID'siyle değiştirilmeli; aksi halde signIn() başarısız olur.
+ * Setup notes:
+ *   - iOS: the "Game Center" capability must be added to the target app in
+ *     Xcode (ios/App/App/App.entitlements already has it added; enabling the
+ *     capability from Xcode > Signing & Capabilities wires it into the pbxproj
+ *     correctly) and Game Center must be enabled from the App Store Connect >
+ *     Features tab.
+ *   - Android: the game_services_project_id placeholder in
+ *     android/app/src/main/res/values/strings.xml must be replaced with the
+ *     real project ID from Play Console > Play Games Services; otherwise
+ *     signIn() fails.
  *
- * Web'de bu sınıf hiç seçilmez; createServices() platforma göre seçer.
+ * Never selected on web; createServices() picks based on platform.
  */
 export class NativeGameAuth implements AuthProvider {
   readonly platformLabel: string;
@@ -81,7 +83,7 @@ export class NativeGameAuth implements AuthProvider {
     try {
       const res = await CapacitorGameConnect.signIn();
       this.identity = { id: res.player_id, name: res.player_name, platform: this.platform };
-      // Oyun içi isim/kimliği native oyuncu adıyla senkronla (yerel yedek olarak kalır).
+      // Sync in-game name/identity with the native player name (local value stays as fallback).
       this.save.playerName = res.player_name || this.save.playerName;
       return { ok: true, msg: t("{platform}'a giriş yapıldı: {name} 🎮", { platform: this.platformLabel, name: res.player_name }) };
     } catch {
@@ -90,12 +92,12 @@ export class NativeGameAuth implements AuthProvider {
   }
 }
 
-/** Yalnızca native (Capacitor) ortamda (iOS veya Android) çalışırken oyun platformu girişi kullanılabilir olur. */
+/** Game-platform sign-in is only available when running in a native (Capacitor) environment (iOS or Android). */
 export function isNativeGameAuthAvailable(): boolean {
   return Capacitor.isNativePlatform() && (Capacitor.getPlatform() === 'ios' || Capacitor.getPlatform() === 'android');
 }
 
-// ---------- Mikro ödemeler ----------
+// ---------- Micro-transactions ----------
 
 export interface IAPPack {
   id: string;
@@ -104,19 +106,19 @@ export interface IAPPack {
   coins?: number;
   bonus: string;
   /**
-   * Mağazaya ulaşılamadığında gösterilecek YEDEK etiket. Gerçek fiyat
-   * IAPProvider.loadPrices() ile mağazadan çekilir ve oyuncunun ülkesine/para
-   * birimine göre gelir; buradaki değer yalnızca web önizlemesinde ve mağaza
-   * cevap vermediğinde görünür.
+   * FALLBACK label shown when the store can't be reached. The real price is
+   * fetched from the store via IAPProvider.loadPrices() and reflects the
+   * player's country/currency; the value here is only shown in the web
+   * preview and when the store doesn't respond.
    */
   priceLabel: string;
   emoji: string;
-  removesAds?: boolean; // true ise inci/altın değil, kalıcı "reklamları kaldır" hakkı verir
+  removesAds?: boolean; // if true, grants a permanent "remove ads" entitlement instead of pearls/coins
 }
 
-// Not: id'ler Play Console'un "tek seferlik ürün" kimliği kısıtlamasına uygun
-// olarak alt çizgi kullanır (tire desteklenmiyor) — bu id'ler RevenueCat/Play
-// Billing'de mağazadaki ürün kimlikleriyle birebir eşleşmeli.
+// Note: ids use underscores (hyphens aren't supported), matching Play Console's
+// "one-time product" id restriction — these ids must match the store product
+// ids in RevenueCat/Play Billing exactly.
 export const IAP_PACKS: IAPPack[] = [
   { id: 'pearls_s',  name: 'Avuç İnci',      pearls: 60,   bonus: '',          priceLabel: '$2.99',  emoji: '🫧' },
   { id: 'pearls_m',  name: 'Kese İnci',      pearls: 170,  bonus: '+%15 bonus', priceLabel: '$6.99',  emoji: '👛' },
@@ -129,13 +131,13 @@ export const IAP_PACKS: IAPPack[] = [
 export interface IAPProvider {
   packs(): IAPPack[];
   /**
-   * Mağazadan yerelleştirilmiş fiyatları çeker. Başarılı olursa packs() bundan
-   * sonra oyuncunun kendi para biriminde fiyat döndürür (₺, €, ₹ — Play/App Store
-   * ne diyorsa). Çağrılmazsa ya da mağazaya ulaşılamazsa IAP_PACKS'teki yedek
-   * etiket görünmeye devam eder; yani asla boş fiyat gösterilmez.
+   * Fetches localized prices from the store. On success, packs() then returns
+   * prices in the player's own currency (₺, €, ₹ — whatever Play/App Store
+   * reports). If not called, or if the store can't be reached, the fallback
+   * label in IAP_PACKS keeps showing; the price is never shown blank.
    */
   loadPrices(): Promise<void>;
-  /** Satın alma akışı. Web sürümünde bilgilendirme döner; native pakette mağazaya bağlanır. */
+  /** Purchase flow. Returns an info message on web; connects to the store in native builds. */
   purchase(packId: string): Promise<{ ok: boolean; msg: string; grantPearls?: number; grantCoins?: number; grantRemovesAds?: boolean }>;
   readonly storeLabel: string;
 }
@@ -153,44 +155,45 @@ export class StubIAP implements IAPProvider {
 }
 
 /**
- * RevenueCat API anahtarları (public SDK key'ler — Stripe publishable key gibi
- * istemci tarafında gömülü olması güvenlidir, gizli tutulması gereken key değildir).
- * RevenueCat dashboard > Project Settings > API Keys üzerinden alınır.
- * Doldurulmadan (yer tutucu değerdeyken) RevenueCatIAP.configure() atlanır ve
- * satın alma denemeleri "mağazaya bağlanılamadı" hatası döner.
+ * RevenueCat API keys (public SDK keys — like a Stripe publishable key, it's
+ * safe to embed on the client and isn't a secret that needs to be hidden).
+ * Obtained from RevenueCat dashboard > Project Settings > API Keys.
+ * While unfilled (still a placeholder value), RevenueCatIAP.configure() is
+ * skipped and purchase attempts return a "couldn't connect to store" error.
  */
 const REVENUECAT_API_KEYS: { android: string; ios: string } = {
   android: 'goog_lRHfCAmAuwPZrEvwJtzktoNWCWy',
   ios: 'REPLACE_WITH_REVENUECAT_APPLE_API_KEY',
 };
 
-/** Yalnızca çalışılan platformun key'i doldurulmuş olması yeterli — Android ve iOS
- * birbirinden bağımsız olarak devreye girer, biri beklerken diğeri engellenmez. */
+/** Only the key for the currently running platform needs to be filled in — Android
+ * and iOS activate independently of each other, one waiting doesn't block the other. */
 function isRevenueCatConfigured(): boolean {
   const key = Capacitor.getPlatform() === 'ios' ? REVENUECAT_API_KEYS.ios : REVENUECAT_API_KEYS.android;
   return !key.startsWith('REPLACE_');
 }
 
 /**
- * Native (Capacitor) paketlerde RevenueCat üzerinden gerçek Google Play Billing /
- * Apple StoreKit satın alma akışı. IAP_PACKS.id değerleri, RevenueCat dashboard'da
- * tanımlanan "current offering"in paket (package) identifier'larıyla birebir eşleşmelidir.
+ * Real Google Play Billing / Apple StoreKit purchase flow via RevenueCat in
+ * native (Capacitor) builds. IAP_PACKS.id values must match the package
+ * identifiers of the "current offering" defined in the RevenueCat dashboard exactly.
  *
- * Kurulum notları:
- *   - RevenueCat'te bir proje oluştur, Google Play / App Store Connect ürünlerini
- *     (pearls-s, pearls-m, pearls-l, pearls-xl, starter) tanımla ve bunları bir
- *     "offering" altında paketle.
- *   - REVENUECAT_API_KEYS içindeki yer tutucuları RevenueCat dashboard'daki
- *     gerçek public API key'lerle değiştir.
- *   - grantPearls/grantCoins miktarları RevenueCat'ten değil, doğrudan IAP_PACKS'ten
- *     okunur; yani gerçek para karşılığı verilecek miktar hep bu dosyada kontrol altında kalır.
+ * Setup notes:
+ *   - Create a project in RevenueCat, define the Google Play / App Store Connect
+ *     products (pearls-s, pearls-m, pearls-l, pearls-xl, starter), and bundle
+ *     them under an "offering".
+ *   - Replace the placeholders in REVENUECAT_API_KEYS with the real public API
+ *     keys from the RevenueCat dashboard.
+ *   - grantPearls/grantCoins amounts are read directly from IAP_PACKS, not from
+ *     RevenueCat; so the amount granted for real money always stays under
+ *     control in this file.
  */
 export class RevenueCatIAP implements IAPProvider {
   readonly storeLabel: string;
   private configured = false;
   private appUserId: string | null = null;
   private offeringsPromise: ReturnType<typeof Purchases.getOfferings> | null = null;
-  /** packId -> mağazanın verdiği yerelleştirilmiş fiyat metni (ör. "₺39,99", "$2.99") */
+  /** packId -> localized price text as given by the store (e.g. "₺39,99", "$2.99") */
   private livePrices: Record<string, string> = {};
 
   constructor(appUserId: string) {
@@ -215,9 +218,9 @@ export class RevenueCatIAP implements IAPProvider {
   }
 
   /**
-   * Mağazadan fiyat geldiyse onu kullanır. Miktarlar (inci/altın) bilerek
-   * IAP_PACKS'te kalır — mağazadan yalnızca FİYAT alınır, verilecek miktar
-   * hiçbir zaman dışarıdan gelmez.
+   * Uses the store's price if one came in. Amounts (pearls/coins) intentionally
+   * stay in IAP_PACKS — only the PRICE is taken from the store, the granted
+   * amount never comes from outside.
    */
   packs(): IAPPack[] {
     return IAP_PACKS.map((p) => {
@@ -247,7 +250,7 @@ export class RevenueCatIAP implements IAPProvider {
         if (price) this.livePrices[pkg.identifier] = price;
       }
     } catch {
-      /* fiyat çekilemedi — yedek etiketler kalır, mağaza yine de açılır */
+      /* couldn't fetch prices — fallback labels stay, the store still opens */
     }
   }
 
@@ -288,12 +291,12 @@ export class RevenueCatIAP implements IAPProvider {
   }
 }
 
-// ---------- Sosyal: arkadaşlar + liderlik ----------
+// ---------- Social: friends + leaderboard ----------
 
 export interface LeaderboardEntry {
   rank: number;
   name: string;
-  score: number;   // toplam kazanç
+  score: number;   // total earnings
   isPlayer: boolean;
   isBot: boolean;
 }
@@ -302,17 +305,17 @@ export interface SocialProvider {
   readonly label: string;
   leaderboard(save: SaveData, friendScores?: Record<string, number>): LeaderboardEntry[];
   addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }>;
-  /** Arkadaş kodu -> güncel skor. Sağlayıcı gerçek skorları desteklemiyorsa boş döner. */
+  /** Friend code -> current score. Returns empty if the provider doesn't support real scores. */
   friendScores(save: SaveData): Promise<Record<string, number>>;
-  /** Oyuncunun kendi skorunu arkadaşlarının görebilmesi için sağlayıcıya bildirir (fire-and-forget). */
+  /** Notifies the provider of the player's own score so friends can see it (fire-and-forget). */
   updateScore?(save: SaveData): void;
-  /** Oyuncu dokümanını (arkadaş kodu -> ad/skor) yayımlar. Bulut senkronu
-   *  friendCode'u değiştirebildiği için MUTLAKA senkron sonrası çağrılır. */
+  /** Publishes the player document (friend code -> name/score). Cloud sync can
+   *  change friendCode, so this MUST be called after sync. */
   publishPlayer?(): Promise<void>;
 }
 
-/** Ziyaret/hediye ödülleri arkadaş başına günlük verildiği için kod kodu spam'iyle
- * sınırsız altın/yem çiftliğini önlemek amacıyla listeye üst sınır konur. */
+/** Visit/gift rewards are given once per friend per day, so a cap is put on the
+ * list to prevent unlimited gold/feed farming via friend-code spam. */
 const MAX_FRIENDS = 50;
 
 const BOTS = [
@@ -325,10 +328,10 @@ const BOTS = [
   { name: 'TembelDeniz 🤖', mult: 0.2 },
 ];
 
-/** Liderlik tablosu, oyuncunun skorunu topluluk botlarıyla kıyaslar. Arkadaşların
- * skoru `friendScores` (kod -> skor) ile geldiyse gerçek değer, gelmediyse
- * (sağlayıcı desteklemiyor veya henüz çekilmedi) ⏳ placeholder gösterilir.
- * LocalSocial ve FirebaseSocial aynı liderlik mantığını paylaşır. */
+/** The leaderboard compares the player's score against community bots. If a
+ * friend's score came in via `friendScores` (code -> score), the real value is
+ * shown; otherwise (provider doesn't support it, or not fetched yet) a ⏳
+ * placeholder is shown. LocalSocial and FirebaseSocial share this same leaderboard logic. */
 function buildLocalLeaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {
   const base = Math.max(1000, save.stats.totalEarned);
   const rows = BOTS.map((b) => ({
@@ -351,8 +354,8 @@ function buildLocalLeaderboard(save: SaveData, friendScores: Record<string, numb
   return rows.map((r, i) => ({ ...r, rank: i + 1 }));
 }
 
-/** Ortak biçim/tekrar/üst-sınır kontrolleri — hem yerel hem Firebase sağlayıcı
- * ağa gitmeden önce bunları senkron olarak eler. */
+/** Shared format/duplicate/limit checks — both the local and Firebase providers
+ * filter these out synchronously before hitting the network. */
 function validateFriendCode(save: SaveData, code: string): { c: string } | { msg: string } {
   const c = code.trim().toUpperCase();
   if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { msg: t('Geçersiz kod. Örnek biçim: REEF-AB12C') };
@@ -363,10 +366,10 @@ function validateFriendCode(save: SaveData, code: string): { c: string } | { msg
 }
 
 /**
- * Yerel sosyal sağlayıcı: arkadaş kodları biçim olarak doğrulanır ve
- * kaydedilir, ama karşı tarafın gerçekten var olup olmadığı kontrol
- * edilmez — bunun için bkz. FirebaseSocial. Firebase yapılandırılmadığında
- * (bkz. isFirebaseConfigured) createServices() bu sağlayıcıya düşer.
+ * Local social provider: friend codes are validated for format and saved,
+ * but whether the other side actually exists is not checked — see
+ * FirebaseSocial for that. When Firebase isn't configured (see
+ * isFirebaseConfigured), createServices() falls back to this provider.
  */
 export class LocalSocial implements SocialProvider {
   readonly label = t('Yerel mod — çevrimiçi liderlik mobil sürümde');
@@ -391,37 +394,38 @@ export class LocalSocial implements SocialProvider {
 }
 
 /**
- * Firebase/Firestore üzerinden gerçek arkadaş kodu doğrulaması. Anonim olarak
- * giriş yapar, kendi kodunu `players/{friendCode}` dokümanı olarak kaydeder,
- * ve addFriend() girilen kodun Firestore'da gerçekten var olup olmadığını
- * kontrol edip gerçek oyuncu adını çeker (bkz. firestore.rules: `get` herkese
- * açık, `list` kapalı — kod taranamaz/enumerate edilemez, sadece bilinen tek
- * bir kod sorgulanabilir).
+ * Real friend-code verification via Firebase/Firestore. Signs in anonymously,
+ * saves its own code as a `players/{friendCode}` document, and addFriend()
+ * checks whether the entered code actually exists in Firestore and fetches
+ * the real player name (see firestore.rules: `get` is public, `list` is
+ * closed — codes can't be scanned/enumerated, only a single known code can
+ * be queried).
  *
- * Botlarla kıyaslanan liderlik tablosu iskeleti buildLocalLeaderboard'tan gelir;
- * arkadaşların skoru friendScores() ile ayrıca çekilip UI'da bu iskeleye enjekte
- * edilir (bkz. ui.ts renderSocial) — Firestore `list` kapalı olduğu için tek
- * sorguyla arkadaş listesi çekilemez, her kod ayrı ayrı get edilir.
+ * The leaderboard skeleton compared against bots comes from
+ * buildLocalLeaderboard; friend scores are fetched separately via
+ * friendScores() and injected into that skeleton in the UI (see ui.ts
+ * renderSocial) — since Firestore `list` is closed, the friend list can't be
+ * fetched in a single query, each code is get'd individually.
  */
 export class FirebaseSocial implements SocialProvider {
   readonly label = t('Firebase — arkadaş kodu doğrulanıyor');
-  // Uygulama örneği ve anonim oturum cloud-save.ts ile paylaşılır (bkz.
-  // firebase-app.ts) — ikinci bir initializeApp() "app/duplicate-app" verirdi.
+  // The app instance and anonymous session are shared with cloud-save.ts (see
+  // firebase-app.ts) — a second initializeApp() would throw "app/duplicate-app".
   private db = firestore();
   private ready: Promise<void>;
   private lastScoreWrite = { at: 0, score: -1 };
 
   constructor(private save: SaveData) {
-    // Oyuncu dokümanı BURADA yazılmaz. Bulut kaydı geri yüklenirse friendCode
-    // değişebilir (buluttaki kayıt kendi kodunu getirir) ve burada yazılmış
-    // doküman eski kodla ortada kalırdı — arkadaşların gördüğü kod ile
-    // oyuncunun kendi kodu ayrışırdı. Bunun yerine publishPlayer() bulut
-    // senkronu bittikten sonra game.ts tarafından çağrılır.
+    // The player document is NOT written HERE. Restoring a cloud save can
+    // change friendCode (the cloud save brings its own code), and a document
+    // written here would be left stranded under the old code — the code
+    // friends see would diverge from the player's own code. Instead,
+    // publishPlayer() is called by game.ts after cloud sync finishes.
     this.ready = ensureUid().then(() => undefined).catch(() => undefined);
   }
 
-  /** Oyuncu dokümanını (arkadaş kodu → ad/skor) yazar. Bulut senkronu
-   *  tamamlandıktan SONRA çağrılmalı; bkz. constructor'daki gerekçe. */
+  /** Writes the player document (friend code -> name/score). Must be called
+   *  AFTER cloud sync completes; see the rationale in the constructor. */
   async publishPlayer(): Promise<void> {
     const uid = await ensureUid();
     if (!uid) return;
@@ -433,7 +437,7 @@ export class FirebaseSocial implements SocialProvider {
         updatedAt: serverTimestamp(),
       });
     } catch {
-      /* bağlantı yoksa sessizce geç — bir sonraki açılışta tekrar denenir */
+      /* no connection — fail silently, retried on the next launch */
     }
   }
 
@@ -441,8 +445,8 @@ export class FirebaseSocial implements SocialProvider {
     return buildLocalLeaderboard(save, friendScores);
   }
 
-  /** Her arkadaş kodunu ayrı ayrı get eder (bkz. sınıf yorumu) — MAX_FRIENDS
-   * sınırı sayesinde bu paralel istek sayısı kontrol altında kalır. */
+  /** Gets each friend code individually (see class comment) — the MAX_FRIENDS
+   * limit keeps this parallel request count under control. */
   async friendScores(save: SaveData): Promise<Record<string, number>> {
     await this.ready;
     const entries = await Promise.all(
@@ -460,8 +464,8 @@ export class FirebaseSocial implements SocialProvider {
     return Object.fromEntries(entries.filter((e): e is [string, number] => e !== null));
   }
 
-  /** Skoru en fazla dakikada bir ve gerçekten değiştiyse yazar — sık syncSave
-   * çağrılarında Firestore günlük yazma kotasını (Spark planı) tüketmemek için. */
+  /** Writes the score at most once a minute, and only if it actually changed —
+   * to avoid burning through the Firestore daily write quota (Spark plan) on frequent syncSave calls. */
   updateScore(save: SaveData): void {
     const score = save.stats.totalEarned;
     const now = Date.now();
@@ -470,7 +474,7 @@ export class FirebaseSocial implements SocialProvider {
     void this.ready
       .then(() => setDoc(doc(this.db, 'players', save.friendCode), { score }, { merge: true }))
       .catch(() => {
-        /* bağlantı sorunu — bir sonraki syncSave'de tekrar denenecek */
+        /* connection issue — will be retried on the next syncSave */
       });
   }
 
@@ -490,7 +494,7 @@ export class FirebaseSocial implements SocialProvider {
   }
 }
 
-// ---------- Servis kayıt noktası ----------
+// ---------- Service registration point ----------
 
 export interface Services {
   auth: AuthProvider;
@@ -500,14 +504,14 @@ export interface Services {
 }
 
 export function createServices(save: SaveData): Services {
-  // iOS/Android native (Capacitor) paketinde Game Center / Play Games'e gerçek giriş,
-  // RevenueCat üzerinden gerçek satın alma ve AdMob üzerinden gerçek reklamlar; diğer
-  // tüm ortamlarda (web önizleme, dev sunucusu) yerel/stub sağlayıcılara düşülür.
+  // In iOS/Android native (Capacitor) builds: real sign-in to Game Center / Play
+  // Games, real purchases via RevenueCat, and real ads via AdMob; in all other
+  // environments (web preview, dev server), falls back to local/stub providers.
   const native = isNativeGameAuthAvailable();
   return {
     auth: native ? new NativeGameAuth(save) : new LocalAuth(save),
     iap: native ? new RevenueCatIAP(save.friendCode) : new StubIAP(),
-    // Native bayrağına bağlı değil: config girildikten sonra web preview'de de gerçek backend'e karşı çalışır.
+    // Not tied to the native flag: once configured, this also works against the real backend in web preview.
     social: isFirebaseConfigured() ? new FirebaseSocial(save) : new LocalSocial(),
     ads: native ? new AdMobAds(save) : new StubAds(),
   };
