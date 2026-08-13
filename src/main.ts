@@ -17,21 +17,22 @@ const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
 if (playBtn) playBtn.innerHTML = `▶&nbsp; ${t('Oyna')}`;
 let started = false;
 /**
- * Geri tuşunun konuşacağı UI. mount() çağrılana kadar null kalır — handleBack
- * panel/toast düğümlerine dayanır ve onlar ancak mount'ta bağlanır.
+ * The UI that the back button talks to. Stays null until mount() is called —
+ * handleBack relies on panel/toast nodes, which are only wired up at mount.
  */
 let mountedUI: UI | null = null;
 
 /**
- * Android geri tuşunu oyun içi gezinmeye bağlar.
+ * Wires the Android back button to in-game navigation.
  *
- * Bir dinleyici KAYDEDİLMEDİĞİ sürece Capacitor geri tuşunu doğrudan
- * "uygulamayı kapat"a çevirir — oyuncu bir panelin ortasındayken bile.
- * Giriş menüsündeyken geri, her uygulamada olduğu gibi doğrudan çıkar;
- * oyun içindeyken kararı UI.handleBack() verir.
+ * Unless a listener is REGISTERED, Capacitor turns the back button directly
+ * into "close the app" — even while the player is in the middle of a panel.
+ * On the entry menu, back exits directly like in any app; while in-game, the
+ * decision is made by UI.handleBack().
  *
- * Eklenti yoksa (tarayıcıda çalışırken) import başarısız olur ve sessizce
- * geçilir — kod tabanının geri kalanındaki "eklenti yoksa no-op" deyimi.
+ * If the plugin is absent (running in the browser) the import fails and is
+ * silently ignored — the "no-op if plugin absent" idiom used elsewhere in
+ * the codebase.
  */
 void import('@capacitor/app')
   .then(({ App: CapApp }) => {
@@ -40,7 +41,7 @@ void import('@capacitor/app')
     });
   })
   .catch(() => {
-    /* tarayıcıda geri tuşu diye bir şey yok */
+    /* there's no such thing as a back button in the browser */
   });
 
 playBtn.addEventListener('click', () => {
@@ -71,9 +72,9 @@ playBtn.addEventListener('click', () => {
     ui.mount(document.getElementById('ui')!);
     mountedUI = ui;
 
-    // Test/geliştirme kancası: e2e testi oyun durumuna buradan erişir.
-    // Yalnızca dev sunucusunda etkin — prod/iOS derlemesinde tree-shake ile silinir,
-    // böylece herkese açık build'de tüm oyun state'i/API'si console'a sızmaz.
+    // Test/dev hook: e2e tests access game state through this.
+    // Only active on the dev server — stripped by tree-shaking in prod/iOS builds,
+    // so the whole game state/API doesn't leak into the console on public builds.
     if (import.meta.env.DEV) {
       (window as unknown as { __reefyGame?: Game }).__reefyGame = game;
     }

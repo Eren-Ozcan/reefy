@@ -7,27 +7,27 @@ export interface FishSave {
   hunger: number;   // 0..1
   name: string;
   seed: number;
-  tank: string;     // hangi akvaryumda yaşıyor
-  bonus?: number;   // kaliteli yemlerle biriken satış fiyatı bonusu (0..0.6)
+  tank: string;     // which aquarium it lives in
+  bonus?: number;   // sale price bonus accumulated from quality feed (0..0.6)
 }
 
 export interface PlacedDecor {
   def: string;  // DecorDef id
-  fx: number;   // 0..1 yatay konum
+  fx: number;   // 0..1 horizontal position
 }
 
 export interface DirtSpot {
   id: number;
-  fx: number;   // 0..1 yatay konum
-  fy: number;   // 0..1 dikey konum
-  r: number;    // boyut çarpanı
-  kind: 0 | 1;  // görsel çeşit
+  fx: number;   // 0..1 horizontal position
+  fy: number;   // 0..1 vertical position
+  r: number;    // size multiplier
+  kind: 0 | 1;  // visual variant
 }
 
 export interface QuestState {
-  day: string;                       // görevlerin üretildiği gün
-  progress: Record<string, number>;  // questId -> ilerleme
-  claimed: string[];                 // bugün ödülü alınanlar
+  day: string;                       // day the quests were generated
+  progress: Record<string, number>;  // questId -> progress
+  claimed: string[];                 // rewards claimed today
 }
 
 export interface SaveData {
@@ -39,18 +39,18 @@ export interface SaveData {
   playerName: string;
   friendCode: string;
   fishes: FishSave[];
-  collection: string[];                       // yetişkinliğe ulaşmış tür id'leri
-  feedOwned: Record<string, number>;          // feedId -> stok (paketten alınan yem taneleri)
-  decorOwned: Record<string, number>;         // defId -> adet (yerleştirilmemiş)
-  decorPlaced: Record<string, PlacedDecor[]>; // tankId -> yerleştirilenler
-  dirtSpots: Record<string, DirtSpot[]>;      // tankId -> temizlenmemiş kir lekeleri
+  collection: string[];                       // ids of species that have reached adulthood
+  feedOwned: Record<string, number>;          // feedId -> stock (feed portions bought from packs)
+  decorOwned: Record<string, number>;         // defId -> count (not placed)
+  decorPlaced: Record<string, PlacedDecor[]>; // tankId -> placed items
+  dirtSpots: Record<string, DirtSpot[]>;      // tankId -> uncleaned dirt spots
   tanksOwned: string[];
   activeTank: string;
   friends: { code: string; name: string }[];
-  friendVisits: { day: string; visited: string[]; count: number }; // gün içinde ziyaret edilen arkadaş kodları
-  friendGifts: { day: string; gifted: string[] };                  // gün içinde hediye gönderilen arkadaş kodları
+  friendVisits: { day: string; visited: string[]; count: number }; // friend codes visited today
+  friendGifts: { day: string; gifted: string[] };                  // friend codes gifted today
   quests: QuestState;
-  weeklyQuest: QuestState; // "day" alanı burada haftanın pazartesi tarihini (hafta anahtarı) tutar
+  weeklyQuest: QuestState; // here the "day" field holds this week's Monday date (week key)
   achievementsClaimed: string[];
   stats: {
     totalSold: number;
@@ -60,37 +60,37 @@ export interface SaveData {
     decorPlacedCount: number;
     totalCleaned: number;
   };
-  pityCounter: number;   // altın yumurta efsanevi garanti sayacı
-  streak: number;        // ardışık gün serisi (gün kaçırılırsa sıfırlanır)
-  bestStreak: number;    // şimdiye dek ulaşılan en yüksek seri — başarımlar bunu kullanır, sıfırlanmaz
-  incomePot: number;     // biriken, henüz toplanmamış pasif gelir
-  cleanRewardDay: string;   // günün ilk birkaç temizliği ödüllü — bu alan günü takip eder
-  cleanRewardCount: number; // bugün ödüllü temizlenen leke sayısı
-  petDay: string;           // günde bir kez bir balığı okşayabilirsin — son okşama günü
+  pityCounter: number;   // golden egg legendary pity counter
+  streak: number;        // consecutive day streak (resets if a day is missed)
+  bestStreak: number;    // highest streak reached so far — achievements use this, it never resets
+  incomePot: number;     // accumulated, not-yet-collected passive income
+  cleanRewardDay: string;   // the first few cleanups of the day are rewarded — this field tracks the day
+  cleanRewardCount: number; // number of spots cleaned with a reward today
+  petDay: string;           // you can pet one fish once a day — last petting day
   music: boolean;
   sfx: boolean;
   lastSeen: number;
   lastDaily: string;
   tutorialDone: boolean;
-  feedHintSeen: boolean; // yem modu ipucu ("suya dokunarak yemle") bir kez gösterildi mi
-  editHintSeen: boolean; // dekor düzenleme ipucu bir kez gösterildi mi
-  adsRemoved: boolean; // "Reklamları kaldır" IAP'i satın alındı mı
+  feedHintSeen: boolean; // whether the feed mode hint ("touch the water to feed") has been shown once
+  editHintSeen: boolean; // whether the decor edit hint has been shown once
+  adsRemoved: boolean; // whether the "Remove ads" IAP has been purchased
   lang: Lang;
 }
 
 const KEY = 'reefy-save-v1';
 const START_TANK = 'tank-mercan-koyu';
 
-/** Yeni kaydın başlangıç değerleri — hasProgress() bunlarla karşılaştırır. */
+/** Starting values for a new save — hasProgress() compares against these. */
 export const START_COINS = 300;
 export const START_PEARLS = 5;
 export const START_FISH_COUNT = 2;
 
 /**
- * Kayıt şeması sürümü. Buluttaki kayıt bundan YENİ ise indirilmez: daha eski
- * bir istemcinin, henüz tanımadığı alanları migrate() ile "eksik" sayıp
- * silmesini ve sonra bu bozulmuş hali geri yüklemesini engeller (bkz.
- * cloud-save.ts).
+ * Save schema version. If the cloud save is NEWER than this, it is not
+ * downloaded: this prevents an older client from treating fields it doesn't
+ * yet recognize as "missing" via migrate(), stripping them, and then
+ * restoring that corrupted state (see cloud-save.ts).
  */
 export const SAVE_SCHEMA_VERSION = 2;
 
@@ -111,7 +111,7 @@ export function defaultSave(): SaveData {
     playerName: 'Misafir-' + Math.floor(1000 + Math.random() * 9000),
     friendCode: makeFriendCode(),
     fishes: [
-      // İlk balık %60 büyümüş başlar: ilk satış (ilk zafer) oyunun ilk ~1 dakikasında yaşanır
+      // The first fish starts 60% grown: the first sale (the first win) happens within the game's first ~1 minute
       { sp: 'lepistes', progress: 0.6, hunger: 0.9, name: 'Baloncuk', seed: 11, tank: START_TANK },
       { sp: 'neon-tetra', progress: 0.3, hunger: 0.85, name: 'Mercan', seed: 42, tank: START_TANK },
     ],
@@ -149,37 +149,40 @@ export function defaultSave(): SaveData {
 }
 
 /**
- * Bu kayıtta oyuncunun EMEĞİ var mı — bulut çakışmasında "yerel tarafı feda
- * etmek güvenli mi" sorusunun tek yanıtı (bkz. cloud-save.ts hızlı yol).
+ * Does this save have the player's EFFORT in it — the single answer to "is it
+ * safe to sacrifice the local side" in a cloud conflict (see cloud-save.ts
+ * fast path).
  *
- * Neden `dirty` bayrağı ya da varsayılanla derin karşılaştırma değil: kayıt,
- * oyuncu hiçbir şey yapmasa bile oyuna girdikten saniyeler sonra "değişmiş"
- * sayılır (lastSeen, biriken gelir, kendiliğinden çıkan kir lekeleri, ilk
- * açılışta kurulan gün sayacı). Bu yüzden yeni kurulmuş bir cihaz, hesabını
- * bağladığında bir tarafı bomboş olan "hangi ilerleme?" ekranını görüyordu.
+ * Why not a `dirty` flag or a deep comparison with the default: a save is
+ * considered "changed" within seconds of entering the game even if the
+ * player does nothing (lastSeen, accumulated income, dirt spots appearing on
+ * their own, the day counter set up on first launch). Because of this, a
+ * freshly set up device linking its account was shown a "which progress?"
+ * screen with one side completely empty.
  *
- * YÖN ÖNEMLİ: yanlışlıkla "ilerleme yok" demek oyuncunun oyununu sessizce
- * siler; yanlışlıkla "ilerleme var" demek yalnızca bugünkü davranışa —
- * kullanıcıya soran çakışma ekranına — düşürür. Bu yüzden kuşkuda kalınan her
- * alan ilerleme SAYILIR.
+ * DIRECTION MATTERS: mistakenly saying "no progress" silently deletes the
+ * player's game; mistakenly saying "has progress" only falls back to today's
+ * behavior — the conflict screen that asks the user. So any field left in
+ * doubt COUNTS as progress.
  *
- * Bilerek DIŞARIDA bırakılanlar (oyuncunun eylemi olmadan da değişirler ya da
- * geri yüklenirken kaybı önemsizdir):
- * - `lastSeen`, `incomePot`, `dirtSpots`, balıkların `progress`/`hunger` değeri
- *   — hepsi zamanla kendiliğinden ilerler
- * - `tutorialDone` — giriş karuseli ENGELLEYİCİDİR: oyuna giren herkes onu
- *   kapatmak zorunda, ayarlara ancak öyle ulaşılıyor. İlerleme sayılsaydı hızlı
- *   yol tam da var olma sebebi olan durumda (yeni cihaz, hesabını bağlıyor)
- *   hiç çalışmazdı — emülatörde birebir böyle oldu
- * - Yalnızca açılış balıklarından oluşan `collection` — aşağıdaki nota bak
- * - `lastDaily` ve 1 değerindeki `streak`/`bestStreak` — ilk açılışta hediye
- *   VERİLMEDEN kurulur (bkz. game.ts applyDailyGift); 1'den büyüğü gerçek
- *   dönüşü gösterir, o sayılır
- * - `quests.day` / `weeklyQuest.day` — görev günü açılışta kendiliğinden kurulur
- * - `music`/`sfx`/`lang` ayarları ve `feedHintSeen`/`editHintSeen` ipuçları —
- *   ilerleme değil, arayüz durumu
- * - `friendCode`, varsayılan `playerName` — rastgele üretilirler
- * - `adsRemoved` — zaten buluttan hiç geri yüklenmez, cihazdaki değer korunur
+ * Deliberately left OUT (they change even without player action, or losing
+ * them on restore doesn't matter):
+ * - `lastSeen`, `incomePot`, `dirtSpots`, fish `progress`/`hunger` values
+ *   — all of these advance on their own over time
+ * - `tutorialDone` — the intro carousel is BLOCKING: everyone who enters the
+ *   game has to dismiss it, and settings can only be reached that way. If it
+ *   counted as progress, the fast path would never work in the exact
+ *   situation it exists for (a new device linking its account) — this
+ *   happened exactly this way on the emulator
+ * - `collection` consisting only of the starting fish — see the note below
+ * - `lastDaily` and `streak`/`bestStreak` when equal to 1 — these are set up
+ *   on first launch WITHOUT giving the gift (see game.ts applyDailyGift);
+ *   anything greater than 1 shows a real return, and that counts
+ * - `quests.day` / `weeklyQuest.day` — the quest day is set up on its own at launch
+ * - `music`/`sfx`/`lang` settings and the `feedHintSeen`/`editHintSeen` hints —
+ *   not progress, just UI state
+ * - `friendCode`, default `playerName` — randomly generated
+ * - `adsRemoved` — never restored from the cloud anyway, the on-device value is kept
  */
 export function hasProgress(s: SaveData): boolean {
   const st = s.stats;
@@ -190,10 +193,10 @@ export function hasProgress(s: SaveData): boolean {
   if (s.coins !== START_COINS || s.pearls !== START_PEARLS) return true;
   if (s.fishes.length !== START_FISH_COUNT) return true;
 
-  // Koleksiyon: yalnızca AÇILIŞ BALIKLARININ DIŞINDAKİ türler sayılır. İkisi de
-  // yarı büyümüş başlar ve oyuncu hiçbir şey yapmasa bile birkaç dakika içinde
-  // yetişkinliğe ulaşıp koleksiyona girer (emülatörde birebir gözlendi) —
-  // koleksiyonun dolu olması tek başına emek göstermez.
+  // Collection: only species OUTSIDE THE STARTING FISH count. Both of them
+  // start half-grown and reach adulthood, entering the collection, within a
+  // few minutes even if the player does nothing (observed exactly this way
+  // on the emulator) — the collection being non-empty alone doesn't show effort.
   const starting = new Set(defaultSave().fishes.map((f) => f.sp));
   if (s.collection.some((id) => !starting.has(id))) return true;
 
@@ -221,7 +224,7 @@ export function hasProgress(s: SaveData): boolean {
   return false;
 }
 
-/** Varsayılan ad `Misafir-1234` biçimindedir; başka her ad oyuncunun seçimidir. */
+/** The default name has the form `Misafir-1234`; any other name is the player's own choice. */
 function isDefaultPlayerName(name: string): boolean {
   return /^Misafir-\d{4}$/.test(name);
 }

@@ -1,8 +1,9 @@
 /**
- * Basit i18n: Türkçe metin doğrudan sözlük anahtarı olarak kullanılır (ayrı anahtar
- * isimleri icat etmeye gerek kalmaz). t('Türkçe metin') çağrısı, dil 'en' ise EN
- * sözlüğünde karşılığını arar, bulamazsa Türkçe metni olduğu gibi döndürür — bu sayede
- * çeviri eksik kalsa bile uygulama asla kırılmaz.
+ * Simple i18n: Turkish text is used directly as the dictionary key (no need
+ * to invent separate key names). t('Turkish text') looks up its counterpart
+ * in the EN dictionary when the language is 'en', and falls back to the
+ * Turkish text as-is if not found — so the app never breaks even if a
+ * translation is missing.
  */
 export type Lang = 'tr' | 'en';
 
@@ -22,8 +23,9 @@ function readStored(): Lang | undefined {
   }
 }
 
-// Menü, oyun kaydı yüklenmeden (Oyna'ya basılmadan) önce de gösterildiği için başlangıç
-// dili localStorage'daki son tercihten, yoksa tarayıcı dilinden belirlenir.
+// The menu is shown before the save loads (before pressing Play), so the
+// initial language is determined from the last localStorage preference, or
+// the browser language otherwise.
 let current: Lang = readStored() ?? detectLang();
 
 export function getLang(): Lang {
@@ -39,8 +41,9 @@ export function initLang(saved?: Lang): void {
   current = saved ?? detectLang();
 }
 
-/** Türkçe'de "gün" sayıya göre değişmediği için tekil/çoğul ayrımı gerektiren birkaç
- * şablon burada özel olarak çözülür (İngilizce'de "1 day" / "2 days" farkı için). */
+/** In Turkish "gün" doesn't change with number, so a few templates that need
+ * a singular/plural distinction are handled specially here (for the English
+ * "1 day" / "2 days" difference). */
 const EN_PLURAL: Record<string, (n: number) => string> = {
   '{n} gün': (n) => `${n} day${n === 1 ? '' : 's'}`,
   'Günlük görevler 🔥 Seri: {n} gün': (n) => `Daily quests 🔥 Streak: ${n} day${n === 1 ? '' : 's'}`,
@@ -48,7 +51,7 @@ const EN_PLURAL: Record<string, (n: number) => string> = {
     `🔥 Streak: <b>${n} day${n === 1 ? '' : 's'}</b> — keep it up and gifts grow bigger!`,
 };
 
-/** Türkçe metni (anahtar) mevcut dile çevirir; {var} kalıplarını vars ile değiştirir. */
+/** Translates the Turkish text (key) to the current language; replaces {var} patterns with vars. */
 export function t(s: string, vars?: Record<string, string | number>): string {
   if (current === 'en' && vars && typeof vars.n === 'number' && EN_PLURAL[s]) {
     return EN_PLURAL[s](vars.n);
@@ -61,12 +64,12 @@ export function t(s: string, vars?: Record<string, string | number>): string {
 }
 
 const EN: Record<string, string> = {
-  // ---- Nadirlik / biyom ----
+  // ---- Rarity / biome ----
   'Yaygın': 'Common', 'Az Bulunur': 'Uncommon', 'Nadir': 'Rare', 'Epik': 'Epic', 'Efsanevi': 'Legendary',
   'Tropik': 'Tropical', 'Lagün': 'Lagoon', 'Derin Deniz': 'Deep Sea', 'Mağara': 'Cave',
   'Kutup': 'Polar', 'Gün Batımı': 'Sunset', 'Mistik': 'Mystic',
 
-  // ---- El yapımı türler ----
+  // ---- Handcrafted species ----
   'Lepistes': 'Guppy',
   'Neşeli ve dayanıklı. Her resifin ilk sakini.': 'Cheerful and hardy. Every reef\'s first resident.',
   'Karanlıkta bile parlayan kırmızı şeridiyle ünlü.': 'Famous for the red stripe that glows even in the dark.',
@@ -95,7 +98,7 @@ const EN: Record<string, string> = {
   'İnci Balığı': 'Pearl Fish',
   'Sadece incilerle çağrılabilen ışıltılı bir sır.': 'A shimmering secret summoned only by pearls.',
 
-  // ---- Gerçek türler: yaygın ----
+  // ---- Real species: common ----
   'Zebra Danio': 'Zebra Danio',
   'Yatay çizgileriyle tanınan hareketli ve dayanıklı bir tatlı su balığı.': 'An active, hardy freshwater fish known for its horizontal stripes.',
   'Platy': 'Platy',
@@ -151,7 +154,7 @@ const EN: Record<string, string> = {
   'Panda Kori': 'Panda Corydoras',
   'Siyah-beyaz panda desenli sevimli bir tabanci balığı.': 'An adorable catfish with a black-and-white panda pattern.',
 
-  // ---- Gerçek türler: az bulunur ----
+  // ---- Real species: uncommon ----
   'Rummy Nose Tetra': 'Rummynose Tetra',
   'Kırmızı burnu ve bantlı kuyruğuyla kolayca tanınır.': 'Easily recognized by its red nose and banded tail.',
   'Kongo Tetrası': 'Congo Tetra',
@@ -197,7 +200,7 @@ const EN: Record<string, string> = {
   'Sarı Kuyruklu Mavi Damla': 'Yellowtail Blue Damsel',
   'Koyu mavi gövdesi ve parlak sarı kuyruğuyla resif sakini.': 'A reef dweller with a deep blue body and bright yellow tail.',
 
-  // ---- Gerçek türler: nadir ----
+  // ---- Real species: rare ----
   'Çiçek Boynuzlu Çiklit': 'Flowerhorn Cichlid',
   'Alnındaki belirgin hörgücü ve canlı pembe rengiyle özel bir melez çiklit.': 'A special hybrid cichlid with a pronounced forehead hump and vivid pink color.',
   'Tavus Levrek': 'Peacock Bass',
@@ -233,7 +236,7 @@ const EN: Record<string, string> = {
   'Kaplan Oskar': 'Tiger Oscar',
   'Turuncu-siyah kaplan desenli, karizmatik bir Oskar varyetesi.': 'A charismatic Oscar variety with an orange-and-black tiger pattern.',
 
-  // ---- Gerçek türler: epik ----
+  // ---- Real species: epic ----
   'Mavi Cerrah Balığı': 'Blue Tang',
   "Okyanusun en tanınan mavi-sarı desenli yıldızı.": "The ocean's most recognizable blue-and-yellow star.",
   'Sarı Cerrah Balığı': 'Yellow Tang',
@@ -259,7 +262,7 @@ const EN: Record<string, string> = {
   'Akhilleus Cerrahı': 'Achilles Tang',
   'Kuyruğundaki alev turuncusu lekesiyle resifin en değerli cerrahlarından.': "One of the reef's most prized tangs, with a fiery orange patch on its tail.",
 
-  // ---- Gerçek türler: efsanevi ----
+  // ---- Real species: legendary ----
   'Platin Arowana': 'Platinum Arowana',
   "Pürüzsüz gümüş-beyaz pullarıyla koleksiyonerlerin rüyası.": "A collector's dream, with flawless silver-white scales.",
   'Kırmızı Arowana': 'Red Arowana',
@@ -277,7 +280,7 @@ const EN: Record<string, string> = {
   'Bıçak Yüzgeçli Bas Balığı': 'Swalesi Basslet',
   "Dünyanın en pahalı akvaryum balıklarından biri olarak bilinir.": "Known as one of the most expensive aquarium fish in the world.",
 
-  // ---- Yumurtalar ----
+  // ---- Eggs ----
   'Bronz Yumurta': 'Bronze Egg',
   'Başlangıç sürprizi. Küçük ama umut dolu.': 'A starter surprise. Small but full of hope.',
   'Gümüş Yumurta': 'Silver Egg',
@@ -285,7 +288,7 @@ const EN: Record<string, string> = {
   'Altın Yumurta': 'Golden Egg',
   'Efsaneler bu yumurtadan doğar. Her 8. yumurtada efsanevi garanti!': 'Legends are born from this egg. Guaranteed legendary every 8th egg!',
 
-  // ---- Akvaryumlar ----
+  // ---- Tanks ----
   'Mercan Koyu': 'Coral Cove',
   'Her şeyin başladığı sıcak, güvenli koy.': 'The warm, safe cove where it all begins.',
   'Altın Kumsal': 'Golden Sands',
@@ -337,108 +340,108 @@ const EN: Record<string, string> = {
   'Sonsuzluk Havuzu': 'Infinity Pool',
   "Ufku olmayan su. Reefy'nin en büyük sırrı.": "Water with no horizon. Reefy's greatest secret.",
 
-  // ---- Dekor: yosun ----
+  // ---- Decor: kelp ----
   'Yosun': 'Kelp',
   'Suyla dans eden canlı bitki.': 'A living plant that dances with the water.',
   'Yeşil Yosun': 'Green Kelp', 'Koyu Yosun': 'Dark Kelp', 'Kızıl Yosun': 'Red Kelp',
   'Altın Yosun': 'Golden Kelp', 'Mor Yosun': 'Purple Kelp', 'Neon Yosun': 'Neon Kelp', 'Işıl Yosun': 'Glowing Kelp',
-  // ---- Dekor: kılıç bitkisi ----
+  // ---- Decor: sword plant ----
   'Kılıç Bitkisi': 'Sword Plant',
   'Dik yapraklı zarif akvaryum bitkisi.': 'An elegant aquarium plant with upright leaves.',
   'Yeşil Kılıç Bitkisi': 'Green Sword Plant', 'Limon Kılıç Bitkisi': 'Lemon Sword Plant',
   'Bordo Kılıç Bitkisi': 'Burgundy Sword Plant', 'Alacalı Kılıç Bitkisi': 'Mottled Sword Plant',
   'Kristal Kılıç Bitkisi': 'Crystal Sword Plant',
-  // ---- Dekor: mercan kümesi ----
+  // ---- Decor: coral cluster ----
   'Mercan Kümesi': 'Coral Cluster',
   'Rengarenk yumuşak mercan yatağı.': 'A colorful bed of soft coral.',
   'Pembe Mercan Kümesi': 'Pink Coral Cluster', 'Gül Mercan Kümesi': 'Rose Coral Cluster',
   'Turuncu Mercan Kümesi': 'Orange Coral Cluster', 'Lila Mercan Kümesi': 'Lilac Coral Cluster',
   'Turkuaz Mercan Kümesi': 'Turquoise Coral Cluster', 'Gökkuşağı Mercan Kümesi': 'Rainbow Coral Cluster',
   'Kristal Mercan Kümesi': 'Crystal Coral Cluster',
-  // ---- Dekor: boru mercanı ----
+  // ---- Decor: tube coral ----
   'Boru Mercanı': 'Tube Coral',
   'Dik boruların oluşturduğu koloni.': 'A colony formed of upright tubes.',
   'Turuncu Boru Mercanı': 'Orange Tube Coral', 'Sarı Boru Mercanı': 'Yellow Tube Coral',
   'Kırmızı Boru Mercanı': 'Red Tube Coral', 'Mavi Boru Mercanı': 'Blue Tube Coral', 'Gece Boru Mercanı': 'Midnight Tube Coral',
-  // ---- Dekor: yelpaze mercanı ----
+  // ---- Decor: fan coral ----
   'Yelpaze Mercanı': 'Fan Coral',
   'Akıntıda sallanan zarif yelpaze.': 'An elegant fan swaying in the current.',
   'Kızıl Yelpaze Mercanı': 'Red Fan Coral', 'Mor Yelpaze Mercanı': 'Purple Fan Coral',
   'Amber Yelpaze Mercanı': 'Amber Fan Coral', 'İnci Yelpaze Mercanı': 'Pearl Fan Coral',
-  // ---- Dekor: anemon ----
+  // ---- Decor: anemone ----
   'Anemon': 'Anemone',
   'Palyaço balıklarının yuvası.': "A clownfish's home.",
   'Pembe Anemon': 'Pink Anemone', 'Yeşil Anemon': 'Green Anemone', 'Mor Anemon': 'Purple Anemone',
   'Ateş Anemon': 'Fire Anemone', 'Kraliyet Anemon': 'Royal Anemone',
-  // ---- Dekor: kaya ----
+  // ---- Decor: rock ----
   'Kaya': 'Rock',
   'Doğal görünümlü dekoratif kaya.': 'A natural-looking decorative rock.',
   'Gri Kaya': 'Gray Rock', 'Kumtaşı Kaya': 'Sandstone Rock', 'Bazalt Kaya': 'Basalt Rock',
   'Yosunlu Kaya': 'Mossy Rock', 'Lav Kaya': 'Lava Rock', 'Ametist Kaya': 'Amethyst Rock',
-  // ---- Dekor: kaya kemeri ----
+  // ---- Decor: rock arch ----
   'Kaya Kemeri': 'Rock Arch',
   'Balıkların içinden geçmeyi sevdiği kemer.': 'An arch fish love swimming through.',
   'Gri Kaya Kemeri': 'Gray Rock Arch', 'Kumtaşı Kaya Kemeri': 'Sandstone Rock Arch',
   'Mercanlı Kaya Kemeri': 'Coral-Crusted Rock Arch',
-  // ---- Dekor: deniz kabuğu ----
+  // ---- Decor: sea shell ----
   'Deniz Kabuğu': 'Sea Shell',
   'Dev istiridye kabuğu.': 'A giant oyster shell.',
   'Bej Deniz Kabuğu': 'Beige Sea Shell', 'Pembe Deniz Kabuğu': 'Pink Sea Shell',
   'Sedef Deniz Kabuğu': 'Mother-of-Pearl Sea Shell', 'İncili Deniz Kabuğu': 'Pearled Sea Shell',
   'Altın Deniz Kabuğu': 'Golden Sea Shell',
-  // ---- Dekor: denizyıldızı ----
+  // ---- Decor: starfish ----
   'Denizyıldızı': 'Starfish',
   'Kumda dinlenen sevimli yıldız.': 'A cute star resting on the sand.',
   'Turuncu Denizyıldızı': 'Orange Starfish', 'Kırmızı Denizyıldızı': 'Red Starfish',
   'Mavi Denizyıldızı': 'Blue Starfish', 'Mor Denizyıldızı': 'Purple Starfish', 'Altın Denizyıldızı': 'Golden Starfish',
-  // ---- Dekor: hazine sandığı ----
+  // ---- Decor: treasure chest ----
   'Hazine Sandığı': 'Treasure Chest',
   'İçinden kabarcık çıkan gizemli sandık.': 'A mysterious chest that bubbles from within.',
   'Ahşap Hazine Sandığı': 'Wooden Treasure Chest', 'Demir Hazine Sandığı': 'Iron Treasure Chest',
   'Altın Hazine Sandığı': 'Golden Treasure Chest',
-  // ---- Dekor: batık ----
+  // ---- Decor: shipwreck ----
   'Batık': 'Shipwreck',
   'Efsanevi bir geminin kalıntısı.': 'The remains of a legendary ship.',
   'Balıkçı Teknesi Batık': 'Fishing Boat Wreck', 'Kalyon Batık': 'Galleon Wreck',
-  // ---- Dekor: antik sütun ----
+  // ---- Decor: ancient column ----
   'Antik Sütun': 'Ancient Column',
   'Kayıp bir uygarlıktan kalan sütun.': 'A column left behind by a lost civilization.',
   'Mermer Antik Sütun': 'Marble Ancient Column', 'Yıkık Antik Sütun': 'Ruined Ancient Column',
   'Yosunlu Antik Sütun': 'Mossy Ancient Column',
-  // ---- Dekor: heykel ----
+  // ---- Decor: statue ----
   'Heykel': 'Statue',
   'Denizin dibinde bir sanat eseri.': 'A work of art on the seafloor.',
   'Denizkızı Heykel': 'Mermaid Statue', 'Poseidon Heykel': 'Poseidon Statue', 'Altın Balık Heykel': 'Golden Fish Statue',
-  // ---- Dekor: kale ----
+  // ---- Decor: castle ----
   'Kale': 'Castle',
   'Klasik akvaryum şatosu.': 'A classic aquarium castle.',
   'Taş Kale': 'Stone Castle', 'Mercan Kale': 'Coral Castle',
-  // ---- Dekor: dev kafatası ----
+  // ---- Decor: giant skull ----
   'Dev Kafatası': 'Giant Skull',
   'Korsanların uğrak noktası.': "A pirate's favorite haunt.",
   'Kadim Dev Kafatası': 'Ancient Giant Skull',
-  // ---- Dekor: amfora ----
+  // ---- Decor: amphora ----
   'Amfora': 'Amphora',
   'Antik ticaret gemilerinden kalan testi.': 'A jar left behind by ancient trading ships.',
   'Toprak Amfora': 'Clay Amphora', 'Devrik Amfora': 'Tipped Amphora',
   'Desenli Amfora': 'Patterned Amphora', 'Kraliyet Amfora': 'Royal Amphora',
-  // ---- Dekor: fener ----
+  // ---- Decor: lantern ----
   'Fener': 'Lantern',
   'Suya sıcak bir ışık huzmesi ekler.': 'Adds a warm beam of light to the water.',
   'Bakır Fener': 'Copper Lantern', 'Deniz Feneri Fener': 'Lighthouse Lantern',
   'Ay Işığı Fener': 'Moonlight Lantern', 'Güneş Fener': 'Sun Lantern',
-  // ---- Dekor: kabarcık taşı ----
+  // ---- Decor: bubble stone ----
   'Kabarcık Taşı': 'Bubble Stone',
   'Sürekli kabarcık üretir, suya hayat katar.': 'Continuously produces bubbles, bringing life to the water.',
   'Mini Kabarcık Taşı': 'Mini Bubble Stone', 'Volkan Kabarcık Taşı': 'Volcano Bubble Stone',
   'Kristal Kabarcık Taşı': 'Crystal Bubble Stone',
-  // ---- Dekor: tabela ----
+  // ---- Decor: sign ----
   'Tabela': 'Sign',
   'Resifine kişilik katan minik tabela.': 'A tiny sign that adds personality to your reef.',
   '"Balık Geçidi" Tabela': '"Fish Crossing" Sign', '"Dalış Yasak" Tabela': '"No Diving" Sign',
   '"Reefy" Tabela': '"Reefy" Sign',
 
-  // ---- Yemler ----
+  // ---- Feeds ----
   'Standart Yem': 'Basic Feed',
   'Ücretsiz, doyurucu. Bonus vermez.': 'Free and filling. No bonus.',
   'Lezzet Yemi': 'Tasty Feed',
@@ -446,7 +449,7 @@ const EN: Record<string, string> = {
   'Altın Yem': 'Golden Feed',
   '%30 şansla satış fiyatına +%6 ekler.': '30% chance to add +6% to sale price.',
 
-  // ---- Günlük görevler ----
+  // ---- Daily quests ----
   'Balıklarına 20 yem yedir': 'Feed your fish 20 times',
   'Balıklarına 50 yem yedir': 'Feed your fish 50 times',
   '3 balık sat': 'Sell 3 fish',
@@ -466,7 +469,7 @@ const EN: Record<string, string> = {
   '5.000 altın kazan': 'Earn 5,000 coins',
   'Koleksiyona 2 tür ekle': 'Add 2 species to your collection',
   '6 kir lekesi temizle': 'Clean 6 dirt spots',
-  // ---- Haftalık görevler ----
+  // ---- Weekly quests ----
   'Bu hafta 200 yem yedir': 'Feed 200 times this week',
   'Bu hafta 20 balık sat': 'Sell 20 fish this week',
   'Bu hafta 20.000 altın kazan': 'Earn 20,000 coins this week',
@@ -476,7 +479,7 @@ const EN: Record<string, string> = {
   'Bu hafta 12 yeni balık satın al': 'Buy 12 new fish this week',
   'Bu hafta 8 dekor yerleştir': 'Place 8 decorations this week',
 
-  // ---- Başarımlar ----
+  // ---- Achievements ----
   'İlk Satış': 'First Sale', 'İlk balığını sat': 'Sell your first fish',
   'Esnaf': 'Shopkeeper',
   'Balık Tüccarı': 'Fish Trader', '50 balık sat': 'Sell 50 fish',
@@ -512,14 +515,14 @@ const EN: Record<string, string> = {
   'Resif Topluluğu': 'Reef Community', '25 arkadaş ekle': 'Add 25 friends',
   'Aylık Dost': 'Monthly Friend', '30 gün üst üste oyna': 'Play 30 days in a row',
 
-  // ---- Ana menü ----
+  // ---- Main menu ----
   'Kendi resifini kur, balıklarını büyüt,\nkoleksiyonunu tamamla': 'Build your own reef, grow your fish,\ncomplete your collection',
   'Oyna': 'Play',
 
-  // ---- Balık büyüme evreleri (fish.ts) ----
+  // ---- Fish growth stages (fish.ts) ----
   'Yetişkin': 'Adult', 'Genç': 'Young', 'Yavru': 'Baby',
 
-  // ---- game.ts: oyun mesajları ----
+  // ---- game.ts: game messages ----
   'Henüz birikmiş gelir yok': 'No income collected yet',
   '+{n} altın toplandı! 🪙': '+{n} coins collected! 🪙',
   '🎉 {name} yetişkin oldu! Satmak için üzerine dokun.': '🎉 {name} grew up! Tap it to sell.',
@@ -614,7 +617,7 @@ const EN: Record<string, string> = {
   'MercanKral 🤖': 'CoralKing 🤖', 'DerinMavi 🤖': 'DeepBlue 🤖', 'KaptanYosun 🤖': 'CaptainKelp 🤖',
   'İnciAvcısı 🤖': 'PearlHunter 🤖', 'BalonBalık 🤖': 'PufferFish 🤖', 'MinikYüzgeç 🤖': 'TinyFin 🤖', 'TembelDeniz 🤖': 'LazySea 🤖',
 
-  // ---- ui.ts: arayüz ----
+  // ---- ui.ts: interface ----
   'Besle': 'Feed', 'Mağaza': 'Shop', 'Envanter': 'Inventory', 'Sosyal': 'Social', 'Daha': 'More',
   'Akvaryum değiştir': 'Switch tank', 'Bitti ✓': 'Done ✓',
   'Sv': 'Lv',
@@ -691,7 +694,7 @@ const EN: Record<string, string> = {
   '✅ +%5 satış bonusu': '✅ +5% sale bonus',
   '👤 Oyuncu adı': '👤 Player name', 'Kaydet': 'Save',
   '🎮 Hesap': '🎮 Account', 'Giriş yap': 'Sign in',
-  // Bulut kaydı (ayarlar satırı + hesap bağlama + çakışma ekranı)
+  // Cloud save (settings row + account linking + conflict screen)
   '☁️ Bulut kaydı': '☁️ Cloud save', 'Bağla': 'Link', 'Bağlı': 'Linked',
   'Bağlı: {who}': 'Linked: {who}', 'Mobil sürümde': 'On mobile',
   'Google hesabına bağlanılıyor…': 'Connecting to your Google account…',
@@ -748,7 +751,7 @@ const EN: Record<string, string> = {
   '🎁 Günlük hediyen: <b>+{coins} altın, +{pearls} inci</b>': '🎁 Your daily gift: <b>+{coins} coins, +{pearls} pearls</b>',
   '🌊 Tekrar hoş geldin!': '🌊 Welcome back!',
   'Akvaryuma dal 🐠': 'Dive into your tank 🐠',
-  // ---- ui.ts: ilk açılış tutorial'ı (zorunlu, adım adım) ----
+  // ---- ui.ts: first-launch tutorial (mandatory, step by step) ----
   '🌊 Reefy\'ye hoş geldin!': '🌊 Welcome to Reefy!',
   'Bu resif artık senin. Balıklarını büyüt, koleksiyonunu tamamla, kendi resifini kur.':
     'This reef is now yours. Grow your fish, complete your collection, and build your own reef.',
@@ -764,7 +767,7 @@ const EN: Record<string, string> = {
   'İleri': 'Next',
   'Hadi başlayalım! 🎉': "Let's dive in! 🎉",
 
-  // ---- ui.ts: panel başlıkları ----
+  // ---- ui.ts: panel titles ----
   '🛒 Mağaza': '🛒 Shop', '🎒 Envanter': '🎒 Inventory', '🏆 Sosyal': '🏆 Social', '☰ Menü': '☰ Menu',
   '📈 Kazanç Raporu': '📈 Earnings Report', '📋 Görevler': '📋 Quests',
   '⚙️ Ayarlar': '⚙️ Settings',

@@ -1,8 +1,8 @@
-// Tüm sesler WebAudio ile sentezlenir — harici dosya/lisans yok.
+// All sounds are synthesized with WebAudio — no external files/licensing.
 import type { Rarity } from './species';
 import type { Biome } from './tanks';
 
-// Her biyomun kendi akor atmosferi var
+// Each biome has its own chord atmosphere
 const BIOME_CHORDS: Record<Biome, number[][]> = {
   tropik: [
     [261.6, 329.6, 392.0], [220.0, 277.2, 329.6], [246.9, 311.1, 370.0], [196.0, 246.9, 293.7],
@@ -31,7 +31,7 @@ class AudioMan {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private musicGain!: GainNode;
-  private echo: DelayNode | null = null; // müzik yankı kanalı (su altı derinliği)
+  private echo: DelayNode | null = null; // music echo channel (underwater depth)
   private ambientOn = false;
   private chordTimer: number | null = null;
   private ambientNoise: AudioBufferSourceNode | null = null;
@@ -74,7 +74,7 @@ class AudioMan {
     osc.stop(t0 + dur + 0.05);
   }
 
-  /** Kuru, kısa arayüz tık'ı — müzikten net biçimde ayrışır. */
+  /** Dry, short UI click — clearly distinct from the music. */
   click(): void {
     this.ensure();
     if (!this.sfx || !this.ctx) return;
@@ -124,7 +124,7 @@ class AudioMan {
     [659, 830, 988].forEach((f, i) => this.tone(f, 0.15, 'triangle', 0.12, i * 0.08));
   }
 
-  /** Aktif akvaryum biyomuna göre müzik atmosferini değiştirir. */
+  /** Changes the music atmosphere based on the active tank's biome. */
   setBiome(b: Biome): void {
     if (this.biome === b) return;
     this.biome = b;
@@ -134,7 +134,7 @@ class AudioMan {
     }
   }
 
-  /** Müzik kanalına tek nota (mutlak zamanlı). */
+  /** Plays a single note on the music channel (absolute timing). */
   private mnote(freq: number, dur: number, type: OscillatorType, vol: number, when: number, detune = 0): void {
     if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
@@ -150,7 +150,7 @@ class AudioMan {
     osc.stop(when + dur + 0.05);
   }
 
-  /** Kalimba/su çanı tınısı: yumuşak sinüs + hafif doğuşkan, uzun sönüm, yankıya gönderilir. */
+  /** Kalimba/water-bell timbre: soft sine + slight overtone, long decay, sent to the echo. */
   private bell(freq: number, when: number, vol = 0.05): void {
     if (!this.ctx) return;
     const g = this.ctx.createGain();
@@ -162,14 +162,14 @@ class AudioMan {
     o1.frequency.value = freq;
     const o2 = this.ctx.createOscillator();
     o2.type = 'sine';
-    o2.frequency.value = freq * 3.01; // hafif çan doğuşkanı
+    o2.frequency.value = freq * 3.01; // slight bell overtone
     const g2 = this.ctx.createGain();
     g2.gain.setValueAtTime(vol * 0.18, when);
     g2.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
     o1.connect(g);
     o2.connect(g2); g2.connect(g);
     g.connect(this.musicGain);
-    if (this.echo) g.connect(this.echo); // su altı yankısı — sadece müzikte var
+    if (this.echo) g.connect(this.echo); // underwater echo — only present in music
     o1.start(when); o1.stop(when + 1);
     o2.start(when); o2.stop(when + 0.4);
   }
@@ -179,7 +179,7 @@ class AudioMan {
     const ctx = this.ensure();
     this.ambientOn = true;
 
-    // Hafif okyanus uğultusu (arka dokuda)
+    // Faint ocean rumble (background texture)
     const len = 2 * ctx.sampleRate;
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = buf.getChannelData(0);
@@ -197,7 +197,7 @@ class AudioMan {
     this.ambientNoise = noise;
     this.ambientNodes = [lp, ng];
 
-    // Su altı yankısı: müzik notaları yumuşak ekoyla derinleşir (arayüz sesleri kuru kalır)
+    // Underwater echo: music notes deepen with a soft echo (UI sounds stay dry)
     this.echo = ctx.createDelay(1.0);
     this.echo.delayTime.value = 0.32;
     const fb = ctx.createGain();
@@ -214,9 +214,9 @@ class AudioMan {
     echoOut.connect(this.musicGain);
     this.ambientNodes.push(this.echo, fb, echoLp, echoOut);
 
-    // Akışkan su altı ezgisi: bas + pad + yankılı kalimba, biyoma göre tonalite
+    // Flowing underwater melody: bass + pad + echoing kalimba, tonality per biome
     const chords = BIOME_CHORDS[this.biome];
-    const BAR = 3.6; // saniye — bir akorluk ölçü
+    const BAR = 3.6; // seconds — one chord's bar
     let bar = 0;
     const playBar = () => {
       if (!this.ctx || !this.ambientOn) return;
@@ -224,22 +224,22 @@ class AudioMan {
       const chord = chords[bar % chords.length];
       const root = chord[0];
 
-      // Yumuşak bas
+      // Soft bass
       this.mnote(root / 2, BAR * 0.9, 'sine', 0.055, t0);
 
-      // İnce pad
+      // Thin pad
       for (const f of chord) this.mnote(f, BAR, 'triangle', 0.018, t0, (Math.random() - 0.5) * 7);
 
-      // Kalimba ezgisi: ölçüde 5 nota, akıp giden — staccato değil
+      // Kalimba melody: 5 notes per bar, flowing — not staccato
       const seq = [0, 2, 1, 3, 2];
       for (let i = 0; i < 5; i++) {
-        if ((bar * 2 + i) % 9 === 8) continue; // ara sıra nefes payı
+        if ((bar * 2 + i) % 9 === 8) continue; // occasional breathing room
         const when = t0 + i * (BAR / 5) + (i % 2 === 1 ? 0.08 : 0);
         const tone = chord[seq[i] % chord.length];
         this.bell(tone * (i === 3 ? 2 : 1), when, i === 0 ? 0.055 : 0.042);
       }
 
-      // Dört ölçüde bir tepede yankılanan parıltı
+      // Every four bars, a shimmer echoing at the top
       if (bar % 4 === 3) this.bell(chord[chord.length - 1] * 2, t0 + BAR * 0.55, 0.035);
       bar++;
     };

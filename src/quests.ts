@@ -6,13 +6,13 @@ export interface QuestDef {
   emoji: string;
   target: number;
   event: QuestEvent;
-  rewardCoins: number;   // seviye ile ölçeklenir
+  rewardCoins: number;   // scales with level
   rewardPearls: number;
 }
 
 export type QuestEvent = 'feed' | 'sell' | 'hatch' | 'buyFish' | 'placeDecor' | 'earn' | 'collect' | 'clean';
 
-/** Günlük görev havuzu — her gün tarihe göre 3'ü seçilir. */
+/** Daily quest pool — 3 are picked each day based on the date. */
 export const QUEST_POOL: QuestDef[] = [
   { id: 'q-feed20',   name: 'Balıklarına 20 yem yedir', emoji: '🍤', target: 20, event: 'feed',       rewardCoins: 150, rewardPearls: 0 },
   { id: 'q-feed50',   name: 'Balıklarına 50 yem yedir', emoji: '🍤', target: 50, event: 'feed',       rewardCoins: 320, rewardPearls: 0 },
@@ -35,7 +35,7 @@ export const QUEST_POOL: QuestDef[] = [
   { id: 'q-clean6',   name: '6 kir lekesi temizle',     emoji: '🧹', target: 6,  event: 'clean',      rewardCoins: 380, rewardPearls: 0 },
 ];
 
-/** Tarihten deterministik günlük görev seçimi */
+/** Deterministic daily quest selection from the date */
 export function questsForDay(day: string): QuestDef[] {
   let h = 0;
   for (const ch of day) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -48,7 +48,7 @@ export function questsForDay(day: string): QuestDef[] {
   return picked;
 }
 
-/** Haftalık görev havuzu — günlüklerden çok daha büyük hedef ve ödül. */
+/** Weekly quest pool — much larger targets and rewards than dailies. */
 export const WEEKLY_QUEST_POOL: QuestDef[] = [
   { id: 'w-feed200',  name: 'Bu hafta 200 yem yedir',        emoji: '🍤', target: 200,   event: 'feed',    rewardCoins: 1500, rewardPearls: 4 },
   { id: 'w-sell20',   name: 'Bu hafta 20 balık sat',          emoji: '🪙', target: 20,    event: 'sell',    rewardCoins: 2500, rewardPearls: 5 },
@@ -60,15 +60,15 @@ export const WEEKLY_QUEST_POOL: QuestDef[] = [
   { id: 'w-decor8',   name: 'Bu hafta 8 dekor yerleştir',      emoji: '🪸', target: 8,    event: 'placeDecor', rewardCoins: 1600, rewardPearls: 3 },
 ];
 
-/** Verilen tarihin içinde bulunduğu haftanın pazartesi gününü YYYY-MM-DD biçiminde döndürür. */
+/** Returns the Monday of the week containing the given date, in YYYY-MM-DD format. */
 export function weekKeyFor(d: Date): string {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const day = dt.getUTCDay() || 7; // Pazartesi=1 .. Pazar=7
+  const day = dt.getUTCDay() || 7; // Monday=1 .. Sunday=7
   dt.setUTCDate(dt.getUTCDate() - day + 1);
   return dt.toISOString().slice(0, 10);
 }
 
-/** Hafta anahtarından deterministik haftalık görev seçimi */
+/** Deterministic weekly quest selection from the week key */
 export function weeklyQuestForWeek(week: string): QuestDef {
   let h = 0;
   for (const ch of week) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -81,7 +81,7 @@ export interface AchievementDef {
   name: string;
   emoji: string;
   desc: string;
-  check: (s: SaveData) => number;  // ilerleme
+  check: (s: SaveData) => number;  // progress
   target: number;
   rewardCoins: number;
   rewardPearls: number;
@@ -92,9 +92,10 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'a-sold10',   name: 'Esnaf',            emoji: '🏪', desc: '10 balık sat',                       check: (s) => s.stats.totalSold, target: 10,  rewardCoins: 400,  rewardPearls: 1 },
   { id: 'a-sold50',   name: 'Balık Tüccarı',    emoji: '⚖️', desc: '50 balık sat',                       check: (s) => s.stats.totalSold, target: 50,  rewardCoins: 1500, rewardPearls: 3 },
   { id: 'a-sold200',  name: 'Resif Baronu',     emoji: '👑', desc: '200 balık sat',                      check: (s) => s.stats.totalSold, target: 200, rewardCoins: 6000, rewardPearls: 10 },
-  // Toplam kazanç kilometre taşları: erken oyundan geç oyuna kadar dengeli aralıklarla uzanır.
-  // Ödül/hedef oranı büyüdükçe düşer (~%3 -> ~%0.75) ki geç oyunda ekonomiyi bozmasın;
-  // claimAchievement() bu ödülleri totalEarned'a geri saymaz, bu yüzden kendi kendini beslemez.
+  // Total-earnings milestones: spans balanced intervals from early game to late game.
+  // The reward/target ratio shrinks as the target grows (~3% -> ~0.75%) so it doesn't
+  // break the late-game economy; claimAchievement() doesn't add these rewards back into
+  // totalEarned, so it isn't self-feeding.
   { id: 'a-earn1k',   name: 'İlk Kazanç',         emoji: '🪙', desc: 'Toplamda 1.000 altın kazan',         check: (s) => s.stats.totalEarned, target: 1000,     rewardCoins: 30,     rewardPearls: 0 },
   { id: 'a-earn5k',   name: 'İlk Birikim',        emoji: '💵', desc: 'Toplamda 5.000 altın kazan',         check: (s) => s.stats.totalEarned, target: 5000,     rewardCoins: 150,    rewardPearls: 0 },
   { id: 'a-earn20k',  name: 'Küçük Servet',       emoji: '🏦', desc: 'Toplamda 20.000 altın kazan',        check: (s) => s.stats.totalEarned, target: 20000,    rewardCoins: 500,    rewardPearls: 1 },
@@ -117,14 +118,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'a-decor20',  name: 'İç Mimar',         emoji: '🏛️', desc: '20 dekor yerleştir',                 check: (s) => s.stats.decorPlacedCount, target: 20, rewardCoins: 1800, rewardPearls: 4 },
   { id: 'a-tank3',    name: 'Gezgin',           emoji: '🗺️', desc: '3 akvaryuma sahip ol',               check: (s) => s.tanksOwned.length, target: 3,  rewardCoins: 1000, rewardPearls: 2 },
   { id: 'a-tank10',   name: 'Okyanus İmparatoru', emoji: '🌊', desc: '10 akvaryuma sahip ol',            check: (s) => s.tanksOwned.length, target: 10, rewardCoins: 5000, rewardPearls: 10 },
-  // bestStreak kullanılıyor (streak değil): streak gün kaçırılınca sıfırlanıyor, oyuncu 7 güne
-  // ulaşıp ödülü almadan bir gün kaçırırsa bestStreak olmasa başarım kalıcı olarak kilitli kalırdı.
+  // bestStreak is used (not streak): streak resets when a day is missed, so if a player
+  // reaches 7 days without claiming the reward and then misses a day, without bestStreak
+  // the achievement would stay permanently locked.
   { id: 'a-streak7',  name: 'Sadık Dost',       emoji: '🔥', desc: '7 gün üst üste oyna',                check: (s) => s.bestStreak, target: 7, rewardCoins: 1200, rewardPearls: 3 },
   { id: 'a-clean25',  name: 'Temizlikçi',       emoji: '🧽', desc: '25 kir lekesi temizle',              check: (s) => s.stats.totalCleaned, target: 25, rewardCoins: 900, rewardPearls: 2 },
   { id: 'a-feed500',  name: 'Sadık Besleyici',  emoji: '🍤', desc: 'Toplam 500 yem ver',                 check: (s) => s.stats.totalFed, target: 500,  rewardCoins: 700,  rewardPearls: 2 },
   { id: 'a-feed2000', name: 'Yem Ustası',       emoji: '🍽️', desc: 'Toplam 2.000 yem ver',               check: (s) => s.stats.totalFed, target: 2000, rewardCoins: 3000, rewardPearls: 5 },
   { id: 'a-decor50',  name: 'Saray Mimarı',     emoji: '🏰', desc: '50 dekor yerleştir',                 check: (s) => s.stats.decorPlacedCount, target: 50, rewardCoins: 4000, rewardPearls: 6 },
-  // friends.length: arkadaş listesindeki kod sayısı (üst sınır 50, bkz. services.ts MAX_FRIENDS).
+  // friends.length: number of codes in the friends list (capped at 50, see services.ts MAX_FRIENDS).
   { id: 'a-friend5',  name: 'Sosyal Kelebek',   emoji: '🦋', desc: '5 arkadaş ekle',                     check: (s) => s.friends.length, target: 5,  rewardCoins: 600,  rewardPearls: 1 },
   { id: 'a-friend25', name: 'Resif Topluluğu',  emoji: '🐬', desc: '25 arkadaş ekle',                    check: (s) => s.friends.length, target: 25, rewardCoins: 3500, rewardPearls: 5 },
   { id: 'a-streak30', name: 'Aylık Dost',       emoji: '🌙', desc: '30 gün üst üste oyna',               check: (s) => s.bestStreak, target: 30, rewardCoins: 6000, rewardPearls: 8 },

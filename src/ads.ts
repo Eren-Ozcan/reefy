@@ -1,15 +1,15 @@
-// Reklam sağlayıcısı soyutlama katmanı (services.ts'teki IAP/Auth desenini izler).
+// Ad provider abstraction layer (follows the IAP/Auth pattern in services.ts).
 //
-// Web/geliştirme ortamında StubAds çalışır (reklam göstermez).
-// Capacitor paketlerinde AdMobAds, @capacitor-community/admob üzerinden
-// Google AdMob'a bağlanır. Oyun kodu yalnızca AdsProvider arayüzünü kullanır.
+// In the web/dev environment StubAds runs (shows no ads).
+// In Capacitor builds, AdMobAds connects to Google AdMob via
+// @capacitor-community/admob. Game code only uses the AdsProvider interface.
 
 import { Capacitor } from '@capacitor/core';
 import { AdMob, AdmobConsentStatus, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { t } from './i18n';
 import type { SaveData } from './save';
 
-/** AdMob dashboard'da oluşturulan reklam birimi kimlikleri (bkz. apps.admob.com > Reefy). */
+/** Ad unit IDs created in the AdMob dashboard (see apps.admob.com > Reefy). */
 const INTERSTITIAL_AD_IDS: { android: string; ios: string } = {
   android: 'ca-app-pub-9709993577664180/8876084322',
   ios: 'ca-app-pub-9709993577664180/3722729912',
@@ -19,24 +19,24 @@ const REWARDED_AD_IDS: { android: string; ios: string } = {
   ios: 'ca-app-pub-9709993577664180/6249920983',
 };
 
-/** Ödüllü reklam başına verilen inci miktarı — mağaza IAP'lerinde olduğu gibi ödül miktarı
- * her zaman burada, kodda kontrol altındadır (reklam ağının kendi callback verisine güvenilmez). */
+/** Pearl amount granted per rewarded ad — as with store IAPs, the reward amount
+ * is always controlled here in code (the ad network's own callback data is not trusted). */
 export const REWARDED_AD_PEARLS = 5;
 
-const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // akvaryum geçişlerinde art arda reklam basmasın
-const REWARDED_COOLDOWN_MS = 30 * 1000;         // yanlışlıkla çift tıklamayı önle
+const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // don't show ads back-to-back on tank transitions
+const REWARDED_COOLDOWN_MS = 30 * 1000;         // prevent accidental double-clicks
 
-/** Soğuma sayacının diskteki yeri. Yalnızca bellekte tutulduğunda oyuncu uygulamayı
- *  kapatıp açtığında sıfırlanıyordu; her soğuk açılış yeni bir reklam hakkı doğuruyordu.
- *  Kayıt dosyasından (SaveData) bilerek ayrı: bu oyun ilerlemesi değil, silinmesi
- *  zararsız bir yan bilgi. */
+/** Where the cooldown timer lives on disk. When kept only in memory, it reset
+ *  whenever the player closed and reopened the app; every cold start yielded a
+ *  fresh ad opportunity. Deliberately kept separate from the save file
+ *  (SaveData): this isn't game progress, it's harmless-to-lose side data. */
 const INTERSTITIAL_TS_KEY = 'reefy.ads.lastInterstitial';
 
 function loadLastInterstitial(): number {
   try {
     const raw = Number(localStorage.getItem(INTERSTITIAL_TS_KEY));
-    // Gelecekteki bir zaman damgası (cihaz saati geri alınmış) kalıcı kilide yol
-    // açmasın: geçersiz say, sıfırdan başlat.
+    // A future timestamp (device clock rolled back) shouldn't cause a permanent
+    // lock: treat it as invalid and start fresh.
     return Number.isFinite(raw) && raw > 0 && raw <= Date.now() ? raw : 0;
   } catch {
     return 0;
@@ -47,20 +47,20 @@ function saveLastInterstitial(ts: number): void {
   try {
     localStorage.setItem(INTERSTITIAL_TS_KEY, String(ts));
   } catch {
-    /* özel mod / kota — reklam sayacı uğruna oyun akışı bozulmasın */
+    /* private mode / quota — don't let the ad timer break game flow */
   }
 }
 
 export interface AdsProvider {
-  /** Oyunun İÇİNDEKİ doğal bir mola noktasında (akvaryum değişimi, akvaryumun tamamen
-   * temizlenmesi) çağrılır; sessizce no-op olabilir (soğuma süresi dolmadıysa, reklam
-   * hazır değilse veya "reklamları kaldır" satın alındıysa).
+  /** Called at a natural break point INSIDE the game (tank change, tank fully
+   * cleared); may silently no-op (if the cooldown hasn't elapsed, the ad isn't
+   * ready, or "remove ads" has been purchased).
    *
-   * Uygulama açılışından ÇAĞIRILMAZ: AdMob açılışta/öne gelişte geçiş reklamını
-   * yasaklıyor, o senaryonun izin verilen formatı ayrı bir "App Open" birimi —
-   * kullandığımız @capacitor-community/admob sürümünde o format yok. */
+   * NOT CALLED on app startup: AdMob forbids interstitials on launch/foreground,
+   * the allowed format for that scenario is a separate "App Open" unit —
+   * which doesn't exist in the version of @capacitor-community/admob we use. */
   maybeShowInterstitial(): void;
-  /** Oyuncunun bilerek başlattığı ödüllü reklam akışı. */
+  /** The rewarded ad flow, deliberately started by the player. */
   showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }>;
 }
 
@@ -88,9 +88,9 @@ export class AdMobAds implements AdsProvider {
     return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
   }
 
-  /** GDPR/UMP onam akışı: AB/İngiltere trafiğinde reklam isteği ATILMADAN ÖNCE
-   *  onam sorulmak zorunda. Onam alınamazsa (ya da SDK hata verirse) reklamsız
-   *  devam edilir — oyunun açılışı hiçbir koşulda buna takılmaz. */
+  /** GDPR/UMP consent flow: for EU/UK traffic, consent must be requested
+   *  BEFORE any ad request is made. If consent can't be obtained (or the SDK
+   *  errors out), proceed without ads — app startup must never block on this. */
   private async requestConsent(): Promise<boolean> {
     try {
       let info = await AdMob.requestConsentInfo();

@@ -1,16 +1,16 @@
-// Yem türleri: elle atılır (her dokunuş bir tane), kaliteli yemler
-// balığın yetişkin satış fiyatına kalıcı bonus ekleme şansı taşır.
+// Feed types: dispensed by hand (one per tap); higher-quality feeds
+// carry a chance to add a permanent bonus to the fish's adult sale price.
 
 export interface FeedDef {
   id: string;
   name: string;
   emoji: string;
-  cost: number;         // tane başına altın (0 = ücretsiz)
-  hunger: number;       // tokluk artışı
-  bonusChance: number;  // her yiyişte satış bonusu kazanma olasılığı (0..1)
-  bonusAmount: number;  // kazanılan bonus (satış fiyatının oranı)
-  color: number;        // yem tanesi rengi
-  color2: number;       // parlama rengi
+  cost: number;         // gold per piece (0 = free)
+  hunger: number;       // hunger increase
+  bonusChance: number;  // chance to earn a sale bonus per feeding (0..1)
+  bonusAmount: number;  // bonus earned (as a fraction of sale price)
+  color: number;        // feed particle color
+  color2: number;       // glow color
   desc: string;
 }
 
@@ -39,24 +39,24 @@ export function feedById(id: string): FeedDef {
   return FEEDS.find((f) => f.id === id) ?? FEEDS[0];
 }
 
-/** Toplu yem paketleri: stok olarak çantaya girer; stok bitince tane başı normal fiyat işler. */
+/** Bulk feed packs: added to the bag as stock; once stock runs out, the normal per-unit price applies. */
 export interface FeedPack {
   id: string;
   feed: string;   // FeedDef id
   qty: number;
-  price: number;  // altın — tane başına normalden ucuz
+  price: number;  // gold — cheaper per unit than normal
 }
 
 export const FEED_PACKS: FeedPack[] = [
-  { id: 'pack-lezzet-10', feed: 'lezzet', qty: 10, price: 70 },    // 7/tane (normal 8)
-  { id: 'pack-lezzet-50', feed: 'lezzet', qty: 50, price: 320 },   // 6.4/tane
-  { id: 'pack-altin-10',  feed: 'altin',  qty: 10, price: 350 },   // 35/tane (normal 40)
-  { id: 'pack-altin-50',  feed: 'altin',  qty: 50, price: 1600 },  // 32/tane
+  { id: 'pack-lezzet-10', feed: 'lezzet', qty: 10, price: 70 },    // 7/unit (normal 8)
+  { id: 'pack-lezzet-50', feed: 'lezzet', qty: 50, price: 320 },   // 6.4/unit
+  { id: 'pack-altin-10',  feed: 'altin',  qty: 10, price: 350 },   // 35/unit (normal 40)
+  { id: 'pack-altin-50',  feed: 'altin',  qty: 50, price: 1600 },  // 32/unit
 ];
 
 export function feedPackById(id: string): FeedPack | undefined {
   return FEED_PACKS.find((p) => p.id === id);
 }
 
-/** Bir balığın yemle biriktirebileceği en yüksek satış bonusu. */
+/** The highest sale bonus a fish can accumulate through feeding. */
 export const FISH_BONUS_CAP = 0.6;

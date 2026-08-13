@@ -18,12 +18,12 @@ export interface DecorDef {
   desc: string;
 }
 
-/** Nadirlik başına yerleştirilmiş dekor büyüme bonusu (%) */
+/** Placed decor growth bonus per rarity (%) */
 export const DECOR_BOOST: Record<Rarity, number> = {
   common: 1, uncommon: 2, rare: 3, epic: 5, legendary: 8,
 };
-export const DECOR_BOOST_CAP = 35; // toplam % üst sınırı
-export const MAX_PLACED = 10;      // akvaryum başına yerleştirme limiti
+export const DECOR_BOOST_CAP = 35; // total % upper limit
+export const MAX_PLACED = 10;      // placement limit per aquarium
 
 interface KindPlan {
   kind: DecorKind;
@@ -230,7 +230,7 @@ function buildDecor(): DecorDef[] {
     for (const v of plan.variants) {
       n++;
       const p = PRICE_BY_RARITY[v.rarity];
-      // Aynı nadirlikte fiyatları hafifçe çeşitlendir
+      // Slightly vary prices within the same rarity
       const jitter = 1 + ((n * 7) % 5) * 0.06;
       out.push({
         id: `dec-${plan.kind}-${n}`,

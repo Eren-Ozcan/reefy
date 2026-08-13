@@ -2,8 +2,8 @@ import { Rarity } from './species';
 
 export type Biome = 'tropik' | 'lagun' | 'derin' | 'magara' | 'kutup' | 'gunbatimi' | 'mistik';
 
-/** Kum bandının üst kenarının formu. Kumun üstünde nesne yoktur; akvaryumlar
- *  birbirinden renk, ışık ve kumun kendi şekliyle ayrılır. */
+/** The shape of the sand strip's top edge. There are no objects on the sand;
+ *  tanks are distinguished from each other by color, light, and the sand's own shape. */
 export type FloorShape = 'flat' | 'mound' | 'dip' | 'wave';
 
 export interface TankDef {
@@ -11,24 +11,24 @@ export interface TankDef {
   name: string;
   biome: Biome;
   rarity: Rarity;
-  /** Suyun arkasındaki düz katman rengi; su gradyanı bunun üzerine yarı saydam biner. */
+  /** Flat backdrop color behind the water; the water gradient layers on top of it translucently. */
   backdrop: number;
-  /** su gradyanı: yüzey, orta, dip */
+  /** water gradient: surface, mid, bottom */
   water: [number, number, number];
   sand: number;
   sandDots: number;
   floor: FloorShape;
-  rayCount: number;       // ışık huzmesi sayısı
-  rayAlpha: number;       // huzme yoğunluğu (0..1)
-  bubbles: number;        // kabarcık sıklığı çarpanı (0.4 seyrek — 1.6 yoğun)
-  price: number;          // 0 => başlangıç akvaryumu
+  rayCount: number;       // number of light rays
+  rayAlpha: number;       // ray intensity (0..1)
+  bubbles: number;        // bubble frequency multiplier (0.4 sparse — 1.6 dense)
+  price: number;          // 0 => starter tank
   currency: 'coins' | 'pearls';
   unlockLevel: number;
-  growthBonus: number;    // % büyüme bonusu
+  growthBonus: number;    // % growth bonus
   desc: string;
 }
 
-/** Akvaryum kademesinin balık kapasitesine eklediği bonus. */
+/** Bonus the tank's rarity tier adds to fish capacity. */
 export const TANK_CAP_BONUS: Record<Rarity, number> = {
   common: 0, uncommon: 2, rare: 4, epic: 7, legendary: 10,
 };
@@ -44,14 +44,14 @@ export const BIOME_INFO: Record<Biome, { name: string; emoji: string }> = {
 };
 
 export const TANKS: TankDef[] = [
-  // ---- Başlangıç ----
+  // ---- Starter ----
   { id: 'tank-mercan-koyu', name: 'Mercan Koyu', biome: 'tropik', rarity: 'common',
     backdrop: 0x8bd2da, water: [0x9ad0cf, 0x5cbcb9, 0x358288],
     sand: 0xe6d5a8, sandDots: 0xddba74,
     floor: 'mound', rayCount: 4, rayAlpha: 0.070, bubbles: 1.0,
     price: 0, currency: 'coins', unlockLevel: 1, growthBonus: 0,
     desc: 'Her şeyin başladığı sıcak, güvenli koy.' },
-  // ---- Yaygın ----
+  // ---- Common ----
   { id: 'tank-kumsal', name: 'Altın Kumsal', biome: 'tropik', rarity: 'common',
     backdrop: 0xaeeacc, water: [0xbfe4d6, 0x80d0b3, 0x3fb696],
     sand: 0xf3e7ba, sandDots: 0xefd181,
@@ -76,7 +76,7 @@ export const TANKS: TankDef[] = [
     floor: 'flat', rayCount: 4, rayAlpha: 0.065, bubbles: 1.2,
     price: 8500, currency: 'coins', unlockLevel: 6, growthBonus: 1,
     desc: 'Açık denize açılan kapı.' },
-  // ---- Az Bulunur ----
+  // ---- Uncommon ----
   { id: 'tank-lagun', name: 'Turkuaz Lagün', biome: 'lagun', rarity: 'uncommon',
     backdrop: 0xa0eeec, water: [0xa8e6dd, 0x62daca, 0x27b9b4],
     sand: 0xf0e6c7, sandDots: 0xe7ce92,
@@ -107,7 +107,7 @@ export const TANKS: TankDef[] = [
     floor: 'wave', rayCount: 2, rayAlpha: 0.040, bubbles: 1.6,
     price: 33000, currency: 'coins', unlockLevel: 11, growthBonus: 2,
     desc: 'Cesur balıkların sınandığı dalgalı sular.' },
-  // ---- Nadir ----
+  // ---- Rare ----
   { id: 'tank-batik-koyu', name: 'Batık Koyu', biome: 'derin', rarity: 'rare',
     backdrop: 0x4c4fa9, water: [0x606aa9, 0x3d457b, 0x1e1f3e],
     sand: 0x9c8563, sandDots: 0x786249,
@@ -138,7 +138,7 @@ export const TANKS: TankDef[] = [
     floor: 'wave', rayCount: 4, rayAlpha: 0.095, bubbles: 0.8,
     price: 135000, currency: 'coins', unlockLevel: 16, growthBonus: 3,
     desc: 'Suyun altında bile gün batımı yaşanır.' },
-  // ---- Epik ----
+  // ---- Epic ----
   { id: 'tank-abis', name: 'Abis Kapısı', biome: 'derin', rarity: 'epic',
     backdrop: 0x182059, water: [0x4059ab, 0x253774, 0x0e122f],
     sand: 0x4f4b63, sandDots: 0x312f41,
@@ -169,7 +169,7 @@ export const TANKS: TankDef[] = [
     floor: 'wave', rayCount: 2, rayAlpha: 0.068, bubbles: 1.5,
     price: 400000, currency: 'coins', unlockLevel: 21, growthBonus: 5,
     desc: 'Her canlının kendi ışığını taşıdığı vadi.' },
-  // ---- Efsanevi ----
+  // ---- Legendary ----
   { id: 'tank-ay-lagunu', name: 'Ay Lagünü', biome: 'mistik', rarity: 'legendary',
     backdrop: 0xbcb9e9, water: [0xc6c7e6, 0x898cd1, 0x4c45ba],
     sand: 0xced0de, sandDots: 0xa8aec7,
