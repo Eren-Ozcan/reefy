@@ -34,6 +34,8 @@ class AudioMan {
   private echo: DelayNode | null = null; // müzik yankı kanalı (su altı derinliği)
   private ambientOn = false;
   private chordTimer: number | null = null;
+  private ambientNoise: AudioBufferSourceNode | null = null;
+  private ambientNodes: AudioNode[] = [];
   private biome: Biome = 'tropik';
   music = true;
   sfx = true;
@@ -192,6 +194,8 @@ class AudioMan {
     ng.gain.value = 0.028;
     noise.connect(lp); lp.connect(ng); ng.connect(this.musicGain);
     noise.start();
+    this.ambientNoise = noise;
+    this.ambientNodes = [lp, ng];
 
     // Su altı yankısı: müzik notaları yumuşak ekoyla derinleşir (arayüz sesleri kuru kalır)
     this.echo = ctx.createDelay(1.0);
@@ -208,6 +212,7 @@ class AudioMan {
     fb.connect(this.echo);
     echoLp.connect(echoOut);
     echoOut.connect(this.musicGain);
+    this.ambientNodes.push(this.echo, fb, echoLp, echoOut);
 
     // Akışkan su altı ezgisi: bas + pad + yankılı kalimba, biyoma göre tonalite
     const chords = BIOME_CHORDS[this.biome];
@@ -246,7 +251,26 @@ class AudioMan {
   stopAmbient(): void {
     this.ambientOn = false;
     if (this.chordTimer !== null) { clearInterval(this.chordTimer); this.chordTimer = null; }
-    if (this.ctx) this.musicGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+    // Kaynak/yankı zinciri yalnızca gain sıfırlanarak bırakılırsa bağlı kalır;
+    // setBiome() her tank değişiminde stopAmbient() + startAmbient() çağırdığından
+    // node'lar sınırsız birikip her geçişte ses kademeli olarak yükselirdi.
+    // Ramp bitene kadar beklenir ki kesme duyulur bir "tık" yaratmasın.
+    const noise = this.ambientNoise;
+    const nodes = this.ambientNodes;
+    this.ambientNoise = null;
+    this.ambientNodes = [];
+    this.echo = null;
+    const cleanup = () => {
+      try { noise?.stop(); } catch { /* zaten durmuş olabilir */ }
+      noise?.disconnect();
+      for (const n of nodes) n.disconnect();
+    };
+    if (this.ctx) {
+      this.musicGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+      setTimeout(cleanup, 650);
+    } else {
+      cleanup();
+    }
   }
 
   setMusic(on: boolean): void {
