@@ -17,7 +17,10 @@ function hex(c: number): string {
 }
 
 export function fmt(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.0', '') + 'M';
+  // Eşik kontrolü yuvarlamadan ÖNCE yapılırsa 999_950-999_999 arası değerler
+  // k-dalında (n/1000).toFixed(1) ile "1000.0" -> "1000k" olur; M eşiği bu
+  // yüzden gerçek yuvarlanmış değere göre (999_950) kontrol edilir.
+  if (n >= 999_950) return (n / 1_000_000).toFixed(1).replace('.0', '') + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + 'k';
   return String(n);
 }
@@ -507,7 +510,7 @@ export class UI {
     this.panelHost.innerHTML = '';
   }
 
-  private panelShell(title: string, bodyHTML: string, tabs?: { id: string; label: string; active: boolean }[]): HTMLElement {
+  private panelShell(title: string, bodyHTML: string, tabs?: { id: string; label: string; active: boolean }[], blocking = false): HTMLElement {
     this.closePanel();
     const wrap = document.createElement('div');
     wrap.className = 'panel-backdrop';
@@ -516,16 +519,18 @@ export class UI {
       : '';
     wrap.innerHTML = `
       <div class="panel">
-        <div class="panel-head"><h2>${title}</h2><button class="close-btn">✕</button></div>
+        <div class="panel-head"><h2>${title}</h2>${blocking ? '' : '<button class="close-btn">✕</button>'}</div>
         ${tabHTML}
         <div class="panel-body">${bodyHTML}</div>
       </div>`;
-    wrap.addEventListener('click', (e) => {
-      if (e.target === wrap) { audio.click(); this.closePanel(); }
-    });
-    wrap.querySelector('.close-btn')!.addEventListener('click', () => {
-      audio.click(); this.closePanel();
-    });
+    if (!blocking) {
+      wrap.addEventListener('click', (e) => {
+        if (e.target === wrap) { audio.click(); this.closePanel(); }
+      });
+      wrap.querySelector('.close-btn')!.addEventListener('click', () => {
+        audio.click(); this.closePanel();
+      });
+    }
     this.panelHost.appendChild(wrap);
     return wrap;
   }
@@ -1324,7 +1329,7 @@ export class UI {
           <button class="buy-btn" id="keep-local">${tt('Bunu kullan')}</button>
         </div>
       </div>
-    `);
+    `, undefined, true);
 
     el.querySelector('#keep-cloud')!.addEventListener('click', () => {
       audio.click();
