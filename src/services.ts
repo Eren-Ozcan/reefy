@@ -188,6 +188,7 @@ function isRevenueCatConfigured(): boolean {
 export class RevenueCatIAP implements IAPProvider {
   readonly storeLabel: string;
   private configured = false;
+  private appUserId: string | null = null;
   private offeringsPromise: ReturnType<typeof Purchases.getOfferings> | null = null;
   /** packId -> mağazanın verdiği yerelleştirilmiş fiyat metni (ör. "₺39,99", "$2.99") */
   private livePrices: Record<string, string> = {};
@@ -195,10 +196,22 @@ export class RevenueCatIAP implements IAPProvider {
   constructor(appUserId: string) {
     this.storeLabel = Capacitor.getPlatform() === 'ios' ? 'App Store' : 'Google Play';
     if (!isRevenueCatConfigured()) return;
-    const apiKey = Capacitor.getPlatform() === 'ios' ? REVENUECAT_API_KEYS.ios : REVENUECAT_API_KEYS.android;
-    void Purchases.configure({ apiKey, appUserID: appUserId }).then(() => {
+    this.appUserId = appUserId;
+    void this.ensureConfigured();
+  }
+
+  /** configure() soğuk açılışta reddedilirse (kötü key, ağ yok, plugin hazır değil)
+   * `configured` sonsuza dek false kalıp satın almayı kilitli bırakmasın diye,
+   * bir sonraki purchase()/loadPrices() çağrısında sessizce yeniden denenir. */
+  private async ensureConfigured(): Promise<void> {
+    if (this.configured || !this.appUserId) return;
+    try {
+      const apiKey = Capacitor.getPlatform() === 'ios' ? REVENUECAT_API_KEYS.ios : REVENUECAT_API_KEYS.android;
+      await Purchases.configure({ apiKey, appUserID: this.appUserId });
       this.configured = true;
-    });
+    } catch {
+      /* bağlantı kurulamadı — configured false kalır, bir sonraki çağrıda tekrar denenir */
+    }
   }
 
   /**
@@ -213,11 +226,21 @@ export class RevenueCatIAP implements IAPProvider {
     });
   }
 
+  /** Başarısız getOfferings() çağrısını sonsuza dek önbellekte tutmaz — reddedilince
+   * sıfırlanır ki bir sonraki çağrı (ör. bağlantı geri geldiğinde) yeniden dener. */
+  private getOfferings(): ReturnType<typeof Purchases.getOfferings> {
+    this.offeringsPromise ??= Purchases.getOfferings().catch((err) => {
+      this.offeringsPromise = null;
+      throw err;
+    });
+    return this.offeringsPromise;
+  }
+
   async loadPrices(): Promise<void> {
+    if (!this.configured) await this.ensureConfigured();
     if (!this.configured) return;
     try {
-      this.offeringsPromise ??= Purchases.getOfferings();
-      const current = (await this.offeringsPromise).current;
+      const current = (await this.getOfferings()).current;
       if (!current) return;
       for (const pkg of current.availablePackages) {
         const price = pkg.product?.priceString;
@@ -229,8 +252,7 @@ export class RevenueCatIAP implements IAPProvider {
   }
 
   private async findStorePackage(packId: string): Promise<PurchasesPackage | null> {
-    if (!this.offeringsPromise) this.offeringsPromise = Purchases.getOfferings();
-    const offerings = await this.offeringsPromise;
+    const offerings = await this.getOfferings();
     const current = offerings.current;
     if (!current) return null;
     return current.availablePackages.find((p) => p.identifier === packId) ?? null;
@@ -239,6 +261,7 @@ export class RevenueCatIAP implements IAPProvider {
   async purchase(packId: string): Promise<{ ok: boolean; msg: string; grantPearls?: number; grantCoins?: number; grantRemovesAds?: boolean }> {
     const pack = IAP_PACKS.find((p) => p.id === packId);
     if (!pack) return { ok: false, msg: t('Bilinmeyen paket.') };
+    if (!this.configured) await this.ensureConfigured();
     if (!this.configured) {
       return { ok: false, msg: t('{store} bağlantısı henüz kurulmadı. Lütfen daha sonra tekrar dene.', { store: this.storeLabel }) };
     }
