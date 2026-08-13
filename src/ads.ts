@@ -144,19 +144,24 @@ export class AdMobAds implements AdsProvider {
     if (now - this.lastRewarded < REWARDED_COOLDOWN_MS) {
       return { ok: false, msg: t('Az önce bir reklam izledin, biraz sonra tekrar dene.') };
     }
+    let listener: { remove: () => Promise<void> } | null = null;
     try {
       await AdMob.prepareRewardVideoAd({ adId: REWARDED_AD_IDS[this.platform()] });
       let rewarded = false;
-      const listener = await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
+      listener = await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
         rewarded = true;
       });
       await AdMob.showRewardVideoAd();
-      await listener.remove();
       if (!rewarded) return { ok: false, msg: t('Reklamı tamamlamadan çıktın, ödül verilmedi.') };
       this.lastRewarded = now;
       return { ok: true, msg: t('Reklamı izledin! +{n} inci 🦪', { n: REWARDED_AD_PEARLS }), grantPearls: REWARDED_AD_PEARLS };
     } catch {
       return { ok: false, msg: t('Şu anda gösterilecek reklam bulunamadı, daha sonra tekrar dene.') };
+    } finally {
+      // showRewardVideoAd() reddederse (reklam süresi doldu, ağ koptu) eskiden
+      // dinleyici hiç kaldırılmıyordu; bir sonraki başarılı izlemede eski ve
+      // yeni dinleyici birlikte tetiklenip ödülü iki kez işleyebiliyordu.
+      if (listener) void listener.remove();
     }
   }
 }
