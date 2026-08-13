@@ -1,11 +1,11 @@
-// CloudSave.sync() karar tablosu — ağa hiç çıkılmaz, Firestore taklit edilir.
+// CloudSave.sync() decision table — never touches the network, Firestore is mocked.
 //
-// Buradaki iddiaların üçü sessizce bozulabilir ve bozulduğunda oyuncu veri
-// kaybeder:
-//   1. Gerçek çakışmada (iki tarafta da ilerleme) ASLA otomatik karar verilmez.
-//   2. Yerelde emek yokken çakışma ekranı gösterilmez, doğrudan geri yüklenir
-//      (hızlı yol — yeni kurulan cihazın beklediği davranış).
-//   3. Reklamsız sürüm hakkı ne buluta gider ne buluttan gelir.
+// Three of the claims here can silently break, and when they do the player
+// loses data:
+//   1. In a real conflict (progress on both sides), a decision is NEVER made automatically.
+//   2. When there's no local effort, the conflict screen isn't shown — it
+//      restores directly (fast path — the behavior a newly set-up device expects).
+//   3. The ad-removal entitlement never goes to the cloud and never comes from it.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SaveData } from './save';
@@ -41,7 +41,7 @@ const { defaultSave, SAVE_SCHEMA_VERSION } = await import('./save');
 const REV_KEY = 'reefy-cloud-rev';
 const DIRTY_KEY = 'reefy-cloud-dirty';
 
-/** Buluttaki dokümanı taklit eder; `payload` verilmezse kayıt yok sayılır. */
+/** Mocks the document in the cloud; if `payload` isn't given, the save is treated as absent. */
 function cloudDoc(opts: {
   payload?: unknown;
   rev?: number;
@@ -63,7 +63,7 @@ function cloudDoc(opts: {
 
 const noCloudDoc: CloudSnapshot = { exists: () => false, data: () => ({}) };
 
-/** Buluta yazılmış gibi görünen, gerçekten ilerlemiş bir kayıt. */
+/** A save that looks like it was written to the cloud and has genuinely progressed. */
 function advancedSave(): SaveData {
   const s = defaultSave();
   s.level = 9;
@@ -74,7 +74,7 @@ function advancedSave(): SaveData {
   return s;
 }
 
-/** Yerelde gerçekten oynanmış bir kayıt. */
+/** A save that has genuinely been played locally. */
 function playedSave(): SaveData {
   const s = defaultSave();
   s.level = 3;
@@ -84,10 +84,10 @@ function playedSave(): SaveData {
   return s;
 }
 
-/** Yeni kurulmuş cihaz: kayıt bakir ama "gönderilmemiş değişiklik" işaretli. */
+/** A freshly set-up device: the save is untouched but flagged as having an "unsent change." */
 function freshButDirty(): SaveData {
   const s = defaultSave();
-  // Oyuna girildikten saniyeler sonra kendiliğinden olan değişiklikler.
+  // Changes that happen on their own a few seconds after entering the game.
   s.lastSeen = Date.now();
   s.incomePot = 12.5;
   s.lastDaily = '2026-08-07';
@@ -146,7 +146,7 @@ describe('bulut geride ya da eşitken', () => {
     const save = playedSave();
     await expect(new CloudSave().sync(save)).resolves.toBe('in-sync');
 
-    expect(save.level).toBe(3); // yerel korundu
+    expect(save.level).toBe(3); // local was preserved
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
@@ -182,8 +182,8 @@ describe('bulut ilerideyken', () => {
     const cloud = new CloudSave();
     await expect(cloud.sync(save)).resolves.toBe('conflict');
 
-    expect(save.level).toBe(3);                 // yerel dokunulmadı
-    expect(setDocMock).not.toHaveBeenCalled();  // bulut da dokunulmadı (yedek kalır)
+    expect(save.level).toBe(3);                 // local wasn't touched
+    expect(setDocMock).not.toHaveBeenCalled();  // cloud wasn't touched either (stays as the backup)
     expect(cloud.hasConflict).toBe(true);
     expect(cloud.conflictSummary).toEqual({
       level: 9, coins: 8000, collection: 12, updatedAtMs: 1_700_000_000_000,
@@ -199,13 +199,13 @@ describe('bulut ilerideyken', () => {
         rev: 4,
         schemaVersion: SAVE_SCHEMA_VERSION,
         summary: { level: 9, coins: 8000, collection: 12 },
-        updatedAt: undefined, // yerel önbellekten okunmuş, henüz sunucuya yazılmamış
+        updatedAt: undefined, // read from local cache, not yet written to the server
       }),
     });
 
     const cloud = new CloudSave();
     await expect(cloud.sync(playedSave())).resolves.toBe('conflict');
-    // 0 = "bilinmiyor"; arayüz bu durumda tarih yerine "bilinmiyor" yazar.
+    // 0 = "unknown"; in this case the UI shows "unknown" instead of a date.
     expect(cloud.conflictSummary?.updatedAtMs).toBe(0);
   });
 });
@@ -235,7 +235,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
 
   it('hızlı yolda da reklamsız sürüm hakkı buluttan GELMEZ', async () => {
     const cloudSave = advancedSave();
-    cloudSave.adsRemoved = true; // bulutta olsa bile (elle kurcalanmış doküman)
+    cloudSave.adsRemoved = true; // even if it's set in the cloud (a manually tampered document)
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(cloudSave), rev: 4 }));
 
     const save = freshButDirty();
@@ -259,7 +259,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
     const save = freshButDirty();
-    save.stats.totalFed = 1; // tek bir yem atıldı
+    save.stats.totalFed = 1; // a single feed was dropped
     const cloud = new CloudSave();
 
     await expect(cloud.sync(save)).resolves.toBe('conflict');
@@ -279,7 +279,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
   });
 
   it('hesap değişiminden sonra (rev sıfırlanınca) da çalışır', async () => {
-    localStorage.setItem(REV_KEY, '30'); // eski hesabın sayacı
+    localStorage.setItem(REV_KEY, '30'); // the old account's counter
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
     const cloud = new CloudSave();
@@ -291,31 +291,31 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
   });
 });
 
-// İki cihaz sırayla senkron olunca gerçekten yaşandı: B buluttan geri yükledi,
-// hâlâ açık olan A yüklemeye devam etti, B'nin bir sonraki senkronunda bulut
-// ileride ve yerel "gönderilmemiş" göründü — çakışma ekranının iki sütunu
-// birebir aynı veriyi gösterdi. rev sayacı "kim sonra yazdı"yı bilir, "ne
-// yazdı"yı bilmez; içerik karşılaştırması bu boşluğu kapatır.
+// This actually happened when two devices synced one after another: B
+// restored from the cloud, A — still open — kept uploading, and on B's next
+// sync the cloud looked ahead while local looked "unsent" — the conflict
+// screen's two columns showed identical data. The rev counter knows "who
+// wrote last," not "what they wrote"; the content comparison closes that gap.
 describe('iki taraf aynı kayıtken', () => {
-  /** Gerçek yükleme gibi: reklamsız sürüm hakkı pakete girmez. */
+  /** Like a real upload: the ad-removal entitlement doesn't go into the payload. */
   function uploaded(s: SaveData): string {
     const copy: Record<string, unknown> = { ...s };
     delete copy.adsRemoved;
     return JSON.stringify(copy);
   }
 
-  /** Aynı kaydın "birkaç dakika sonraki" hali — oyuncu hiçbir şey yapmadı. */
+  /** The "a few minutes later" state of the same save — the player did nothing. */
   function drifted(s: SaveData): SaveData {
     const d = JSON.parse(JSON.stringify(s)) as SaveData;
     d.lastSeen += 300_000;
     d.incomePot = 63.4;
     d.dirtSpots[d.activeTank] = [{ id: 7, fx: 0.3, fy: 0.4, r: 0.9, kind: 0 }];
     d.fishes = d.fishes.map((f) => ({ ...f, progress: 1, hunger: 0.4 }));
-    d.music = false; // cihaz ayarı
+    d.music = false; // a device setting
     return d;
   }
 
-  /** Bulutta 4. sürüm var, yerelde aynı kaydın sürüklenmiş hali ve gönderilmemiş değişiklik. */
+  /** The cloud has rev 4, local has a drifted copy of the same save plus an unsent change. */
   function twoSidedSetup(): SaveData {
     const shared = advancedSave();
     localStorage.setItem(DIRTY_KEY, '1');
@@ -341,7 +341,7 @@ describe('iki taraf aynı kayıtken', () => {
   });
 
   it('GERİ YÜKLEME YAPMAZ — yereldeki daha ileri durum ezilmez', async () => {
-    // Karşılaştırmanın dışında tuttuğumuz alanlar yerelde ilerlemiş olabilir.
+    // The fields we exclude from the comparison may have progressed locally.
     const save = twoSidedSetup();
     await new CloudSave().sync(save);
 
@@ -368,7 +368,7 @@ describe('iki taraf aynı kayıtken', () => {
     cloud.flush(save);
     await vi.waitFor(() => expect(setDocMock).toHaveBeenCalledTimes(1));
     const written = setDocMock.mock.calls[0][1] as { rev: number };
-    expect(written.rev).toBe(5); // buluttaki 4'ün üstüne
+    expect(written.rev).toBe(5); // on top of the cloud's 4
   });
 
   it('cihazdaki reklamsız sürüm hakkı bu yolda da korunur', async () => {
@@ -449,7 +449,7 @@ describe('çakışma çözümü', () => {
     expect(save.level).toBe(3);
     expect(setDocMock).toHaveBeenCalledTimes(1);
     const written = setDocMock.mock.calls[0][1] as { rev: number };
-    expect(written.rev).toBe(5); // buluttaki 4'ün üstüne
+    expect(written.rev).toBe(5); // on top of the cloud's 4
   });
 
   it('çakışma çözülmeden hiçbir yazma geçmez', async () => {

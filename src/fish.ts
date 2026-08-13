@@ -2,12 +2,12 @@ import { BlurFilter, Container, Graphics } from 'pixi.js';
 import { RARITY_INFO, Species } from './species';
 import type { FishSave } from './save';
 
-export const HUNGER_RATE = 1 / (90 * 60); // saniyede — 90 dk'da tok -> aç
+export const HUNGER_RATE = 1 / (90 * 60); // per second — full -> hungry in 90 min
 export const SAD_THRESHOLD = 0.25;
-/** Açlık büyümeyi hiç durdurmaz: %100 tokken tam hız, %0 tokken bile bu oranda devam eder. */
+/** Hunger never fully stops growth: full speed at 100% fed, still continues at this rate even at 0% fed. */
 export const HUNGER_GROWTH_FLOOR = 0.3;
 
-/** Açlığa göre büyüme hız çarpanı: 0 tokluk -> HUNGER_GROWTH_FLOOR, 1 tokluk -> 1. */
+/** Growth speed multiplier based on hunger: 0 fed -> HUNGER_GROWTH_FLOOR, 1 fed -> 1. */
 export function hungerGrowthMult(hunger: number): number {
   return HUNGER_GROWTH_FLOOR + (1 - HUNGER_GROWTH_FLOOR) * hunger;
 }
@@ -22,7 +22,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Türün id'sinden -1..1 aralığında deterministik bir sapma üretir. Aynı ailedeki (aynı tailShape/dorsalStyle) türlerin bile birebir aynı geometriyi paylaşmamasını sağlar. */
+/** Produces a deterministic deviation in the -1..1 range from the species' id. Ensures that even species in the same family (same tailShape/dorsalStyle) don't share the exact same geometry. */
 function idJitter(id: string, salt: number): number {
   let h = 0;
   const s = id + ':' + salt;
@@ -45,12 +45,12 @@ export class Fish {
   name: string;
   seed: number;
   tank: string;
-  bonus: number; // yem kaynaklı satış fiyatı bonusu
+  bonus: number; // feed-derived sale price bonus
 
   x: number; y: number;
   private tx = 0; private ty = 0;
   private wanderTimer = 0;
-  private dir = 1; // -1..1 arasında yumuşatılmış yön
+  private dir = 1; // smoothed direction, -1..1
   private phase = Math.random() * Math.PI * 2;
   private speedMul: number;
   private wasAdult: boolean;
@@ -156,7 +156,7 @@ export class Fish {
   private buildSprite(): void {
     const sp = this.sp;
     const L = sp.size;
-    // Türe özgü, id'den türetilen sabit sapmalar: aynı aileyi paylaşan türleri de birbirinden ayırır.
+    // Species-specific fixed deviations derived from the id: keeps species sharing the same family visually distinct.
     const jTail = 1 + 0.09 * idJitter(sp.id, 1);
     const jDorsal = 1 + 0.14 * idJitter(sp.id, 2);
     const jEye = 1 + 0.09 * idJitter(sp.id, 3);
@@ -166,7 +166,7 @@ export class Fish {
     const c = sp.colors;
     const rnd = mulberry32(this.seed + 7);
 
-    // Nadirlik parıltısı (epik/efsanevi)
+    // Rarity glow (epic/legendary)
     if (sp.rarity === 'epic' || sp.rarity === 'legendary') {
       this.glow = new Graphics();
       this.glow.circle(0, 0, L * 0.72).fill({
@@ -177,12 +177,12 @@ export class Fish {
       this.root.addChild(this.glow);
     }
 
-    // Kuyruk (rotasyon merkezi gövdeye bağlantı noktası)
+    // Tail (rotation center is the joint with the body)
     this.tail.position.set(-L / 2 + 2, 0);
     this.drawTail(L, H, FS * jTail, c.fin, sp.tailShape);
     this.root.addChild(this.tail);
 
-    // Gövde
+    // Body
     const bodyG = new Graphics();
     bodyG.ellipse(0, 0, L / 2, H / 2).fill(c.body);
     switch (sp.snout) {
@@ -198,7 +198,7 @@ export class Fish {
     }
     this.body.addChild(bodyG);
 
-    // Desen katmanı (gövde elipsi ile maskelenir)
+    // Pattern layer (masked by the body ellipse)
     const maskG = new Graphics();
     maskG.ellipse(0, 0, L / 2, H / 2).fill(0xffffff);
     const patG = new Graphics();
@@ -226,7 +226,7 @@ export class Fish {
     patG.mask = maskG;
     this.body.addChild(maskG, patG);
 
-    // Yüzgeçler
+    // Fins
     const finsG = new Graphics();
     const DFS = FS * jDorsal;
     switch (sp.dorsalStyle) {
@@ -273,7 +273,7 @@ export class Fish {
       .fill({ color: c.fin, alpha: 0.8 });
     this.body.addChild(finsG);
 
-    // Göz
+    // Eye
     const eyeG = new Graphics();
     eyeG.circle(L * 0.3, -H * 0.08, L * 0.052 * jEye).fill(0xffffff);
     eyeG.circle(L * 0.315, -H * 0.08, L * 0.026 * jEye).fill(0x26262e);
@@ -282,7 +282,7 @@ export class Fish {
 
     this.root.addChild(this.body);
 
-    // Açlık göstergesi
+    // Hunger indicator
     this.sad.circle(0, 0, 9).fill({ color: 0xffffff, alpha: 0.9 });
     for (let i = 0; i < 3; i++) this.sad.circle(-4 + i * 4, 0, 1.4).fill(0x8a94a0);
     this.sad.position.set(0, -H * 0.9 - 14);
@@ -296,7 +296,7 @@ export class Fish {
     this.wanderTimer = 3 + Math.random() * 4;
   }
 
-  /** dt: saniye. target: yem hedefi (varsa). growthMult: akvaryum+dekor bonusu. Dönüş: bu karede yetişkin oldu mu. */
+  /** dt: seconds. target: feed target (if any). growthMult: tank+decor bonus. Returns: whether it became an adult this frame. */
   update(dt: number, time: number, bounds: Bounds, target: { x: number; y: number } | null, growthMult = 1): boolean {
     this.hunger = Math.max(0, this.hunger - dt * HUNGER_RATE);
 
@@ -310,7 +310,7 @@ export class Fish {
       }
     }
 
-    // Hedef seçimi: yem varsa ona, yoksa gezinti noktasına
+    // Target selection: toward feed if any, otherwise toward the wander point
     let dx: number, dy: number, speed: number;
     if (target) {
       dx = target.x - this.x; dy = target.y - this.y;
@@ -329,7 +329,7 @@ export class Fish {
     this.x = Math.min(bounds.w - 40, Math.max(40, this.x + vx * dt));
     this.y = Math.min(bounds.h - 100, Math.max(64, this.y + vy * dt));
 
-    // Yumuşak yön dönüşü
+    // Smooth direction turn
     if (Math.abs(vx) > 2) {
       const want = Math.sign(vx);
       this.dir += (want - this.dir) * Math.min(1, dt * 5);

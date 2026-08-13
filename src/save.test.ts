@@ -1,13 +1,14 @@
-// hasProgress() — bulut çakışmasında yerel kaydın feda edilebilir olup
-// olmadığına karar veren yordam (bkz. cloud-save.ts hızlı yol).
+// hasProgress() — the routine that decides, in a cloud conflict, whether the
+// local save is safe to discard (see cloud-save.ts fast path).
 //
-// Bu testin iki yarısı var ve İKİSİ DE gereklidir:
+// This test has two halves and BOTH are required:
 //
-// 1. "ilerleme sayılan" her sinyal ayrı ayrı sınanır — biri düşerse oyuncunun
-//    emeği sessizce silinir.
-// 2. "bilerek yok sayılan" her alan da ayrı ayrı sınanır — biri yanlışlıkla
-//    ilerleme sayılırsa hızlı yol hiç çalışmaz ve düzeltilen hata geri gelir
-//    (yeni kurulan cihaz yine bir tarafı boş çakışma ekranı görür).
+// 1. Every signal that "counts as progress" is tested separately — if one is
+//    missed, the player's effort gets silently deleted.
+// 2. Every field that is "deliberately ignored" is also tested separately —
+//    if one is wrongly counted as progress, the fast path never runs and the
+//    fixed bug comes back (a newly set-up device sees a conflict screen with
+//    one side empty again).
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -27,7 +28,7 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-/** Varsayılan kayıt üstünde tek bir alanı değiştirip yordamı çalıştırır. */
+/** Mutates a single field on the default save and runs the routine. */
 function withChange(mutate: (s: SaveData) => void): boolean {
   const s = defaultSave();
   mutate(s);
@@ -40,7 +41,7 @@ describe('dokunulmamış kayıt', () => {
   });
 
   it('varsayılanın rastgele alanları (ad, arkadaş kodu) ilerleme saydırmaz', () => {
-    // Her çağrı yeni bir ad ve kod üretir; hiçbiri oyuncu tercihi değildir.
+    // Every call generates a new name and code; none of them is a player choice.
     for (let i = 0; i < 25; i++) expect(hasProgress(defaultSave())).toBe(false);
   });
 
@@ -195,7 +196,7 @@ describe('ilerleme sayılan sinyaller', () => {
   });
 
   it('varsayılan ada benzeyen ama oyuncunun yazdığı ad', () => {
-    // Rakam sayısı tutmuyorsa varsayılan üretimden gelmiş olamaz.
+    // If the digit count doesn't match, it couldn't have come from the default generator.
     expect(withChange((s) => { s.playerName = 'Misafir-12345'; })).toBe(true);
     expect(withChange((s) => { s.playerName = 'Misafir-12'; })).toBe(true);
     expect(withChange((s) => { s.playerName = 'misafir-1234'; })).toBe(true);
@@ -208,7 +209,7 @@ describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
   });
 
   it('biriken (henüz toplanmamış) pasif gelir', () => {
-    // Oyuncu ekrana bakarken kendiliğinden artar; toplanınca totalEarned'a yazılır.
+    // Grows on its own while the player is watching the screen; gets written to totalEarned when collected.
     expect(withChange((s) => { s.incomePot = 999; })).toBe(false);
   });
 
@@ -229,7 +230,7 @@ describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
   });
 
   it('ilk açılışta kurulan gün sayacı ve 1 değerindeki seri', () => {
-    // game.ts applyDailyGift: ilk açılışta HEDİYE VERMEDEN lastDaily/streak kurar.
+    // game.ts applyDailyGift: on first launch it sets up lastDaily/streak WITHOUT giving a gift.
     expect(withChange((s) => {
       s.lastDaily = '2026-08-07';
       s.streak = 1;
@@ -265,14 +266,14 @@ describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
   });
 
   it('engelleyici giriş karuselinin kapatılması (tutorialDone)', () => {
-    // Karusel oyuna girer girmez çıkıyor ve ayarlara ancak kapatılınca
-    // ulaşılıyor; "oyuncu bir şey başardı" demek DEĞİL.
+    // The carousel appears as soon as the game opens and settings are only
+    // reachable once it's dismissed; this does NOT mean "the player achieved something."
     expect(withChange((s) => { s.tutorialDone = true; })).toBe(false);
   });
 
   it('kendi kendine yetişkin olan açılış balıkları koleksiyona girince', () => {
-    // İki açılış balığı yarı büyümüş başlar; oyuncu hiçbir şey yapmasa da
-    // birkaç dakika içinde koleksiyona düşerler.
+    // The two starter fish begin half-grown; even if the player does nothing,
+    // they'll drop into the collection within a few minutes.
     expect(withChange((s) => {
       s.collection = s.fishes.map((f) => f.sp);
       for (const f of s.fishes) f.progress = 1;
@@ -299,16 +300,17 @@ describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
   });
 });
 
-// progressFingerprint() — "bu iki kayıt aslında aynı mı?" sorusunun yanıtı
-// (bkz. cloud-save.ts: iki sütunu birebir aynı olan çakışma ekranı).
+// progressFingerprint() — answers the question "are these two saves actually
+// the same?" (see cloud-save.ts: the conflict screen whose two columns are
+// identical).
 //
-// Buradaki iki yarı da gereklidir ve YÖNLERİ farklıdır:
-// 1. Kendiliğinden değişen alanlar farkı BOZMAMALI — yoksa aynı kaydın iki
-//    kopyası ömür boyu birbirinden farklı görünür ve hata geri gelir.
-// 2. Oyuncunun emeğine dokunan HER alan farkı bozmalı — burada yanılmak
-//    çakışmayı sessizce yutar, yani soru sorulmadan bir taraf seçilir.
+// Both halves here are required and point in OPPOSITE directions:
+// 1. Fields that change on their own must NOT break equality — otherwise two
+//    copies of the same save look different forever and the bug comes back.
+// 2. Every field that reflects the player's effort MUST break equality — a
+//    mistake here silently swallows the conflict, picking a side without asking.
 describe('ilerleme parmak izi', () => {
-  /** Aynı kaydın iki kopyası: ikincisine verilen değişiklik uygulanır. */
+  /** Two copies of the same save: the given mutation is applied to the second one. */
   function sameAfter(mutate: (s: SaveData) => void): boolean {
     const a = defaultSave();
     const b = JSON.parse(JSON.stringify(a)) as SaveData;
@@ -322,7 +324,7 @@ describe('ilerleme parmak izi', () => {
     });
 
     it('kendiliğinden ilerleyen alanların hepsi bir arada', () => {
-      // Oyuna girdikten birkaç dakika sonraki hali — oyuncu hiçbir şey yapmadı.
+      // State after a few minutes in the game — the player did nothing.
       expect(sameAfter((s) => {
         s.lastSeen += 300_000;
         s.incomePot = 42.7;
@@ -364,7 +366,7 @@ describe('ilerleme parmak izi', () => {
     });
 
     it('sıfır değerli girdi ile hiç olmayan girdi', () => {
-      // Yem bitince {yem: 0} kalır; öteki cihazda o anahtar hiç yoktur.
+      // When feed runs out {feed: 0} is left behind; on the other device that key doesn't exist at all.
       expect(sameAfter((s) => {
         s.feedOwned = { 'feed-basic': 0 };
         s.decorOwned = { 'decor-kaya': 0 };
@@ -374,8 +376,8 @@ describe('ilerleme parmak izi', () => {
     });
 
     it('JSON turundan (buluta yaz - buluttan oku) geçmiş kayıt', () => {
-      // cloud-save.ts karşılaştırmayı tam olarak böyle yapar: bir taraf bellekte,
-      // öteki taraf paketten parseSave() ile açılmış.
+      // cloud-save.ts does the comparison exactly like this: one side in memory,
+      // the other side unpacked from the payload via parseSave().
       const s = defaultSave();
       s.level = 6;
       s.coins = 4210;
@@ -386,7 +388,7 @@ describe('ilerleme parmak izi', () => {
     });
 
     it('paketten çıkarılmış reklamsız hakkıyla birlikte JSON turu', () => {
-      // Gerçek yükleme adsRemoved alanını siler; geri okunan kayıtta false olur.
+      // A real upload strips the adsRemoved field; it comes back as false when read.
       const s = defaultSave();
       s.adsRemoved = true;
       const stripped: Record<string, unknown> = { ...s };
@@ -471,10 +473,10 @@ describe('ilerleme parmak izi', () => {
 });
 
 describe('cihazdan alınmış gerçek kayıt (regresyon)', () => {
-  // 2026-08-07, Android 14 emülatörü: TAZE kurulum, oyuna girildi, engelleyici
-  // giriş karuseli kapatıldı, başka HİÇBİR ŞEY yapılmadı, ~2 dakika beklendi.
-  // Bu kayıt "ilerleme yok" saymazsa yeni cihazını bağlayan oyuncu bir tarafı
-  // bomboş olan çakışma ekranını görür — düzeltmenin sebebi tam olarak budur.
+  // 2026-08-07, Android 14 emulator: FRESH install, entered the game, dismissed
+  // the blocking intro carousel, did NOTHING else, waited ~2 minutes.
+  // If this save isn't counted as "no progress," a player connecting a new
+  // device sees a conflict screen with one side empty — that's exactly why this fix exists.
   const FRESH_DEVICE_SAVE = `{"v":2,"coins":300,"pearls":5,"xp":0,"level":1,
     "playerName":"Misafir-3400","friendCode":"REEF-A5NJZ",
     "fishes":[{"sp":"lepistes","progress":1,"hunger":0.8723086425924178,"name":"Baloncuk","seed":11,"tank":"tank-mercan-koyu","bonus":0},

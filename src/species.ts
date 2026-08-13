@@ -6,18 +6,18 @@ export interface Species {
   rarity: Rarity;
   colors: { body: number; belly: number; fin: number; accent: number };
   pattern: 'none' | 'stripes' | 'hstripe' | 'spots' | 'gradient';
-  buyPrice: number;        // 0 => madeni parayla satılmaz
-  pearlPrice?: number;     // inci ile satın alma
-  sellPrice: number;       // yetişkin satış fiyatı
-  growthMs: number;        // yavru -> yetişkin süresi
+  buyPrice: number;        // 0 => not purchasable with coins
+  pearlPrice?: number;     // purchase with pearls
+  sellPrice: number;       // adult sale price
+  growthMs: number;        // baby -> adult duration
   unlockLevel: number;
-  size: number;            // yetişkin gövde uzunluğu (px)
-  bodyH?: number;          // gövde yükseklik oranı (varsayılan 0.48)
-  finScale?: number;       // yüzgeç büyüklük çarpanı
-  spiky?: boolean;         // sırt dikenleri
-  tailShape?: 'lens' | 'forked' | 'round' | 'lyre' | 'ribbon' | 'lunate'; // kuyruk biçimi (varsayılan 'lens')
-  dorsalStyle?: 'triangle' | 'flowing' | 'sail'; // sırt yüzgeci biçimi (varsayılan 'triangle')
-  snout?: 'long' | 'hump' | 'blunt'; // burun/alın çıkıntısı (varsayılan yok)
+  size: number;            // adult body length (px)
+  bodyH?: number;          // body height ratio (default 0.48)
+  finScale?: number;       // fin size multiplier
+  spiky?: boolean;         // dorsal spikes
+  tailShape?: 'lens' | 'forked' | 'round' | 'lyre' | 'ribbon' | 'lunate'; // tail shape (default 'lens')
+  dorsalStyle?: 'triangle' | 'flowing' | 'sail'; // dorsal fin shape (default 'triangle')
+  snout?: 'long' | 'hump' | 'blunt'; // snout/forehead protrusion (default none)
   desc: string;
 }
 
@@ -33,7 +33,7 @@ export const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'le
 
 const MIN = 60_000;
 
-// ---- El yapımı 14 tür (kayıt uyumluluğu için id'ler sabit) ----
+// ---- 14 handmade species (ids fixed for save compatibility) ----
 
 const HANDMADE: Species[] = [
   {
@@ -136,7 +136,7 @@ const HANDMADE: Species[] = [
   },
 ];
 
-// ---- Gerçek türlerden 86 balık (deterministik — id'ler ve isimler her derlemede aynı) ----
+// ---- 86 fish from real species (deterministic — ids and names identical on every build) ----
 
 interface SpeciesSeed {
   name: string;
@@ -463,7 +463,7 @@ function generate(): Species[] {
       const growMin = Math.round(plan.grow[0] + (plan.grow[1] - plan.grow[0]) * t);
       const lvl = Math.round(plan.lvl[0] + (plan.lvl[1] - plan.lvl[0]) * t);
 
-      // Efsanevilerin üçte biri yalnızca inciyle alınır
+      // A third of legendaries are pearl-only
       const pearlOnly = plan.r === 'legendary' && i % 3 === 2;
 
       out.push({
@@ -510,7 +510,7 @@ export interface EggTier {
   emoji: string;
   cost: number;
   currency: 'coins' | 'pearls';
-  odds: Partial<Record<Rarity, number>>; // yüzde
+  odds: Partial<Record<Rarity, number>>; // percent
   desc: string;
 }
 
@@ -532,9 +532,9 @@ export const EGGS: EggTier[] = [
   },
 ];
 
-export const PITY_LIMIT = 8; // Altın yumurtada efsanevi garanti sayacı
+export const PITY_LIMIT = 8; // legendary-guarantee counter for the golden egg
 
-/** Yetişkin balığın saatlik pasif altın üretimi (nadirliğe göre). */
+/** Adult fish's hourly passive coin income (by rarity). */
 export const RARITY_INCOME: Record<Rarity, number> = {
   common: 25,
   uncommon: 60,

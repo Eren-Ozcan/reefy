@@ -1,33 +1,37 @@
-// Game.syncSave() ile buluttan geri yükleme arasındaki yarış — cihazda
-// gerçekten veri kaybettirdi (bkz. TODO.md "two-emulator run"):
+// The race between Game.syncSave() and restoring from the cloud — on a real
+// device this actually caused data loss (see TODO.md "two-emulator run"):
 //
-//   1. syncSave() balık listesini kayıttan değil SAHNEDEN kurar. Oturum
-//      ortasında yapılan geri yüklemede sahne hâlâ ESKİ kaydın balıklarını
-//      tutar ve location.reload()'un tetiklediği beforeunload -> syncSave()
-//      indirilen balıkları eskileriyle ezer (5 balık 2'ye düştü). Üstelik aynı
-//      çağrı buluta da yazdığı için ezilmiş liste diğer cihaza gidebilirdi.
-//   2. Bunun İLK düzeltmesi de yanlıştı: syncSave()'in TAMAMI dondurulunca
-//      persist() de durdu — indirilen kaydı diske yazan tek yer orasıdır,
-//      yeniden yükleme eski kaydı okuyup geri yüklemeyi sessizce yok etti.
+//   1. syncSave() builds the fish list from the SCENE, not from the save.
+//      During a mid-session restore, the scene still holds the OLD save's
+//      fish, and the beforeunload -> syncSave() triggered by
+//      location.reload() overwrites the downloaded fish with the old ones
+//      (5 fish dropped to 2). Worse, the same call also writes to the cloud,
+//      so the overwritten list could propagate to the other device.
+//   2. The FIRST fix for this was also wrong: freezing ALL of syncSave()
+//      also stopped persist() — the only place that writes the downloaded
+//      save to disk — so reloading read the old save and silently wiped
+//      out the restore.
 //
-// Yani doğru davranış üç maddedir ve üçü de aşağıda ayrı ayrı sınanır:
-// donmuşken sahneden kurulum YOK, buluta yazma YOK, diske yazma VAR.
+// So the correct behavior has three parts, each tested separately below:
+// while frozen, NO building from the scene, NO writing to the cloud, YES
+// writing to disk.
 //
-// Game gerçek nesne olarak kurulur (asıl syncSave() çalışır); yalnızca dış
-// dünya taklit edilir: Pixi sahne nesneleri, platform servisleri ve bulut.
+// Game is set up as a real object (the actual syncSave() runs); only the
+// outside world is mocked: Pixi scene objects, platform services, and the
+// cloud.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Fish } from './fish';
 import type { CloudSyncResult } from './cloud-save';
 import type { FishSave, SaveData } from './save';
 
-/** Bulut ve servis katmanına giden çağrıların sırayla dökümü. */
+/** Ordered log of calls made to the cloud and service layer. */
 const calls: string[] = [];
-/** Taklit bulutun sync() sonucu — testler geri yükleme senaryosunu buradan kurar. */
+/** The mocked cloud's sync() result — tests set up the restore scenario from here. */
 let cloudSyncResult: CloudSyncResult = 'in-sync';
 
-// Sahne nesneleri: syncSave() hiçbirine dokunmaz, yalnızca Game'in alan
-// başlangıç değerleri (new Graphics() vb.) kurulabilsin diye gerekliler.
+// Scene objects: syncSave() never touches any of these, they only exist so
+// Game's field initializers (new Graphics() etc.) can be constructed.
 vi.mock('pixi.js', () => {
   class Node {
     addChild(child: unknown): unknown { return child; }
@@ -71,7 +75,7 @@ vi.mock('./cloud-save', () => ({
 const { Game } = await import('./game');
 const { defaultSave, loadSave } = await import('./save');
 
-/** Buluttan inmiş kayıt: 5 balık, sahnedekilerle hiç örtüşmüyor. */
+/** A save downloaded from the cloud: 5 fish, none overlapping with the scene. */
 function cloudRestoredSave(): SaveData {
   const s = defaultSave();
   s.level = 9;
@@ -82,19 +86,19 @@ function cloudRestoredSave(): SaveData {
   return s;
 }
 
-/** Sahnedeki balığın syncSave() açısından tek yüzü toSave()'dir. */
+/** As far as syncSave() is concerned, toSave() is the scene fish's only interface. */
 function sceneFish(name: string): Fish {
   return {
     toSave: (): FishSave => ({ sp: 'lepistes', progress: 0.5, hunger: 0.5, name, seed: 1, tank: 'tank-mercan-koyu' }),
   } as unknown as Fish;
 }
 
-/** Diğer akvaryumlarda uyuyan balıklar — `dormant` bilerek private. */
+/** Fish dormant in other tanks — `dormant` is intentionally private. */
 function setDormant(game: InstanceType<typeof Game>, list: FishSave[]): void {
   (game as unknown as { dormant: FishSave[] }).dormant = list;
 }
 
-/** Sahnesi eski kayıttan kurulmuş, kaydı buluttan yenilenmiş oyun. */
+/** A game whose scene was built from the old save but whose save was refreshed from the cloud. */
 function midSessionRestore(): InstanceType<typeof Game> {
   const game = new Game();
   game.save = cloudRestoredSave();
@@ -124,8 +128,8 @@ describe('normal (donmamış) syncSave', () => {
 
 describe('geri yükleme sonrası donma', () => {
   it('freezeForRestore() indirilen kaydı HEMEN diske yazar', () => {
-    // applyCloud yalnızca bellekteki nesneyi değiştirir; yeniden yükleme diskten
-    // okuduğu için yazılmazsa geri yükleme sessizce kaybolur.
+    // applyCloud only mutates the in-memory object; a reload reads from disk,
+    // so if it isn't written the restore silently disappears.
     const game = midSessionRestore();
 
     game.freezeForRestore();
@@ -149,7 +153,7 @@ describe('geri yükleme sonrası donma', () => {
   it('donmuşken de diske YAZAR — yoksa geri yükleme yeniden yüklemede yok olur', () => {
     const game = midSessionRestore();
     game.freezeForRestore();
-    localStorage.clear(); // dondurmanın yazdığını sil: bundan sonrasını syncSave yazmalı
+    localStorage.clear(); // wipe what freezing wrote: syncSave must write everything from here on
 
     game.syncSave();
 
@@ -169,7 +173,7 @@ describe('geri yükleme sonrası donma', () => {
   });
 
   it('donma kalıcıdır — art arda gelen syncSave çağrıları da yazmaz', () => {
-    // Gerçekte 6 saniyelik zamanlayıcı, yeniden yükleme gelene dek çalışmaya devam eder.
+    // In reality the 6-second timer keeps running until the reload happens.
     const game = midSessionRestore();
     game.freezeForRestore();
     calls.length = 0;
@@ -192,8 +196,8 @@ describe('hesap değişiminde yeniden senkron', () => {
     calls.length = 0;
     game.syncSave();
 
-    expect(game.save.fishes).toHaveLength(5);   // sahne listesi geçmedi
-    expect(loadSave().fishes).toHaveLength(5);  // ama diske yazıldı
+    expect(game.save.fishes).toHaveLength(5);   // the scene list was not applied
+    expect(loadSave().fishes).toHaveLength(5);  // but it was written to disk
     expect(calls).not.toContain('maybeUpload');
   });
 
@@ -209,14 +213,15 @@ describe('hesap değişiminde yeniden senkron', () => {
   });
 });
 
-// Açılış senkronu mühleti (CLOUD_STARTUP_GRACE_MS) aşarsa oyun beklemeden açılır
-// ve sonuç SONRADAN gelir. Eskiden böyle bir yol yoktu: geç kalan sonuç
-// 'disabled' sayılıp atılıyordu, açılış senkronu da oturum başına bir kez
-// çalıştığı için oyuncu ilerlemesini bir daha hiç görmüyordu. İki emülatörde
-// "B'nin ilerlemesi A'ya hiç gelmiyor" diye göründü; ölçümde ensureUid 2946 ms
-// sürmüştü, yani eski 3000 ms'lik tek bütçenin 54 ms altında salınıyordu.
+// If the startup sync grace period (CLOUD_STARTUP_GRACE_MS) is exceeded, the
+// game opens without waiting and the result arrives LATE. There used to be no
+// path for this: a late result was treated as 'disabled' and discarded, and
+// since startup sync only runs once per session the player never saw their
+// progress again. On two emulators it showed up as "B's progress never
+// reaches A"; measurements showed ensureUid took 2946 ms, i.e. it landed
+// 54 ms under the old single 3000 ms budget.
 describe('mühleti aşıp geç gelen açılış senkronu', () => {
-  /** handleLateCloudSync bilerek private — dışarıdan çağrılmaz, geç sonuç onu tetikler. */
+  /** handleLateCloudSync is intentionally private — never called from outside, a late result triggers it. */
   function late(game: InstanceType<typeof Game>, res: CloudSyncResult): void {
     (game as unknown as { handleLateCloudSync(r: CloudSyncResult): void }).handleLateCloudSync(res);
   }
@@ -237,13 +242,13 @@ describe('mühleti aşıp geç gelen açılış senkronu', () => {
     late(game, 'restored');
 
     expect(reloads).toBe(1);
-    // Yeniden yükleme diskten okur: yazılmamışsa geri yükleme sessizce kaybolur.
+    // A reload reads from disk: if it isn't written, the restore silently disappears.
     expect(loadSave().coins).toBe(8000);
     expect(loadSave().fishes).toHaveLength(5);
   });
 
   it("geç gelen 'restored' sonrası sahne indirilen balıkları EZEMEZ", () => {
-    // Yeniden yükleme anında olmaz; arada beforeunload -> syncSave() çalışır.
+    // The reload doesn't happen instantly; beforeunload -> syncSave() runs in between.
     const game = midSessionRestore();
 
     late(game, 'restored');
@@ -275,14 +280,14 @@ describe('mühleti aşıp geç gelen açılış senkronu', () => {
 
     expect(shown).toBe(0);
     expect(reloads).toBe(0);
-    // Donma yok: oyun normal çalışmaya devam etmeli.
+    // No freeze: the game should keep running normally.
     game.syncSave();
     expect(calls).toContain('maybeUpload');
   });
 
   it('UI henüz abone olmadıysa çakışma yine de kaydedilir', () => {
-    // ui.ts önce abone olup sonra kontrol ediyor; yine de sonuç iki satır
-    // arasında düşerse cloudSync okunarak yakalanabilmeli.
+    // ui.ts subscribes first and checks afterward; even if the result lands
+    // between those two lines, it must still be catchable by reading cloudSync.
     const game = midSessionRestore();
 
     late(game, 'conflict');
