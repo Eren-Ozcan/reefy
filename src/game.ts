@@ -1150,7 +1150,7 @@ export class Game {
     for (let i = spots.length - 1; i >= 0; i--) {
       const s = spots[i];
       const cx = s.fx * w, cy = s.fy * h;
-      const hit = 15 * s.r + 12; // tap tolerance
+      const hit = 20 * s.r + 24; // tap tolerance
       if (Math.hypot(x - cx, y - cy) <= hit) return i;
     }
     return -1;
