@@ -1,4 +1,4 @@
-import { BlurFilter, Container, Graphics } from 'pixi.js';
+import { BlurFilter, Container, Graphics, Rectangle } from 'pixi.js';
 import { RARITY_INFO, Species } from './species';
 import type { FishSave } from './save';
 
@@ -281,6 +281,13 @@ export class Fish {
     this.body.addChild(eyeG);
 
     this.root.addChild(this.body);
+
+    // Padded rectangular tap target: the precise silhouette (thin tail/fins,
+    // gaps between shapes) is unreliable to tap on mobile, so use a generous
+    // bounding box instead of exact hit-testing.
+    const hb = this.root.getLocalBounds();
+    const padX = L * 0.22, padY = H * 0.5;
+    this.root.hitArea = new Rectangle(hb.x - padX, hb.y - padY, hb.width + padX * 2, hb.height + padY * 2);
 
     // Hunger indicator
     this.sad.circle(0, 0, 9).fill({ color: 0xffffff, alpha: 0.9 });
