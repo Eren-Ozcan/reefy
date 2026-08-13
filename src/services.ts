@@ -200,9 +200,9 @@ export class RevenueCatIAP implements IAPProvider {
     void this.ensureConfigured();
   }
 
-  /** configure() soğuk açılışta reddedilirse (kötü key, ağ yok, plugin hazır değil)
-   * `configured` sonsuza dek false kalıp satın almayı kilitli bırakmasın diye,
-   * bir sonraki purchase()/loadPrices() çağrısında sessizce yeniden denenir. */
+  /** If configure() rejects at cold start (bad key, no network, plugin not
+   * ready), `configured` must not stay false forever and lock out purchases —
+   * it's silently retried on the next purchase()/loadPrices() call instead. */
   private async ensureConfigured(): Promise<void> {
     if (this.configured || !this.appUserId) return;
     try {
@@ -210,7 +210,7 @@ export class RevenueCatIAP implements IAPProvider {
       await Purchases.configure({ apiKey, appUserID: this.appUserId });
       this.configured = true;
     } catch {
-      /* bağlantı kurulamadı — configured false kalır, bir sonraki çağrıda tekrar denenir */
+      /* connection failed — configured stays false, retried on the next call */
     }
   }
 
@@ -226,8 +226,8 @@ export class RevenueCatIAP implements IAPProvider {
     });
   }
 
-  /** Başarısız getOfferings() çağrısını sonsuza dek önbellekte tutmaz — reddedilince
-   * sıfırlanır ki bir sonraki çağrı (ör. bağlantı geri geldiğinde) yeniden dener. */
+  /** Does not cache a failed getOfferings() call forever — resets on rejection
+   * so the next call (e.g. once connectivity returns) retries. */
   private getOfferings(): ReturnType<typeof Purchases.getOfferings> {
     this.offeringsPromise ??= Purchases.getOfferings().catch((err) => {
       this.offeringsPromise = null;

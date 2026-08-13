@@ -199,10 +199,10 @@ export class CloudSave {
 
     // Yerel en az bulut kadar güncel — normal durum.
     if (cloudRev <= this.rev) {
-      // await edilir: upload() kendi WRITE_TIMEOUT_MS'i ile sınırlı, bu yüzden
-      // sync()'i asla asmaz — ama fire-and-forget bırakılırsa sync()'i await
-      // eden çağıranlar (ör. resyncCloudForNewAccount) yazma bitmeden devam
-      // edip yeni bir state değişikliğiyle yarışabilirdi.
+      // Awaited: upload() is bounded by its own WRITE_TIMEOUT_MS, so it never
+      // hangs sync() — but left fire-and-forget, callers that await sync()
+      // (e.g. resyncCloudForNewAccount) could proceed before the write
+      // finished and race with the next state change.
       if (this.dirty) await this.upload(save);
       return 'in-sync';
     }
@@ -315,10 +315,10 @@ export class CloudSave {
       if (payload.length > MAX_PAYLOAD_BYTES) return false;
 
       const nextRev = this.rev + 1;
-      // setDoc()'un kendisi ayrı tutulur: yarışı zaman aşımı kazanırsa bile
-      // sözün geç gelen reddi (rule reject) sessizce yutulmalı, yoksa
-      // unhandled rejection olur — ama bu .catch() aşağıdaki race'in sonucunu
-      // ETKİLEMEZ, o ayrı zincir üzerinden okunuyor.
+      // The setDoc() promise is kept separate: even if the timeout wins the
+      // race, its late-arriving rejection (rule reject) must be swallowed
+      // silently, or it becomes an unhandled rejection — but this .catch()
+      // does NOT affect the race's outcome below, which reads a separate chain.
       const writePromise = setDoc(this.ref(uid), {
         payload,
         schemaVersion: SAVE_SCHEMA_VERSION,
@@ -345,21 +345,22 @@ export class CloudSave {
         clearTimeout(timer!);
       }
 
-      // Zaman aşımında rev yine de ilerletilir: Firestore yazmayı kuyruğa almış
-      // olabilir (çevrimdışı) ve sonradan sunucuya düşebilir; aynı rev'i tekrar
-      // denemek kural tarafından reddedilirdi ve senkron kalıcı olarak takılırdı.
-      // AMA gerçek bir kural reddi (bayat rev, izin hatası) FARKLI: yazma kesin
-      // olarak gerçekleşmedi, rev'i ilerletmek yerel kaydı gelecekte bulutun
-      // önüne geçirip başka bir cihazın gerçekten daha yeni ilerlemesini
-      // çakışma ekranına hiç uğramadan ezebilirdi.
-      if (outcome === 'rejected') return false; // dirty korunur, rev SABİT kalır
+      // On timeout, rev still advances: Firestore may have queued the write
+      // offline and it could still land on the server later; retrying the
+      // same rev would be rejected by the rule and sync would get stuck for
+      // good. BUT a genuine rule reject (stale rev, permission error) is
+      // different: the write definitely did not happen, so advancing rev
+      // could let the local save get ahead of the cloud and later overwrite
+      // another device's genuinely newer progress without ever hitting the
+      // conflict screen.
+      if (outcome === 'rejected') return false; // dirty stays set, rev stays UNCHANGED
       this.rev = nextRev;
-      if (outcome !== 'ok') return false; // zaman aşımı: dirty korunur, sonra tekrar denenir
+      if (outcome !== 'ok') return false; // timeout: dirty stays set, retried later
 
       this.dirty = false;
       return true;
     } catch {
-      // Beklenmeyen hata (ör. serialize/URL): dirty korunur, sonra yeniden denenir.
+      // Unexpected error (e.g. serialize/URL): dirty stays set, retried later.
       return false;
     } finally {
       this.uploading = false;

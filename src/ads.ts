@@ -158,9 +158,9 @@ export class AdMobAds implements AdsProvider {
     } catch {
       return { ok: false, msg: t('Şu anda gösterilecek reklam bulunamadı, daha sonra tekrar dene.') };
     } finally {
-      // showRewardVideoAd() reddederse (reklam süresi doldu, ağ koptu) eskiden
-      // dinleyici hiç kaldırılmıyordu; bir sonraki başarılı izlemede eski ve
-      // yeni dinleyici birlikte tetiklenip ödülü iki kez işleyebiliyordu.
+      // If showRewardVideoAd() rejects (ad expired, network dropped), the
+      // listener used to never get removed; on the next successful watch the
+      // stale listener and the new one would both fire, risking a double reward.
       if (listener) void listener.remove();
     }
   }

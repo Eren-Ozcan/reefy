@@ -315,10 +315,11 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (!merged.decorPlaced) merged.decorPlaced = {};
   for (const t of merged.tanksOwned) if (!merged.decorPlaced[t]) merged.decorPlaced[t] = [];
   if (!merged.dirtSpots) merged.dirtSpots = {};
-  // Alan-alan birleştirme: `{ ...base, ...parsed }` yukarıda base.stats'ı
-  // parsed.stats varsa TAMAMEN değiştirir; elle düzenlenmiş/kısmi bozulmuş bir
-  // kayıtta stats.totalFed gibi bir alan eksik kalırsa undefined++ NaN üretir
-  // ve JSON.stringify sonraki persist()'te bunu sessizce null'a çevirir.
+  // Field-by-field merge: `{ ...base, ...parsed }` above FULLY replaces
+  // base.stats when parsed.stats is present; a hand-edited or partially
+  // corrupted save missing a field like stats.totalFed would leave it
+  // undefined++ -> NaN, which JSON.stringify silently turns into null on the
+  // next persist().
   merged.stats = { ...base.stats, ...merged.stats };
   if (merged.cleanRewardDay === undefined) merged.cleanRewardDay = '';
   if (merged.cleanRewardCount === undefined) merged.cleanRewardCount = 0;

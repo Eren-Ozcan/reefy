@@ -17,9 +17,9 @@ function hex(c: number): string {
 }
 
 export function fmt(n: number): string {
-  // Eşik kontrolü yuvarlamadan ÖNCE yapılırsa 999_950-999_999 arası değerler
-  // k-dalında (n/1000).toFixed(1) ile "1000.0" -> "1000k" olur; M eşiği bu
-  // yüzden gerçek yuvarlanmış değere göre (999_950) kontrol edilir.
+  // If the threshold check ran BEFORE rounding, values in 999_950-999_999
+  // would hit the k-branch where (n/1000).toFixed(1) gives "1000.0" ->
+  // "1000k"; the M threshold is checked against the rounded value (999_950).
   if (n >= 999_950) return (n / 1_000_000).toFixed(1).replace('.0', '') + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + 'k';
   return String(n);

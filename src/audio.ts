@@ -251,17 +251,18 @@ class AudioMan {
   stopAmbient(): void {
     this.ambientOn = false;
     if (this.chordTimer !== null) { clearInterval(this.chordTimer); this.chordTimer = null; }
-    // Kaynak/yankı zinciri yalnızca gain sıfırlanarak bırakılırsa bağlı kalır;
-    // setBiome() her tank değişiminde stopAmbient() + startAmbient() çağırdığından
-    // node'lar sınırsız birikip her geçişte ses kademeli olarak yükselirdi.
-    // Ramp bitene kadar beklenir ki kesme duyulur bir "tık" yaratmasın.
+    // If the noise source/echo chain is only left connected with gain at 0,
+    // it stays alive; setBiome() calls stopAmbient() + startAmbient() on every
+    // tank switch, so nodes would accumulate without bound and the background
+    // sound would get audibly louder with each switch. Cleanup waits for the
+    // ramp to finish so the cut doesn't produce an audible click.
     const noise = this.ambientNoise;
     const nodes = this.ambientNodes;
     this.ambientNoise = null;
     this.ambientNodes = [];
     this.echo = null;
     const cleanup = () => {
-      try { noise?.stop(); } catch { /* zaten durmuş olabilir */ }
+      try { noise?.stop(); } catch { /* may already be stopped */ }
       noise?.disconnect();
       for (const n of nodes) n.disconnect();
     };
