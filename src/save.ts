@@ -315,7 +315,11 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (!merged.decorPlaced) merged.decorPlaced = {};
   for (const t of merged.tanksOwned) if (!merged.decorPlaced[t]) merged.decorPlaced[t] = [];
   if (!merged.dirtSpots) merged.dirtSpots = {};
-  if (merged.stats.totalCleaned === undefined) merged.stats.totalCleaned = 0;
+  // Alan-alan birleştirme: `{ ...base, ...parsed }` yukarıda base.stats'ı
+  // parsed.stats varsa TAMAMEN değiştirir; elle düzenlenmiş/kısmi bozulmuş bir
+  // kayıtta stats.totalFed gibi bir alan eksik kalırsa undefined++ NaN üretir
+  // ve JSON.stringify sonraki persist()'te bunu sessizce null'a çevirir.
+  merged.stats = { ...base.stats, ...merged.stats };
   if (merged.cleanRewardDay === undefined) merged.cleanRewardDay = '';
   if (merged.cleanRewardCount === undefined) merged.cleanRewardCount = 0;
   if (!merged.friendVisits) merged.friendVisits = { day: '', visited: [], count: 0 };
