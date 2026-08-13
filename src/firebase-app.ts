@@ -1,20 +1,22 @@
-// Paylaşılan Firebase uygulaması ve oyuncu kimliği.
+// Shared Firebase app and player identity.
 //
-// Aynı config ile initializeApp() ikinci kez çağrılırsa Firebase
-// "app/duplicate-app" hatası verir; bu yüzden arkadaş kodu/liderlik
-// (services.ts FirebaseSocial) ve bulut kaydı (cloud-save.ts) tek bir
-// örneği buradan paylaşır.
+// If initializeApp() is called a second time with the same config, Firebase
+// throws an "app/duplicate-app" error; that's why friend code/leaderboard
+// (services.ts FirebaseSocial) and cloud save (cloud-save.ts) share a single
+// instance from here.
 //
-// KİMLİK DİKİŞİ — iOS yolunu açık tutan yer:
-// Oyunun geri kalanı bir kullanıcıyı YALNIZCA ensureUid() üzerinden görür;
-// bu kimliğin anonim mi, Google ile mi, yoksa Sign in with Apple ile mi
-// elde edildiği burada kapsüllenir. Kalıcı giriş eklenirken (linkWithCredential)
-// sadece bu dosya değişir — cloud-save.ts ve oyun kodu aynen kalır.
+// IDENTITY SEAM — where the iOS path is kept open:
+// The rest of the game sees a user ONLY through ensureUid(); whether that
+// identity was obtained anonymously, via Google, or via Sign in with Apple is
+// encapsulated here. When persistent sign-in is added (linkWithCredential),
+// only this file changes — cloud-save.ts and the rest of the game code stay
+// the same.
 //
-// Kimlik bilerek platforma özgü bir kimliğe (Play Games player_id / Game
-// Center) BAĞLANMAZ: Firebase UID'si Android ve iOS'ta aynı şekilde çalışır,
-// böylece aynı oyuncu iki platformda tek kayda ulaşabilir. Native giriş
-// (services.ts NativeGameAuth) oyun-içi isim/rozet için ayrı kalmaya devam eder.
+// Identity is deliberately NOT TIED to a platform-specific id (Play Games
+// player_id / Game Center): Firebase's UID works the same way on Android and
+// iOS, so the same player can reach a single save on both platforms. Native
+// sign-in (services.ts NativeGameAuth) continues to remain separate, for
+// in-game name/badge purposes.
 
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -57,24 +59,25 @@ export function firebaseAuth(): Auth {
 }
 
 /**
- * Oturumu açar ve oyuncunun kalıcı kimliğini döndürür; Firebase
- * yapılandırılmamışsa veya bağlantı kurulamazsa null döner — çağıranlar bu
- * durumda sessizce çevrimdışı çalışmaya devam eder (ads.ts/billing.ts ile
- * aynı deyim).
+ * Signs in and returns the player's persistent identity; returns null if
+ * Firebase isn't configured or a connection can't be established — in that
+ * case callers silently keep working offline (same idiom as
+ * ads.ts/billing.ts).
  *
- * signInAnonymously() zaten açık bir anonim oturum varsa YENİSİNİ
- * oluşturmaz, mevcut kullanıcıyı döndürür; bu yüzden tekrar çağrılması
- * güvenlidir ve UID cihazda sabit kalır.
+ * If an anonymous session is already open, signInAnonymously() does NOT
+ * create a new one, it returns the existing user; so calling it again is
+ * safe and the UID stays fixed on the device.
  *
- * Hata durumunda söz (promise) önbellekten düşürülür: ilk açılış çevrimdışı
- * yapıldıysa bulut kaydı o oturum boyunca ölü kalmasın, ağ gelince bir
- * sonraki çağrı yeniden denesin.
+ * On error the promise is dropped from the cache: if the first startup
+ * happened offline, cloud save shouldn't stay dead for the rest of that
+ * session — the next call retries once the network comes back.
  */
 /**
- * Firebase'in diskteki kalıcı oturumu geri yüklemesini bekler.
+ * Waits for Firebase to restore the persisted session from disk.
  *
- * onAuthStateChanged ilk bildirimini ancak bu geri yükleme bittikten sonra
- * yapar; o ana kadar `auth.currentUser` null'dur ve "oturum yok" sanılır.
+ * onAuthStateChanged only fires its first notification after this restore
+ * finishes; until then `auth.currentUser` is null and gets mistaken for "no
+ * session".
  */
 function waitForRestoredUser(auth: Auth): Promise<User | null> {
   return new Promise((resolve) => {
@@ -96,11 +99,11 @@ export function ensureUid(): Promise<string | null> {
   if (!isFirebaseConfigured()) return Promise.resolve(null);
   uidPromise ??= (async () => {
     const auth = firebaseAuth();
-    // KRİTİK: signInAnonymously()'yi doğrudan çağırmak, kalıcı oturum diskten
-    // geri yüklenmeden önce çalıştığı için HER AÇILIŞTA YENİ bir anonim
-    // kullanıcı yaratıyordu; bağlanmış Google hesabı öksüz kalıyor ve bulut
-    // kaydı geri dönen oyuncuda hiç çalışmıyordu (emülatörde yakalandı).
-    // Önce mevcut oturumun geri yüklenmesini bekle.
+    // CRITICAL: calling signInAnonymously() directly ran before the
+    // persistent session was restored from disk, so it created a NEW
+    // anonymous user on EVERY STARTUP; the linked Google account became
+    // orphaned and cloud save never worked for a returning player (caught on
+    // the emulator). Wait for the existing session to restore first.
     const restored = await waitForRestoredUser(auth);
     if (restored) return restored.uid;
     const cred = await signInAnonymously(auth);
@@ -112,9 +115,9 @@ export function ensureUid(): Promise<string | null> {
   return uidPromise;
 }
 
-// ---------- Kalıcı kimlik (hesap bağlama) ----------
+// ---------- Persistent identity (account linking) ----------
 
-/** Oturum kalıcı bir hesaba bağlı mı — yani başka bir cihazda geri alınabilir mi. */
+/** Whether the session is linked to a persistent account — i.e. can be recovered on another device. */
 export function isLinked(): boolean {
   const u = firebaseAuth().currentUser;
   return !!u && !u.isAnonymous;
@@ -126,47 +129,51 @@ export function linkedLabel(): string | null {
   return u.displayName || u.email || null;
 }
 
-/** Hesap bağlama yalnızca native pakette (Google hesap seçicisi orada var) anlamlı. */
+/** Account linking only makes sense in the native package (that's where the Google account picker lives). */
 export function isAccountLinkingAvailable(): boolean {
   return isFirebaseConfigured() && Capacitor.isNativePlatform();
 }
 
 export type LinkResult =
   | { ok: true; switched: false; msg: string }
-  /** Bu Google hesabı BAŞKA bir kayda bağlıymış: o hesaba geçildi, buluttaki
-   *  ilerleme indirilmeli (çağıran bulut senkronunu yeniden çalıştırmalı). */
+  /** This Google account was already linked to ANOTHER save: switched to that
+   *  account, the cloud progress needs to be downloaded (the caller should
+   *  re-run the cloud sync). */
   | { ok: true; switched: true; uid: string; msg: string }
   | { ok: false; msg: string };
 
 /**
- * Anonim oturumu kalıcı bir Google hesabına bağlar.
+ * Links the anonymous session to a persistent Google account.
  *
- * Kritik dal — `auth/credential-already-in-use`: seçilen Google hesabı zaten
- * BAŞKA bir Firebase kullanıcısına bağlıysa (oyuncu daha önce başka bir
- * cihazda bağlamışsa) bağlama başarısız olur. Bu durumda doğru davranış
- * hatayı yutmak değil, o hesaba GEÇMEK ve buluttaki kaydı indirmektir;
- * aksi halde oyuncunun eski ilerlemesi erişilemez kalır. Bu dalı ele almayan
- * implementasyonlar ya çöker ya da sessizce ilerleme kaybettirir.
+ * Critical branch — `auth/credential-already-in-use`: if the selected Google
+ * account is already linked to ANOTHER Firebase user (the player linked it on
+ * a different device before), linking fails. The correct behavior here is
+ * not to swallow the error but to SWITCH to that account and download the
+ * cloud save; otherwise the player's old progress stays unreachable.
+ * Implementations that don't handle this branch either crash or silently
+ * lose progress.
  *
- * Buradaki anonim kullanıcı yetim kalır (silinmez) — üzerindeki yerel kayıt
- * zaten cihazda duruyor ve çakışma akışı devreye girerse kullanıcıya sorulur.
+ * The anonymous user here is left orphaned (not deleted) — the local save on
+ * it is already sitting on the device, and if the conflict flow kicks in the
+ * user gets asked.
  */
 /**
- * Google kimlik bilgisini alır.
+ * Obtains a Google credential.
  *
- * Android'de eklenti öntanımlı olarak Credential Manager'ı kullanır; bu API
- * yalnızca cihazda BU UYGULAMAYA daha önce yetki vermiş hesapları döndürür.
- * Dolayısıyla ilk girişte hesap cihazda ekli olsa bile "No matching
- * credentials" ile boş döner ve hesap seçici hiç açılmaz. Bu yüzden modern
- * akış önce denenir, boş dönerse klasik seçiciye düşülür — aksi halde hiçbir
- * oyuncu hesabını ilk kez bağlayamazdı.
+ * On Android, the plugin uses Credential Manager by default; this API only
+ * returns accounts that have previously authorized THIS APP on the device.
+ * So on a first sign-in, even if the account is present on the device, it
+ * comes back empty with "No matching credentials" and the account picker
+ * never opens. That's why the modern flow is tried first, and falls back to
+ * the classic picker if it comes back empty — otherwise no player could ever
+ * link their account for the first time.
  */
 async function requestGoogleIdToken(): Promise<string | null> {
   try {
     const res = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
     if (res.credential?.idToken) return res.credential.idToken;
   } catch {
-    /* yedek akışa düş */
+    /* fall through to the backup flow */
   }
   try {
     const res = await FirebaseAuthentication.signInWithGoogle({
@@ -184,10 +191,10 @@ export async function linkWithGoogle(): Promise<LinkResult> {
     return { ok: false, msg: t('Hesap bağlama mobil sürümde kullanılabilir.') };
   }
   try {
-    await ensureUid(); // anonim oturumun açık olduğundan emin ol
+    await ensureUid(); // make sure the anonymous session is open
 
-    // skipNativeAuth: yalnızca hesap seçici + kimlik bilgisi; oturumu JS SDK açar
-    // (bkz. capacitor.config.ts'teki gerekçe).
+    // skipNativeAuth: only the account picker + credential; the JS SDK opens the session
+    // (see the rationale in capacitor.config.ts).
     const idToken = await requestGoogleIdToken();
     if (!idToken) return { ok: false, msg: t('Google girişi tamamlanmadı.') };
 
@@ -206,7 +213,7 @@ export async function linkWithGoogle(): Promise<LinkResult> {
       } catch (e) {
         const code = (e as { code?: string } | null)?.code;
         if (code !== 'auth/credential-already-in-use') throw e;
-        // Bu Google hesabının zaten bir kaydı var: ona geç.
+        // This Google account already has a save: switch to it.
         const signedIn = await signInWithCredential(auth, credential);
         uidPromise = Promise.resolve(signedIn.user.uid);
         return {
@@ -218,7 +225,7 @@ export async function linkWithGoogle(): Promise<LinkResult> {
       }
     }
 
-    // Zaten kalıcı bir hesapta (ya da anonim oturum yok): doğrudan giriş yap.
+    // Already on a persistent account (or no anonymous session): sign in directly.
     const signedIn = await signInWithCredential(auth, credential);
     uidPromise = Promise.resolve(signedIn.user.uid);
     return {

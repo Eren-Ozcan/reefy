@@ -230,12 +230,13 @@ function isDefaultPlayerName(name: string): boolean {
 }
 
 /**
- * Parmak izine GİRMEYEN alanlar. İkiye ayrılırlar ve ikisi de aynı kapıya
- * çıkar — bu alanlar farklı diye oyuncuya "hangi ilerleme?" diye sorulamaz:
- * - kendiliğinden değişenler (`lastSeen`, biriken gelir, kir lekeleri)
- * - cihaza ait arayüz durumu ve ayarlar (dil, ses, görülmüş ipuçları)
- * `adsRemoved` zaten buluta hiç gitmez (bkz. cloud-save.ts ENTITLEMENT_KEYS),
- * bu yüzden karşılaştırmada da yok sayılır.
+ * Fields that do NOT go into the fingerprint. They fall into two groups and
+ * both lead to the same conclusion — the player can't be asked "which
+ * progress?" just because these fields differ:
+ * - fields that change on their own (`lastSeen`, accumulated income, dirt spots)
+ * - device-local UI state and settings (language, sound, hints seen)
+ * `adsRemoved` never goes to the cloud anyway (see cloud-save.ts
+ * ENTITLEMENT_KEYS), so it's ignored in the comparison too.
  */
 const FINGERPRINT_IGNORED = [
   'lastSeen', 'incomePot', 'dirtSpots',
@@ -243,17 +244,18 @@ const FINGERPRINT_IGNORED = [
   'adsRemoved',
 ] as const satisfies readonly (keyof SaveData)[];
 
-/** Kanonik biçimde "hiç yok" ile eşdeğer sayılan değerler — aşağıdaki nota bak. */
+/** Values treated as equivalent to "not present" in canonical form — see the note below. */
 const BLANK_FORMS = new Set(['{}', '[]', '0', 'false', '""', 'null']);
 
 /**
- * Değeri sırası ve "boşluğu" normalleştirilmiş bir metne çevirir:
- * - nesne anahtarları sıralanır (aynı içerik, farklı yazma sırası aynı metin)
- * - diziler de sıralanır: bu şemadaki hiçbir dizinin sırası oyuncu için anlam
- *   taşımaz, üstelik `fishes` her syncSave'de SAHNEDEN yeniden kurulduğu için
- *   sıra cihazdan cihaza zaten değişir
- * - sıfır/boş değerli alanlar hiç yokmuş gibi elenir: bir yemi bitirince
- *   `{yem: 0}` kalır, öteki cihazda o anahtar hiç yoktur — aynı kayıttır
+ * Converts a value into a text normalized for order and "blankness":
+ * - object keys are sorted (same content, different write order -> same text)
+ * - arrays are sorted too: no array's order in this schema is meaningful to
+ *   the player, and on top of that `fishes` is rebuilt FROM SCRATCH on every
+ *   syncSave, so the order already differs from device to device
+ * - fields with a zero/empty value are treated as if they weren't there at
+ *   all: finishing a feed leaves `{feed: 0}` behind, while on the other
+ *   device that key doesn't exist at all — it's the same save
  */
 function canonical(v: unknown): string {
   if (Array.isArray(v)) return '[' + v.map(canonical).sort().join(',') + ']';
@@ -269,29 +271,31 @@ function canonical(v: unknown): string {
 }
 
 /**
- * Kaydın oyuncu için ANLAMLI olan kısmının parmak izi: iki kaydın "aslında
- * aynı ilerleme" olup olmadığı buradan anlaşılır (bkz. cloud-save.ts). İki
- * cihaz sırayla senkron olunca çakışma ekranının iki sütunu birebir aynı
- * veriyi gösterebiliyordu; oyuncuya aynı şeyi seçtirmek hatadır.
+ * A fingerprint of the part of the save that is MEANINGFUL to the player:
+ * this is how we tell whether two saves are "actually the same progress"
+ * (see cloud-save.ts). When two devices synced one after another, the
+ * conflict screen's two columns could show identical data; making the
+ * player pick between the same thing is a bug.
  *
- * Ham JSON karşılaştırması İŞE YARAMAZ: kayıt oyuncu hiçbir şey yapmasa bile
- * saniyeler içinde değişir — hasProgress()'teki listenin aynısı.
+ * Raw JSON comparison DOESN'T WORK: a save changes within seconds even if
+ * the player does nothing — the same list as in hasProgress().
  *
- * YÖN ÖNEMLİ ve burada hasProgress()'in TERSİdir: "aynı" demek soruyu tümden
- * atlatır, bu yüzden kuşkuda kalınan her alan FARK sayılmalıdır. Bu yüzden
- * aşağısı bir izin listesi değil: SaveData'ya yarın eklenecek bir alan
- * kendiliğinden karşılaştırmaya girer, dışarıda kalanlar tek tek sayılıdır.
+ * DIRECTION MATTERS here too, and it's the OPPOSITE of hasProgress(): saying
+ * "same" skips the question entirely, so any field left in doubt must count
+ * as a DIFFERENCE. That's why the list below isn't an allowlist: a field
+ * added to SaveData tomorrow automatically enters the comparison, and only
+ * the ones left out are enumerated individually.
  */
 export function progressFingerprint(s: SaveData): string {
   const cmp: Record<string, unknown> = { ...s };
   for (const k of FINGERPRINT_IGNORED) delete cmp[k];
-  // Balığın büyümesi ve açlığı zamanla kendiliğinden ilerler; balığı oyuncu
-  // gözünde tanımlayan şey türü, adı, hangi akvaryumda olduğu ve yem bonusudur.
+  // A fish's growth and hunger advance on their own over time; what defines a
+  // fish in the player's eyes is its species, name, which aquarium it's in, and its feed bonus.
   cmp.fishes = s.fishes.map((f) => ({ sp: f.sp, name: f.name, seed: f.seed, tank: f.tank, bonus: f.bonus ?? 0 }));
   return canonical(cmp);
 }
 
-/** v1 -> v2 geçişi: eski kayıtlar balıklarını ve parasını korur. */
+/** v1 -> v2 migration: old saves keep their fish and money. */
 function migrate(parsed: Record<string, unknown>): SaveData {
   const base = defaultSave();
   const merged = { ...base, ...parsed } as SaveData;
@@ -311,7 +315,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
     merged.streak = 0;
     merged.fishes = (merged.fishes || []).map((f) => ({ ...f, tank: f.tank ?? START_TANK }));
   }
-  // Zorunlu alanları güvenceye al
+  // Ensure required fields are present
   if (!merged.feedOwned) merged.feedOwned = {};
   if (!merged.tanksOwned?.length) merged.tanksOwned = [START_TANK];
   if (!merged.tanksOwned.includes(merged.activeTank)) merged.activeTank = merged.tanksOwned[0];
@@ -331,8 +335,8 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (!merged.friendGifts) merged.friendGifts = { day: '', gifted: [] };
   if (!merged.weeklyQuest) merged.weeklyQuest = { day: '', progress: {}, claimed: [] };
   if (merged.lang !== 'tr' && merged.lang !== 'en') merged.lang = detectLang();
-  // Kaydedilmiş serbest metin alanları (localStorage doğrudan düzenlenebilir; UI'daki
-  // giriş temizliğine güvenmeyip burada da temizle — HTML injection'a karşı savunma).
+  // Saved free-text fields (localStorage can be edited directly; don't rely
+  // solely on the UI's input sanitization — sanitize here too as defense against HTML injection).
   const stripHtml = (v: string) => v.replace(/[<>&"']/g, '').trim();
   merged.playerName = stripHtml(merged.playerName) || base.playerName;
   merged.fishes = merged.fishes.map((f) => ({ ...f, name: stripHtml(f.name) || 'Balık' }));
@@ -351,10 +355,10 @@ export function loadSave(): SaveData {
 }
 
 /**
- * Cihaz dışından (bulut kaydından) gelen ham JSON'u yerel kayıtla AYNI
- * kapıdan geçirir: migrate() eksik alanları tamamlar, bilinmeyen kalıntıları
- * güvenli varsayılanlara oturtur ve serbest metin alanlarını temizler. Bozuk
- * veride null döner — çağıran o zaman yerel kaydı korur.
+ * Passes raw JSON coming from outside the device (a cloud save) through the
+ * SAME path as a local save: migrate() fills in missing fields, settles
+ * unknown leftovers into safe defaults, and sanitizes free-text fields.
+ * Returns null on corrupt data — the caller then keeps the local save.
  */
 export function parseSave(raw: string): SaveData | null {
   try {
@@ -371,7 +375,7 @@ export function persist(s: SaveData): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
-    /* depolama dolu/engelli — sessizce geç */
+    /* storage full/blocked — silently ignore */
   }
 }
 
