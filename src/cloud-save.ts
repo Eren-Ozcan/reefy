@@ -199,7 +199,11 @@ export class CloudSave {
 
     // Yerel en az bulut kadar güncel — normal durum.
     if (cloudRev <= this.rev) {
-      if (this.dirty) this.flush(save);
+      // await edilir: upload() kendi WRITE_TIMEOUT_MS'i ile sınırlı, bu yüzden
+      // sync()'i asla asmaz — ama fire-and-forget bırakılırsa sync()'i await
+      // eden çağıranlar (ör. resyncCloudForNewAccount) yazma bitmeden devam
+      // edip yeni bir state değişikliğiyle yarışabilirdi.
+      if (this.dirty) await this.upload(save);
       return 'in-sync';
     }
 
@@ -311,30 +315,51 @@ export class CloudSave {
       if (payload.length > MAX_PAYLOAD_BYTES) return false;
 
       const nextRev = this.rev + 1;
-      const written = await withTimeout(
-        setDoc(this.ref(uid), {
-          payload,
-          schemaVersion: SAVE_SCHEMA_VERSION,
-          rev: nextRev,
-          updatedAt: serverTimestamp(),
-          platform: Capacitor.getPlatform(),
-          // Çakışma ekranının payload'ı açmadan özet gösterebilmesi için.
-          summary: { level: save.level, coins: save.coins, collection: save.collection.length },
-        }).then(() => 'ok' as const),
-        WRITE_TIMEOUT_MS,
-      );
+      // setDoc()'un kendisi ayrı tutulur: yarışı zaman aşımı kazanırsa bile
+      // sözün geç gelen reddi (rule reject) sessizce yutulmalı, yoksa
+      // unhandled rejection olur — ama bu .catch() aşağıdaki race'in sonucunu
+      // ETKİLEMEZ, o ayrı zincir üzerinden okunuyor.
+      const writePromise = setDoc(this.ref(uid), {
+        payload,
+        schemaVersion: SAVE_SCHEMA_VERSION,
+        rev: nextRev,
+        updatedAt: serverTimestamp(),
+        platform: Capacitor.getPlatform(),
+        // Çakışma ekranının payload'ı açmadan özet gösterebilmesi için.
+        summary: { level: save.level, coins: save.coins, collection: save.collection.length },
+      });
+      writePromise.catch(() => {});
 
-      // Zaman aşımına uğrasa bile rev ilerletilir: Firestore yazmayı kuyruğa
-      // almış olabilir ve sonradan sunucuya düşebilir. Aynı rev'i tekrar
-      // denemek kural tarafından reddedilirdi (rev > mevcut olmalı) ve senkron
-      // kalıcı olarak takılırdı. Sayaç ucuz, ilerletmek güvenli.
+      let outcome: 'ok' | 'timeout' | 'rejected';
+      let timer: ReturnType<typeof setTimeout>;
+      try {
+        outcome = await Promise.race([
+          writePromise.then(() => 'ok' as const),
+          new Promise<'timeout'>((resolve) => {
+            timer = setTimeout(() => resolve('timeout'), WRITE_TIMEOUT_MS);
+          }),
+        ]);
+      } catch {
+        outcome = 'rejected';
+      } finally {
+        clearTimeout(timer!);
+      }
+
+      // Zaman aşımında rev yine de ilerletilir: Firestore yazmayı kuyruğa almış
+      // olabilir (çevrimdışı) ve sonradan sunucuya düşebilir; aynı rev'i tekrar
+      // denemek kural tarafından reddedilirdi ve senkron kalıcı olarak takılırdı.
+      // AMA gerçek bir kural reddi (bayat rev, izin hatası) FARKLI: yazma kesin
+      // olarak gerçekleşmedi, rev'i ilerletmek yerel kaydı gelecekte bulutun
+      // önüne geçirip başka bir cihazın gerçekten daha yeni ilerlemesini
+      // çakışma ekranına hiç uğramadan ezebilirdi.
+      if (outcome === 'rejected') return false; // dirty korunur, rev SABİT kalır
       this.rev = nextRev;
-      if (written !== 'ok') return false; // dirty korunur, sonra tekrar denenir
+      if (outcome !== 'ok') return false; // zaman aşımı: dirty korunur, sonra tekrar denenir
 
       this.dirty = false;
       return true;
     } catch {
-      // Kural reddi (bayat rev) ya da ağ hatası: dirty korunur, sonra yeniden denenir.
+      // Beklenmeyen hata (ör. serialize/URL): dirty korunur, sonra yeniden denenir.
       return false;
     } finally {
       this.uploading = false;
