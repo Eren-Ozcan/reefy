@@ -19,18 +19,18 @@ interface Particle { x: number; y: number; vy: number; life: number; color: numb
 
 const OFFLINE_CAP_MS = 8 * 3600_000;
 const OFFLINE_SPEED = 0.5;
-const HUNGER_RATE_MS = HUNGER_RATE / 1000; // fish.ts ile aynı kural, ms cinsinden
+const HUNGER_RATE_MS = HUNGER_RATE / 1000; // same rule as fish.ts, in ms
 
-const MAX_DIRT_SPOTS = 6;              // akvaryum başına en fazla temizlenmemiş kir lekesi
-const DIRT_PENALTY_MAX = 0.35;         // tamamen kirli akvaryumda üretim/büyüme %35 azalır
-// İlk leke / ikinci leke / sonraki lekeler için gecikme aralıkları (ms): kirlenme sonraki
-// lekelerde yavaşlar ki oyuncuya temizlemek için makul bir pencere kalsın.
+const MAX_DIRT_SPOTS = 6;              // max unclean dirt spots per tank
+const DIRT_PENALTY_MAX = 0.35;         // production/growth is reduced by 35% in a fully dirty tank
+// Delay ranges (ms) for the first spot / second spot / later spots: dirtying slows down
+// for later spots so the player has a reasonable window to clean up.
 const DIRT_DELAY_1: [number, number] = [120_000, 150_000];
 const DIRT_DELAY_2: [number, number] = [150_000, 180_000];
 const DIRT_DELAY_3: [number, number] = [400_000, 500_000];
 
-/** İki rengi karıştırır (a=0 -> base, a=1 -> over). Yarı saydam katmanları önceden
- *  hesaplamak için: arkaplan düz renk olduğu sürece sonuç gerçek alfa karışımıyla aynıdır. */
+/** Blends two colors (a=0 -> base, a=1 -> over). For precomputing semi-transparent layers:
+ *  as long as the background is a flat color, the result matches a real alpha blend. */
 function blend(base: number, over: number, a: number): number {
   const br = (base >> 16) & 255, bg = (base >> 8) & 255, bb = base & 255;
   const or = (over >> 16) & 255, og = (over >> 8) & 255, ob = over & 255;
@@ -41,7 +41,7 @@ function blend(base: number, over: number, a: number): number {
 
 export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
 
-/** Kazanç raporu satırı: balık başına saatlik üretim (akvaryum+dekor bonuslu) ve satış değeri. */
+/** Earnings report row: per-fish hourly production (with tank+decor bonuses) and sell value. */
 export interface FishEarning {
   name: string;
   sp: Species;
@@ -49,26 +49,26 @@ export interface FishEarning {
   sad: boolean;
   perHour: number;
   sellValue: number;
-  /** Satış için canlı referans: aktif sahnedeki balık ya da uyuyan kayıt. */
+  /** Live reference for selling: the fish in the active scene, or a dormant save record. */
   live?: Fish;
   saved?: FishSave;
 }
 export interface TankEarnings { tank: TankDef; boostPct: number; dirtPct: number; count: number; perHour: number; fishes: FishEarning[] }
 
-export const INCOME_CAP_HOURS = 4; // biriken gelir en fazla bu kadar saatlik üretim olabilir
+export const INCOME_CAP_HOURS = 4; // accumulated income can be at most this many hours of production
 
 export class Game {
   app = new Application();
   ui!: UI;
   save: SaveData;
   services: Services;
-  fishes: Fish[] = [];          // aktif akvaryumdaki balıklar
-  private dormant: FishSave[] = []; // diğer akvaryumlardaki balıklar
+  fishes: Fish[] = [];          // fish in the active tank
+  private dormant: FishSave[] = []; // fish in other tanks
 
   private world = new Container();
   private bgG = new Graphics();
   private sandG = new Graphics();
-  /** Kum taneciği ve ışık havuzları — kum şekline maskelenir, suya taşmaz. */
+  /** Sand grain and light-pool effects — masked to the sand shape so they don't spill into the water. */
   private sandFxG = new Graphics();
   private sandMaskG = new Graphics();
   private decorAnimG = new Graphics();
@@ -79,8 +79,8 @@ export class Game {
   private fxG = new Graphics();
   private bubbleG = new Graphics();
   private dirtG = new Graphics();
-  /** Kirli cam dokusu ekrandışı bu Graphics'e çizilir, ardından tek bir sprite'a "baked" edilir
-   *  (her karede birçok yarı saydam şekli yeniden rasterize etmek yerine tek doku çizimi). */
+  /** The dirty-glass texture is drawn offscreen into this Graphics, then "baked" into a single sprite
+   *  (one texture draw instead of re-rasterizing many semi-transparent shapes every frame). */
   private grimeScratch = new Graphics();
   private grimeSprite = new Sprite();
   private grimeTex: Texture | null = null;
@@ -90,7 +90,7 @@ export class Game {
   private pellets: Pellet[] = [];
   private particles: Particle[] = [];
 
-  /** Giriş modları: seçili yem varsa dokunuşlar yem atar; düzenleme modunda dekor sürüklenir. */
+  /** Input modes: taps drop feed when a feed type is selected; decor is dragged in edit mode. */
   feedType: FeedDef | null = null;
   editMode = false;
   private dragIndex = -1;
@@ -102,18 +102,18 @@ export class Game {
   offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0, income: 0 };
 
   readonly cloud = new CloudSave();
-  /** Açılıştaki bulut senkronunun sonucu — UI bilgilendirme için okur. */
+  /** Result of the startup cloud sync — read by the UI for informational display. */
   cloudSync: CloudSyncResult = 'disabled';
   /**
-   * Açılış senkronunun kaç ms bekletebileceği. Senkronun KENDİ bütçesi değildir
-   * (o çok daha uzun, bkz. cloud-save.ts): bu yalnızca "oyuncuyu ne kadar
-   * bekletiriz" sorusunun cevabı. Aşılırsa oyun açılır, sonuç geç gelince
-   * handleLateCloudSync() işler.
+   * How many ms the startup sync is allowed to hold up boot. This is NOT the sync's own
+   * budget (that's much longer, see cloud-save.ts): it only answers "how long do we make
+   * the player wait." If exceeded, the game opens and handleLateCloudSync() handles the
+   * result once it arrives.
    */
   static readonly CLOUD_STARTUP_GRACE_MS = 3000;
-  /** Mühleti aşan senkron 'conflict' getirirse UI'ın çakışma ekranını açması için. */
+  /** For the UI to open the conflict screen if a sync that exceeded the grace period returns 'conflict'. */
   onLateConflict?: () => void;
-  /** Buluttan geri yükleme sonrası yeniden yükleme bekleniyor — bkz. freezeForRestore(). */
+  /** A reload is pending after a cloud restore — see freezeForRestore(). */
   private frozen = false;
 
   constructor() {
@@ -125,21 +125,21 @@ export class Game {
     return { w: this.app.screen.width, h: this.app.screen.height };
   }
 
-  /** Alt bar / mod çubuğu gibi kalıcı UI'ın kapladığı yükseklik (CSS px). UI mount olurken ölçüp verir. */
+  /** Height (CSS px) taken up by persistent UI like the bottom bar / mode bar. Measured and provided by the UI on mount. */
   private uiBottomInset = 0;
 
-  /** Zemin (kum üstü) çizgisi: dekorlar buraya oturur. Alt UI'ın üstünde kalması için inset kadar yukarıda. */
+  /** Floor (above-sand) line: decor sits here. Raised by the inset so it stays above the bottom UI. */
   get floorY(): number {
     return this.app.screen.height - this.uiBottomInset;
   }
 
-  /** Kum bandının üst kenarının taban çizgisi. Gerçek yüzey buna göre eğrilir (bkz. sandSurfaceY). */
+  /** Baseline of the sand band's top edge. The actual surface curves relative to this (see sandSurfaceY). */
   get sandTopY(): number {
     return this.floorY - 96;
   }
 
-  /** Kum yüzeyinin verilen x'teki gerçek yüksekliği. buildStatic'teki quadratic eğrilerin
-   *  analitik karşılığıdır — dekorlar düz bir çizgiye değil, kumun kendi formuna oturur. */
+  /** The actual height of the sand surface at a given x. The analytic counterpart of the
+   *  quadratic curves in buildStatic — decor sits on the sand's own shape, not a flat line. */
   sandSurfaceY(x: number): number {
     const w = this.app.screen.width || 1;
     const top = this.sandTopY;
@@ -159,12 +159,12 @@ export class Game {
     }
   }
 
-  /** Balıkların yüzebileceği alan: kuma girmemeleri için yükseklik kum çizgisiyle sınırlanır. */
+  /** The area fish can swim in: height is capped at the sand line so they don't swim into the sand. */
   private get swimBounds(): Bounds {
     return { w: this.app.screen.width, h: this.sandTopY };
   }
 
-  /** Alt UI yüksekliği değiştiğinde (mount, ekran döndürme) sahneyi yeni zemin çizgisiyle yeniden kurar. */
+  /** Rebuilds the scene with the new floor line when the bottom UI height changes (mount, screen rotation). */
   setUiBottomInset(px: number): void {
     const next = Math.max(0, Math.round(px));
     if (next === this.uiBottomInset) return;
@@ -173,16 +173,16 @@ export class Game {
   }
   get activeTank(): TankDef { return tankById(this.save.activeTank); }
 
-  /** Belirli bir akvaryumun kapasitesi: seviye tabanı + akvaryum kademesi bonusu. */
+  /** Capacity of a given tank: level baseline + tank-tier bonus. */
   capacityFor(tankId: string): number {
     return Math.min(6 + this.save.level, 24) + TANK_CAP_BONUS[tankById(tankId).rarity];
   }
-  /** Aktif akvaryumun kapasitesi. */
+  /** Active tank's capacity. */
   get capacity(): number { return this.capacityFor(this.save.activeTank); }
 
   get sellMult(): number { return 1 + 0.05 * this.completedSets().length; }
 
-  /** Akvaryumun toplam bonusu (%): tema bonusu + yerleştirilmiş dekorlar. Büyümeye VE pasif gelire işler. */
+  /** Tank's total bonus (%): theme bonus + placed decor. Affects BOTH growth and passive income. */
   tankBoostPct(tankId: string): number {
     const t = tankById(tankId);
     const placed = this.save.decorPlaced[tankId] ?? [];
@@ -191,35 +191,35 @@ export class Game {
     return Math.min(DECOR_BOOST_CAP, pct);
   }
 
-  /** Akvaryumun kirlilik seviyesi (0..1): temizlenmemiş leke sayısına göre. */
+  /** Tank's dirt level (0..1), based on the number of unclean spots. */
   dirtLevel(tankId: string): number {
     return Math.min(1, (this.save.dirtSpots[tankId]?.length ?? 0) / MAX_DIRT_SPOTS);
   }
-  /** Kirlilik yüzdesi (0..100), üretim/büyüme kaybına karşılık gelir. */
+  /** Dirt percentage (0..100), corresponds to production/growth loss. */
   dirtPct(tankId: string): number {
     return Math.round(this.dirtLevel(tankId) * DIRT_PENALTY_MAX * 100);
   }
 
-  /** Akvaryumun net çarpanı: dekor/tema bonusu eksi kirlilik cezası. Büyüme VE gelire işler. */
+  /** Tank's net multiplier: decor/theme bonus minus dirt penalty. Affects both growth and income. */
   tankNetMult(tankId: string): number {
     return (1 + this.tankBoostPct(tankId) / 100) * (1 - this.dirtLevel(tankId) * DIRT_PENALTY_MAX);
   }
 
-  /** Aktif akvaryumun büyüme çarpanı. */
+  /** Active tank's growth multiplier. */
   get growthMult(): number {
     return this.tankNetMult(this.save.activeTank);
   }
 
   /**
-   * Seviye eğrisi: erken hızlı (Sv1 = 50 XP ≈ 2 satış), geç oyunda dikleşir (üs 2.2).
-   * Satış XP'si fiyatın 0.75 kuvveti olduğundan geç seviyeler saatler alır — hedeflenen yapı.
+   * Level curve: fast early on (Lv1 = 50 XP ≈ 2 sales), steepens late-game (exponent 2.2).
+   * Since sale XP is price to the power of 0.75, late levels take hours — this is intentional.
    */
   xpNeed(level: number): number { return Math.round(50 * Math.pow(level, 2.2)); }
 
-  /** Satıştan gelen XP: azalan getiri — pahalı balık çok XP verir ama fiyatla doğrusal büyümez. */
+  /** XP from a sale: diminishing returns — expensive fish give a lot of XP but not linearly with price. */
   saleXp(sellPrice: number): number { return Math.max(5, Math.round(Math.pow(sellPrice, 0.75))); }
 
-  /** Tüm akvaryumlardaki yetişkin balıkların toplam saatlik üretimi (akvaryum+dekor bonuslu). */
+  /** Total hourly production of adult fish across all tanks (with tank+decor bonuses). */
   get incomePerHour(): number {
     let rate = 0;
     const cache: Record<string, number> = {};
@@ -229,7 +229,7 @@ export class Game {
     return Math.round(rate);
   }
 
-  /** Biriken geliri kasaya aktarır. */
+  /** Transfers accumulated income into the coin balance. */
   collectIncome(): { ok: boolean; msg: string } {
     const amount = Math.floor(this.save.incomePot);
     if (amount < 1) return { ok: false, msg: t('Henüz birikmiş gelir yok') };
@@ -254,10 +254,10 @@ export class Game {
   }
 
   async init(host: HTMLElement): Promise<void> {
-    // Bulut senkronunu pixi başlatmasıyla ÇAKIŞTIR ki ağ gecikmesi açılış
-    // süresine eklenmesin. Sonucu aşağıda, kayıt temizliği ve çevrimdışı
-    // hesabı BAŞLAMADAN önce bekliyoruz: buluttan geri yüklenen kayıt da
-    // yerel kayıtla aynı ayıklama/doğrulama adımlarından geçmeli.
+    // OVERLAP the cloud sync with pixi's init so network latency isn't added to
+    // startup time. We await the result below, before starting save cleanup and
+    // the offline accounting: a save restored from the cloud must go through the
+    // same sanitation/validation steps as the local save.
     const cloudSyncPromise = this.cloud.sync(this.save);
 
     await this.app.init({ resizeTo: host, antialias: true, background: 0x2f7f96 });
@@ -270,11 +270,11 @@ export class Game {
     this.sandFxG.mask = this.sandMaskG;
     this.app.stage.addChild(this.world);
 
-    // Açılış senkronu için KISA bir mühlet. Senkronun kendi bütçesi bundan çok
-    // daha cömerttir (bkz. cloud-save.ts AUTH_TIMEOUT_MS): oyuncuyu bekletmekle
-    // senkronu öldürmek aynı şey değil. Eskiden tek bir 3 sn'lik süre iki işi
-    // birden yapıyordu ve süre aşılınca senkron kalıcı olarak iptal oluyordu —
-    // ölçümde ensureUid 2946 ms sürdü, yani sınırın hemen altındaydı.
+    // SHORT grace period for the startup sync. The sync's own budget is much more
+    // generous (see cloud-save.ts AUTH_TIMEOUT_MS): making the player wait and
+    // killing the sync are not the same thing. Previously a single 3s duration did
+    // both jobs at once, and exceeding it permanently canceled the sync — in
+    // measurements ensureUid took 2946 ms, right under the limit.
     const PENDING = Symbol('pending');
     const raced = await Promise.race([
       cloudSyncPromise,
@@ -283,16 +283,16 @@ export class Game {
     if (raced === PENDING) void cloudSyncPromise.then((res) => this.handleLateCloudSync(res));
     else this.cloudSync = raced;
 
-    // Oyuncu dokümanı ancak SENKRON SONRASI yayımlanır: buluttan geri yüklenen
-    // kayıt kendi friendCode'unu getirir; önce yazılsaydı arkadaşların gördüğü
-    // kod ile oyuncunun kodu ayrışırdı (bkz. services.ts publishPlayer).
+    // The player document is only published AFTER THE SYNC: a save restored from the
+    // cloud brings its own friendCode; publishing before that would make the code
+    // friends see diverge from the player's actual code (see services.ts publishPlayer).
     //
-    // Senkron mühleti aşıp geç gelirse burada ESKİ kod yayımlanır; ama geç gelen
-    // bir geri yükleme sayfayı yeniden yüklediği için bir sonraki açılışta doğru
-    // kodla yeniden yayımlanır — sapma geçicidir ve kendini düzeltir.
+    // If the sync exceeds the grace period and arrives late, the OLD code gets published
+    // here; but since a late-arriving restore reloads the page, the next startup
+    // republishes with the correct code — the drift is temporary and self-corrects.
     void this.services.social.publishPlayer?.();
 
-    // Kayıttaki bilinmeyen dekor kimliklerini ayıkla (sürüm değişikliklerine karşı koruma)
+    // Strip unknown decor ids from the save (protects against version changes)
     const known = new Set(DECOR.map((d) => d.id));
     for (const t of Object.keys(this.save.decorPlaced)) {
       this.save.decorPlaced[t] = (this.save.decorPlaced[t] ?? []).filter((p) => known.has(p.def));
@@ -304,7 +304,7 @@ export class Game {
       if (!FEEDS.some((f) => f.id === id)) delete this.save.feedOwned[id];
     }
 
-    // Kayıttaki bilinmeyen akvaryum/tür kimliklerini ayıkla (katalog değişirse çökmeyi önler)
+    // Strip unknown tank/species ids from the save (prevents crashes if the catalog changes)
     const knownTanks = new Set(TANKS.map((t) => t.id));
     this.save.tanksOwned = this.save.tanksOwned.filter((id) => knownTanks.has(id));
     if (!this.save.tanksOwned.length) this.save.tanksOwned = [TANKS[0].id];
@@ -340,7 +340,7 @@ export class Game {
     this.buildStatic();
     this.app.renderer.on('resize', () => this.buildStatic());
 
-    // Balıkları aktif/dormant olarak ayır
+    // Split fish into active/dormant
     for (const fs of this.save.fishes) {
       if (fs.tank === this.save.activeTank) this.spawnFish(fs);
       else this.dormant.push(fs);
@@ -348,7 +348,7 @@ export class Game {
 
     audio.setBiome(this.activeTank.biome);
 
-    // Sahne dokunuşları: yem modu tek tıkla yem atar, düzenleme modu dekor sürükler
+    // Scene taps: feed mode drops feed with a single tap, edit mode drags decor
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = this.app.screen;
     this.app.stage.on('pointerdown', (e) => this.onPointerDown(e.global.x, e.global.y));
@@ -362,28 +362,27 @@ export class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         this.syncSave();
-        // Arka plana alınırken buluta ZORLA yaz: Android/iOS uygulamayı
-        // öldürdüğünde beforeunload çalışmayabilir, visibilitychange çalışır.
+        // FORCE-write to the cloud when backgrounded: beforeunload may not fire when
+        // Android/iOS kills the app, but visibilitychange does.
         this.cloud.flush(this.save);
       }
     });
     window.addEventListener('beforeunload', () => this.syncSave());
 
-    // Burada BİLEREK açılış reklamı yok: AdMob uygulama açılışında geçiş
-    // (interstitial) reklamı göstermeyi yasaklıyor ve bu "izin verilmeyen
-    // uygulama" kategorisinde. Reklam yalnızca oyunun içindeki doğal molalarda
-    // çıkar (akvaryum değişimi, akvaryumun tamamen temizlenmesi).
+    // DELIBERATELY no launch ad here: AdMob prohibits showing an interstitial ad
+    // on app launch, and this falls under the "disallowed app" category. Ads only
+    // appear at natural breaks within the game (switching tanks, fully cleaning a tank).
   }
 
-  // ---------- sahne ----------
+  // ---------- scene ----------
 
   private buildStatic(): void {
     const { w, h } = this.bounds;
     const tank = this.activeTank;
     const sandTop = this.sandTopY;
 
-    // Su: arkaplan katmanının üzerine yarı saydam su gradyanı biner. Arkaplan düz bir renk
-    // olduğu için karışım burada önceden hesaplanır — sonuç birebir aynı, alfa gradyanına gerek kalmaz.
+    // Water: a semi-transparent water gradient sits over the background layer. Since the
+    // background is a flat color, the blend is precomputed here — the result is identical, no alpha gradient needed.
     this.bgG.clear();
     const grad = new FillGradient(0, 0, 0, h);
     grad.addColorStop(0, blend(tank.backdrop, tank.water[0], 0.42));
@@ -391,7 +390,7 @@ export class Game {
     grad.addColorStop(1, blend(tank.backdrop, tank.water[2], 0.96));
     this.bgG.rect(0, 0, w, h).fill(grad);
 
-    // Akvaryum kimliğinden türetilen sabit tohum: aynı akvaryum her açılışta aynı görünür.
+    // Fixed seed derived from the tank id: the same tank looks the same every time it opens.
     let seed = 0;
     for (const ch of tank.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
     const rnd = () => {
@@ -399,9 +398,9 @@ export class Game {
       return (seed >>> 8) / 16777216;
     };
 
-    // ---------- ışık huzmeleri ----------
-    // Karenin üstündeki sanal bir kaynaktan yelpaze gibi açılır ve kuma DEĞMEDEN söner.
-    // Sert bir kesim çizgisi bırakmaması önemli: kum formu aşağı indiğinde o çizgi açıkta kalıyordu.
+    // ---------- light rays ----------
+    // Fans out from a virtual source above the frame and fades out WITHOUT touching the sand.
+    // Important that it leave no hard cutoff line: that line used to show when the sand shape dipped lower.
     const originX = w * (0.40 + rnd() * 0.20);
     const originY = -h * 0.6;
     const hits: { x: number; r: number; a: number }[] = [];
@@ -419,8 +418,8 @@ export class Game {
       const a = tank.rayAlpha * (1.05 + rnd() * 0.5);
 
       const g = new Graphics();
-      // Dikey sönüm, sabit alfalı ince dilimlerle kurulur (gradyan alfası yerine —
-      // her Pixi sürümünde aynı davranır ve bantlaşma bu dilim sayısında görünmez).
+      // Vertical falloff is built from thin fixed-alpha slices (instead of a gradient alpha —
+      // behaves the same across every Pixi version, and banding isn't visible at this slice count).
       const SEG = 18;
       for (const [wm, am] of [[1.75, 0.30], [1.0, 1.0]]) {
         for (let s = 0; s < SEG; s++) {
@@ -441,8 +440,8 @@ export class Game {
       hits.push({ x: originX + (sandTop - originY) * tan, r: halfBot * 7, a });
     }
 
-    // ---------- kum ----------
-    // Üst kenarın formu akvaryuma göre değişir; kumun ÜSTÜNDE hiçbir nesne yoktur.
+    // ---------- sand ----------
+    // The top edge's shape varies per tank; nothing sits ABOVE the sand.
     const drawSandPath = (g: Graphics) => {
       g.moveTo(0, sandTop);
       if (tank.floor === 'mound') {
@@ -458,7 +457,7 @@ export class Game {
       g.lineTo(w, h).lineTo(0, h).closePath();
     };
 
-    // Kendi içinde üstten aydınlık, dipte koyu: ışığın kuma vurduğu hissini verir.
+    // Bright at top, dark at the bottom: gives the feeling of light hitting the sand.
     const sandGrad = new FillGradient(0, sandTop - 40, 0, h);
     sandGrad.addColorStop(0, blend(tank.sand, 0xffffff, 0.13));
     sandGrad.addColorStop(0.4, tank.sand);
@@ -467,7 +466,7 @@ export class Game {
     drawSandPath(this.sandG);
     this.sandG.fill(sandGrad);
 
-    // Tanecik ve ışık havuzları kum şekline maskelenir ki suya taşmasınlar.
+    // Grain and light-pool effects are masked to the sand shape so they don't spill into the water.
     this.sandMaskG.clear();
     drawSandPath(this.sandMaskG);
     this.sandMaskG.fill(0xffffff);
@@ -477,7 +476,7 @@ export class Game {
       this.sandFxG.circle(rnd() * w, sandTop - 30 + rnd() * (h - sandTop + 30), 0.8 + rnd() * 1.3)
         .fill({ color: tank.sandDots, alpha: 0.75 });
     }
-    // Huzmelerin kuma düşürdüğü yumuşak ışık havuzları — iç içe elipslerle sönümlenir.
+    // Soft light pools the rays cast onto the sand — faded out with nested ellipses.
     const RINGS = 8;
     for (const p of hits) {
       const pa = Math.min(0.30, p.a * 3.4);
@@ -489,7 +488,7 @@ export class Game {
     }
   }
 
-  // ---------- dekor çizimi ----------
+  // ---------- decor drawing ----------
 
   private drawDecor(): void {
     const { w } = this.bounds;
@@ -501,7 +500,7 @@ export class Game {
       const d = decorById(p.def);
       const cx = p.fx * w;
       const baseY = this.sandSurfaceY(cx) + 6;
-      // Düzenleme modu: sürüklenebilir parçaları vurgula
+      // Edit mode: highlight draggable pieces
       if (this.editMode) {
         const half = 46 * d.scale;
         const active = i === this.dragIndex;
@@ -717,7 +716,7 @@ export class Game {
     }
   }
 
-  // ---------- döngü ----------
+  // ---------- loop ----------
 
   private incomeUiTimer = 0;
 
@@ -725,7 +724,7 @@ export class Game {
     this.time += dt;
     const { w, h } = this.bounds;
 
-    // Pasif gelir birikimi (yetişkin balıklar, tavan: INCOME_CAP_HOURS saatlik üretim)
+    // Passive income accumulation (adult fish, capped at INCOME_CAP_HOURS of production)
     const rate = this.incomePerHour;
     if (rate > 0) {
       this.save.incomePot = Math.min(rate * INCOME_CAP_HOURS, this.save.incomePot + (rate / 3600) * dt);
@@ -743,7 +742,7 @@ export class Game {
 
     this.drawDecor();
 
-    // Kabarcıklar
+    // Bubbles
     this.bubbleG.clear();
     for (const b of this.bubbles) {
       b.y -= (b.vy * dt) / h;
@@ -752,7 +751,7 @@ export class Game {
       this.bubbleG.circle(bx, b.y * h, b.r).stroke({ width: 1.2, color: 0xffffff, alpha: 0.35 });
     }
 
-    // Yem taneleri
+    // Feed pellets
     for (const p of this.pellets) {
       p.age += dt;
       const floorY = this.sandTopY - 6;
@@ -769,7 +768,7 @@ export class Game {
       this.pelletG.circle(p.x - 1, p.y - 1, 1.3).fill(fd.color2);
     }
 
-    // Balıklar
+    // Fish
     const gm = this.growthMult;
     for (const f of this.fishes) {
       let target: { x: number; y: number } | null = null;
@@ -794,7 +793,7 @@ export class Game {
           this.addXp(1);
           this.save.stats.totalFed++;
           this.questEvent('feed', 1);
-          // Kaliteli yem: satış fiyatı bonusu şansı
+          // Quality feed: chance of a sell-price bonus
           let procced = false;
           if (fd.bonusChance > 0 && f.bonus < FISH_BONUS_CAP && Math.random() < fd.bonusChance) {
             f.bonus = Math.min(FISH_BONUS_CAP, f.bonus + fd.bonusAmount);
@@ -814,7 +813,7 @@ export class Game {
       if (grown) this.onGrown(f);
     }
 
-    // Diğer akvaryumlardaki balıklar da yaşar: acıkır, tok oldukça büyür (aç iken de yavaş devam eder)
+    // Fish in other tanks live too: they get hungry, grow while fed (still progress slowly while hungry)
     const boostCache: Record<string, number> = {};
     const tmult = (tid: string) => (boostCache[tid] ??= this.tankNetMult(tid));
     for (const d of this.dormant) {
@@ -825,7 +824,7 @@ export class Game {
       }
     }
 
-    // Parçacıklar
+    // Particles
     for (const p of this.particles) {
       p.y += p.vy * dt;
       p.life -= dt * 1.1;
@@ -836,7 +835,7 @@ export class Game {
       this.fxG.circle(p.x, p.y, p.r * p.life).fill({ color: p.color, alpha: p.life });
     }
 
-    // Kir lekeleri: zamanla oluşur, temizlenmedikçe camı bulanıklaştırır
+    // Dirt spots: form over time, cloud the glass unless cleaned
     this.dirtTimer -= dt * 1000;
     if (this.dirtTimer <= 0) {
       this.maybeSpawnDirt(this.save.activeTank);
@@ -875,14 +874,14 @@ export class Game {
     }
   }
 
-  // ---------- offline / günlük / seri ----------
+  // ---------- offline / daily / streak ----------
 
   private applyOffline(): void {
     const elapsed = Math.min(OFFLINE_CAP_MS, Date.now() - this.save.lastSeen);
     if (elapsed < 60_000) return;
     this.applyOfflineDirt(elapsed);
     let grown = 0;
-    // Offline pasif gelir: yetişkinler yarım hızda üretir (bonuslar + kirlilik cezası dahil)
+    // Offline passive income: adults produce at half rate (including bonuses + dirt penalty)
     let rate = 0;
     const cache: Record<string, number> = {};
     const mult = (tid: string) => (cache[tid] ??= this.tankNetMult(tid));
@@ -896,7 +895,7 @@ export class Game {
       this.offline.income = Math.floor(this.save.incomePot - before);
     }
     for (const fs of this.save.fishes) {
-      // Açlık zamanla lineer düşer (0.05 tabanına kadar); büyüme, dönemin ortalama açlığına göre ölçeklenir
+      // Hunger drops linearly over time (down to a 0.05 floor); growth scales with the period's average hunger
       const hunger1 = Math.max(0.05, fs.hunger - elapsed * HUNGER_RATE_MS);
       const avgHungerMult = hungerGrowthMult((fs.hunger + hunger1) / 2);
       const before = fs.progress;
@@ -910,7 +909,7 @@ export class Game {
     this.offline.grown = grown;
   }
 
-  /** Uzakta geçen sürede sahip olunan tüm akvaryumlara, aynı kademeli gecikmelerle kir lekesi ekler. */
+  /** Adds dirt spots, with the same tiered delays, to every owned tank for time spent away. */
   private applyOfflineDirt(elapsed: number): void {
     for (const tid of this.save.tanksOwned) {
       const spots = this.save.dirtSpots[tid] ?? (this.save.dirtSpots[tid] = []);
@@ -953,7 +952,7 @@ export class Game {
     }
   }
 
-  // ---------- görevler ----------
+  // ---------- quests ----------
 
   ensureQuestDay(): void {
     const today = new Date().toISOString().slice(0, 10);
@@ -1053,12 +1052,12 @@ export class Game {
     return { ok: true, msg: t('{name}: +{coins} altın, +{pearls} inci', { name: t(a.name), coins: a.rewardCoins, pearls: a.rewardPearls }) };
   }
 
-  // ---------- oyuncu eylemleri ----------
+  // ---------- player actions ----------
 
   private spawnFish(fs: FishSave): Fish {
     const f = new Fish(fs, speciesById(fs.sp), this.swimBounds);
     f.root.on('pointertap', () => {
-      if (this.inputMode !== 'normal') return; // yem/düzenleme modunda balık kartı açılmaz
+      if (this.inputMode !== 'normal') return; // fish card doesn't open in feed/edit mode
       this.ui.showFishInfo(f);
     });
     this.fishLayer.addChild(f.root);
@@ -1066,7 +1065,7 @@ export class Game {
     return f;
   }
 
-  // ---------- giriş modları ----------
+  // ---------- input modes ----------
 
   setFeedType(f: FeedDef | null): void {
     this.feedType = f;
@@ -1098,7 +1097,7 @@ export class Game {
 
   private onPointerUp(): void {
     if (this.inputMode !== 'edit' || this.dragIndex < 0) return;
-    // Bırakılan parça en öne gelir (dizinin sonu = en üst katman)
+    // The dropped piece comes to the front (end of array = top layer)
     const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
     const [p] = placed.splice(this.dragIndex, 1);
     if (p) placed.push(p);
@@ -1107,7 +1106,7 @@ export class Game {
     this.syncSave();
   }
 
-  /** Verilen noktadaki en üstteki dekorun dizinini döndürür (yoksa -1). */
+  /** Returns the index of the topmost decor at the given point (-1 if none). */
   private decorAt(x: number, y: number): number {
     const { w } = this.bounds;
     const placed = this.save.decorPlaced[this.save.activeTank] ?? [];
@@ -1121,10 +1120,10 @@ export class Game {
     return -1;
   }
 
-  // ---------- kir / temizlik ----------
+  // ---------- dirt / cleaning ----------
 
-  /** Aktif akvaryuma, yer varsa yeni bir kir lekesi ekler. */
-  /** Akvaryumdaki mevcut leke sayısına göre bir sonraki lekeye kalan süreyi (ms) rastgele seçer. */
+  /** Adds a new dirt spot to the active tank, if there's room. */
+  /** Randomly picks the time (ms) remaining until the next spot, based on the tank's current spot count. */
   private nextDirtDelay(spotCount: number): number {
     const [min, max] = spotCount <= 0 ? DIRT_DELAY_1 : spotCount === 1 ? DIRT_DELAY_2 : DIRT_DELAY_3;
     return min + Math.random() * (max - min);
@@ -1144,57 +1143,57 @@ export class Game {
     this.ui.refreshHUD();
   }
 
-  /** Verilen noktadaki en üstteki kir lekesinin dizinini döndürür (yoksa -1). */
+  /** Returns the index of the topmost dirt spot at the given point (-1 if none). */
   private dirtAt(x: number, y: number): number {
     const { w, h } = this.bounds;
     const spots = this.save.dirtSpots[this.save.activeTank] ?? [];
     for (let i = spots.length - 1; i >= 0; i--) {
       const s = spots[i];
       const cx = s.fx * w, cy = s.fy * h;
-      const hit = 15 * s.r + 12; // tıklama toleransı
+      const hit = 15 * s.r + 12; // tap tolerance
       if (Math.hypot(x - cx, y - cy) <= hit) return i;
     }
     return -1;
   }
 
-  /** Günün ilk birkaç temizliğine ödül verilir (FishVille'deki günlük ilk 5 leke kuralı gibi). */
+  /** The first few cleanups each day are rewarded (like FishVille's daily first-5-spots rule). */
   private static readonly CLEAN_REWARD_DAILY_CAP = 5;
   private static readonly CLEAN_REWARD_COINS = 5;
   private static readonly CLEAN_REWARD_XP = 1;
 
-  // ---------- Temizlik reklamı (oturum başına bir kez) ----------
+  // ---------- Cleaning ad (once per session) ----------
   //
-  // Temizlik reklamı yalnızca AKVARYUM TAMAMEN TEMİZLENDİĞİNDE çıkar: bu,
-  // oyuncunun başladığı işi bitirdiği doğal mola noktasıdır. Önceki sürüm
-  // rastgele bir leke sayısında tetikliyordu; bu, oyuncu daha temizliğin
-  // ORTASINDAYKEN reklam basmak demekti ve Google Play'in "Better Ads
-  // Experiences" politikasının doğrudan yasakladığı durum bu.
+  // The cleaning ad only appears when a TANK IS FULLY CLEANED: that's the natural
+  // break point where the player finishes the task they started. The previous version
+  // triggered at a random spot count, which meant showing an ad WHILE THE PLAYER WAS
+  // STILL MID-CLEANUP — something Google Play's "Better Ads Experiences" policy
+  // directly prohibits.
   //
-  // Alan bilerek kayda yazılmaz: bellekte olması "yalnızca taze açılışta bir
-  // kez" kuralını yapısal olarak garanti eder — arka plandan dönmek yeni bir
-  // oturum saymaz. Bu sınır olmadan, kir sürekli yeniden oluştuğu için tek bir
-  // oturumda defalarca tetiklenirdi.
+  // The field is deliberately not persisted to the save: keeping it in memory
+  // structurally guarantees the "only once per fresh launch" rule — returning from
+  // the background doesn't count as a new session. Without this boundary, since dirt
+  // keeps regenerating, it would trigger repeatedly within a single session.
 
-  /** Bu oturumda "tamamen temizlendi" reklamı hâlâ gösterilebilir mi. */
+  /** Whether the "fully cleaned" ad can still be shown this session. */
   private cleanAdArmed = false;
 
-  /** Açılışta bir kez: ekranda leke varsa bu oturum için hakkı açar. */
+  /** Once at startup: if there's dirt on screen, arm the right for this session. */
   private armCleanAd(): void {
     const spots = this.save.dirtSpots[this.save.activeTank]?.length ?? 0;
-    // Açılışta hiç leke yoksa temizlenecek bir şey de yok; bu oturum atlanır.
+    // If there's no dirt at startup, there's nothing to clean either; skip this session.
     this.cleanAdArmed = spots > 0;
   }
 
-  /** Her başarılı temizlikten SONRA çağrılır; akvaryumda leke kalmadıysa dener. */
+  /** Called AFTER every successful cleanup; tries if no dirt remains in the tank. */
   private countCleanForAd(): void {
     if (!this.cleanAdArmed) return;
     if ((this.save.dirtSpots[this.save.activeTank]?.length ?? 0) > 0) return;
-    this.cleanAdArmed = false; // oturum başına tek sefer
+    this.cleanAdArmed = false; // once per session
     this.services.ads.maybeShowInterstitial();
   }
 
-  /** Arka arkaya temizlenen lekeler için tek bildirim: her leke ayrı toast basmak yerine
-   *  kısa bir pencerede biriktirilip toplu gösterilir (üst üste yığılmayı önler). */
+  /** A single notification for spots cleaned back-to-back: instead of a toast per spot,
+   *  they're batched over a short window and shown together (prevents toast stacking). */
   private cleanToastCount = 0;
   private cleanToastTimer: number | null = null;
   private static readonly CLEAN_TOAST_WINDOW_MS = 700;
@@ -1213,7 +1212,7 @@ export class Game {
     }, Game.CLEAN_TOAST_WINDOW_MS);
   }
 
-  /** Dokunulan noktadaki kir lekesini temizler (varsa); parçacık efekti ve ses çalar. */
+  /** Cleans the dirt spot at the tapped point (if any); plays a particle effect and sound. */
   private cleanDirtAt(x: number, y: number): void {
     const idx = this.dirtAt(x, y);
     if (idx < 0) return;
@@ -1247,12 +1246,12 @@ export class Game {
 
     this.syncSave();
     this.ui.refreshHUD();
-    // Reklam denemesi bu fonksiyonun EN SONUNDA: parçacık, ses, altın ve HUD
-    // güncellemesi önce uygulanır, reklam oyuncunun ödülünün üstüne binmesin.
+    // The ad attempt is at the VERY END of this function: particles, sound, coins, and
+    // HUD update apply first so the ad doesn't step on top of the player's reward.
     this.countCleanForAd();
   }
 
-  /** Aktif akvaryumdaki kir lekelerini çizer. */
+  /** Draws the dirt spots in the active tank. */
   private drawDirt(w: number, h: number): void {
     const g = this.dirtG;
     g.clear();
@@ -1269,13 +1268,13 @@ export class Game {
   }
 
   /**
-   * Kirlilik arttıkça camın kendisini kirli gösteren bir vinyet çizer: dört köşeden merkeze
-   * doğru yumuşakça yayılan tek bir yosun/kireç rengi gradyanı. Sahneyi bulanıklaştırmaz,
-   * sadece camın üstüne "kirli" bir filtre ekler.
+   * As dirt increases, draws a vignette that makes the glass itself look dirty: a single
+   * algae/limescale-colored gradient spreading softly from the four corners toward the
+   * center. Doesn't blur the scene, just adds a "dirty" filter on top of the glass.
    */
   private drawGrime(w: number, h: number, dl: number): void {
-    // dirtLevel ve boyutlar değişmediği sürece yeniden çizmeye gerek yok (her frame vektör
-    // geometrisini yeniden üretmek gereksiz maliyetli; kirlilik seviyesi seyrek değişir).
+    // No need to redraw as long as dirtLevel and dimensions haven't changed (regenerating
+    // vector geometry every frame is needlessly costly; dirt level changes rarely).
     const key = `${w}x${h}x${dl.toFixed(3)}`;
     if (key === this.grimeCacheKey) return;
     this.grimeCacheKey = key;
@@ -1288,8 +1287,8 @@ export class Game {
     }
     this.grimeSprite.visible = true;
 
-    // Köşelerden merkeze doğru yumuşak bir "kirli cam" vinyeti — çizgi/damla değil, dört köşeden
-    // yayılan tek bir gradyan dolgu (aynı gradyan nesnesi dört köşede yeniden kullanılır).
+    // A soft "dirty glass" vignette from the corners toward the center — not lines/drops,
+    // a single gradient fill spreading from four corners (the same gradient object is reused for all four).
     const cornerAlpha = 0.18 + dl * 0.42;
     const cornerGrad = new FillGradient({
       type: 'radial',
@@ -1306,8 +1305,8 @@ export class Game {
       g.circle(cx, cy, rad).fill(cornerGrad);
     }
 
-    // Yarı saydam şekilleri her karede yeniden rasterize etmek yerine tek bir dokuya
-    // "pişirip" sprite olarak gösteriyoruz: GPU her karede sadece bir quad çizer.
+    // Instead of re-rasterizing semi-transparent shapes every frame, we "bake" them into
+    // a single texture and show it as a sprite: the GPU only draws one quad per frame.
     const oldTex = this.grimeTex;
     this.grimeTex = this.app.renderer.generateTexture({ target: g, frame: new Rectangle(0, 0, w, h) });
     this.grimeSprite.texture = this.grimeTex;
@@ -1315,7 +1314,7 @@ export class Game {
     if (oldTex) oldTex.destroy(true);
   }
 
-  /** Tek yem tanesi at (dokunulan noktadan batar). Ücretli yem önce stoktan, stok yoksa altından düşer. */
+  /** Drops a single feed pellet (sinks from the tapped point). Paid feed is drawn from stock first, coins if stock is out. */
   dropPellet(x: number, y: number): void {
     const f = this.feedType;
     if (!f) return;
@@ -1346,7 +1345,7 @@ export class Game {
     audio.bubble();
   }
 
-  /** Yem paketi satın al: stok çantaya eklenir. */
+  /** Buys a feed pack: stock is added to the bag. */
   buyFeedPack(packId: string): { ok: boolean; msg: string } {
     const p = feedPackById(packId);
     if (!p) return { ok: false, msg: t('Bilinmeyen paket') };
@@ -1414,7 +1413,7 @@ export class Game {
     return { ok: true, msg: t('{name} satıldı: +{n} altın', { name: f.name, n: gain }) };
   }
 
-  /** Uyuyan (başka akvaryumdaki) yetişkin balığı satar — akvaryum değiştirmeye gerek kalmaz. */
+  /** Sells a dormant (other-tank) adult fish — no need to switch tanks. */
   sellDormant(fs: FishSave): { ok: boolean; msg: string } {
     if (fs.progress < 1) return { ok: false, msg: t('Henüz yavru — büyümesini bekle') };
     const idx = this.dormant.indexOf(fs);
@@ -1435,7 +1434,7 @@ export class Game {
     return { ok: true, msg: t('{name} satıldı: +{n} altın', { name: fs.name, n: gain }) };
   }
 
-  /** Kazanç/envanter satırından satış: aktif balığa ya da uyuyan kayda yönlenir. */
+  /** Sale from an earnings/inventory row: routes to either the active fish or a dormant record. */
   sellEarning(fe: FishEarning): { ok: boolean; msg: string } {
     if (fe.live) return this.sellFish(fe.live);
     if (fe.saved) return this.sellDormant(fe.saved);
@@ -1454,7 +1453,7 @@ export class Game {
 
     let rarity: Rarity = 'common';
     if (tier.id === 'altin' && this.save.pityCounter >= PITY_LIMIT - 1) {
-      rarity = 'legendary'; // garanti
+      rarity = 'legendary'; // guaranteed
     } else {
       const roll = Math.random() * 100;
       let acc = 0;
@@ -1479,7 +1478,7 @@ export class Game {
     return { ok: true, msg: '', species: sp };
   }
 
-  // ---------- dekor ----------
+  // ---------- decor ----------
 
   buyDecor(defId: string): { ok: boolean; msg: string } {
     const d = decorById(defId);
@@ -1502,7 +1501,7 @@ export class Game {
     if (owned <= 0) return { ok: false, msg: t('Envanterinde bu dekordan yok') };
     const placed = this.save.decorPlaced[this.save.activeTank] ?? (this.save.decorPlaced[this.save.activeTank] = []);
     if (placed.length >= MAX_PLACED) return { ok: false, msg: t('Bu akvaryumda en fazla {n} dekor olabilir', { n: MAX_PLACED }) };
-    // Diğerlerinden uzak bir yatay konum seç
+    // Pick a horizontal position away from the others
     let fx = 0.1 + Math.random() * 0.8;
     for (let tries = 0; tries < 12; tries++) {
       const cand = 0.08 + Math.random() * 0.84;
@@ -1510,9 +1509,9 @@ export class Game {
     }
     placed.push({ def: defId, fx });
     this.save.decorOwned[defId] = owned - 1;
-    // En yüksek eş zamanlı yerleştirilmiş dekor sayısını takip eder — basit bir sayaç olsaydı
-    // yerleştir/kaldır döngüsüyle bedavaya sonsuz artırılabilirdi (kaldırma dekoru ücretsiz
-    // envantere geri veriyor). Tavan, gerçekten sahip olunan dekorla sınırlı kalır.
+    // Tracks the highest number of concurrently placed decor — a simple counter could be
+    // inflated infinitely for free via a place/remove loop (removal returns decor to the
+    // inventory for free). The cap stays bounded by decor actually owned.
     const totalPlacedNow = this.save.tanksOwned.reduce((sum, t) => sum + (this.save.decorPlaced[t]?.length ?? 0), 0);
     this.save.stats.decorPlacedCount = Math.max(this.save.stats.decorPlacedCount, totalPlacedNow);
     this.questEvent('placeDecor', 1);
@@ -1534,7 +1533,7 @@ export class Game {
     return { ok: true, msg: t('{name} envantere geri alındı', { name: t(decorById(p.def).name) }) };
   }
 
-  // ---------- akvaryumlar ----------
+  // ---------- tanks ----------
 
   buyTank(tankId: string): { ok: boolean; msg: string } {
     const tank = tankById(tankId);
@@ -1558,7 +1557,7 @@ export class Game {
   switchTank(tankId: string): { ok: boolean; msg: string } {
     if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: t('Önce bu akvaryumu satın almalısın') };
     if (tankId === this.save.activeTank) return { ok: false, msg: t('Zaten bu akvaryumdasın') };
-    // Aktif balıkları uyut, yenilerini uyandır
+    // Put active fish to sleep, wake up the new ones
     for (const f of this.fishes) {
       this.dormant.push(f.toSave());
       f.root.destroy({ children: true });
@@ -1582,7 +1581,7 @@ export class Game {
     return this.dormant.filter((d) => d.tank === tankId).length;
   }
 
-  /** Kazanç dökümü: her akvaryum için balık balık saatlik üretim (yavrular potansiyel olarak işaretli). */
+  /** Earnings breakdown: per-fish hourly production for each tank (juveniles marked as potential). */
   earningsByTank(): TankEarnings[] {
     const byTank: Record<string, FishEarning[]> = {};
     const push = (tankId: string, fe: Omit<FishEarning, 'perHour' | 'sellValue'>, bonus: number) => {
@@ -1614,7 +1613,7 @@ export class Game {
       .sort((a, b) => b.perHour - a.perHour);
   }
 
-  /** Aktif akvaryumdaki bir balığı sahip olunan başka bir akvaryuma taşır. */
+  /** Moves a fish from the active tank to another owned tank. */
   moveFish(f: Fish, tankId: string): { ok: boolean; msg: string } {
     if (!this.save.tanksOwned.includes(tankId)) return { ok: false, msg: t('Önce bu akvaryumu satın almalısın') };
     if (tankId === this.save.activeTank) return { ok: false, msg: t('Balık zaten bu akvaryumda') };
@@ -1633,7 +1632,7 @@ export class Game {
     return { ok: true, msg: t('{name}, {tank} akvaryumuna taşındı 🌊', { name: f.name, tank: t(tankById(tankId).name) }) };
   }
 
-  // ---------- ortak ----------
+  // ---------- shared ----------
 
   private addXp(n: number): void {
     this.save.xp += n;
@@ -1646,7 +1645,7 @@ export class Game {
     }
   }
 
-  /** Günün ilk 10 arkadaş ziyareti daha yüksek, sonrakiler düşük ödül verir (FishVille'deki komşu ziyareti gibi). */
+  /** The first 10 friend visits each day give a higher reward, later ones a lower one (like FishVille's neighbor visits). */
   private static readonly VISIT_REWARD_HIGH_CAP = 10;
   private static readonly VISIT_REWARD_HIGH_COINS = 30;
   private static readonly VISIT_REWARD_HIGH_XP = 13;
@@ -1681,7 +1680,7 @@ export class Game {
     return { ok: true, msg: t('Akvaryumu ziyaret ettin: +{coins} altın, +{xp} XP 🤝', { coins, xp }) };
   }
 
-  /** Günde bir kez herhangi bir balığı okşayabilirsin: küçük XP ve satış bonusu kazandırır. */
+  /** You can pet any fish once a day: earns a small XP and sell bonus. */
   private static readonly PET_REWARD_XP = 5;
   private static readonly PET_REWARD_BONUS = 0.05;
 
@@ -1708,7 +1707,7 @@ export class Game {
     return { ok: true, msg: t('{name} mutlu oldu! +{n} XP, satış değeri arttı 💕', { name: f.name, n: Game.PET_REWARD_XP }) };
   }
 
-  /** Başka bir akvaryumdaki (uyuyan) balığı okşar — sahne dışı olduğu için parçacık efekti yok. */
+  /** Pets a fish in another (dormant) tank — no particle effect since it's off-scene. */
   petDormant(fs: FishSave): { ok: boolean; msg: string } {
     if (!this.canPetToday) return { ok: false, msg: t('Bugün zaten bir balığını okşadın. Yarın tekrar gel! 💕') };
     this.save.petDay = new Date().toISOString().slice(0, 10);
@@ -1721,7 +1720,7 @@ export class Game {
     return { ok: true, msg: t('{name} mutlu oldu! +{n} XP, satış değeri arttı 💕', { name: fs.name, n: Game.PET_REWARD_XP }) };
   }
 
-  /** Arkadaşa günde bir kez küçük bir yem hediyesi gönderilebilir; karşılığında sen de birkaç yem kazanırsın. */
+  /** You can send a friend a small feed gift once a day; in return you also earn some feed. */
   private static readonly GIFT_FEED_ID = 'lezzet';
   private static readonly GIFT_FEED_QTY = 3;
   private static readonly GIFT_REWARD_XP = 2;
@@ -1760,48 +1759,48 @@ export class Game {
   tankList(): TankDef[] { return TANKS; }
 
   /**
-   * Hesap değiştikten sonra (bkz. firebase-app.ts linkWithGoogle -> switched)
-   * bulut kaydını yeni hesap için baştan karşılaştırır.
+   * After switching accounts (see firebase-app.ts linkWithGoogle -> switched),
+   * re-compares the cloud save from scratch for the new account.
    *
-   * rev sayacı cihazda tutulduğu ve eski hesaba ait olduğu için önce
-   * sıfırlanır; aksi halde yeni hesabın buluttaki ilerlemesi "eski" sanılıp
-   * sessizce ezilebilirdi.
+   * The rev counter is reset first because it's kept on-device and belonged to
+   * the old account; otherwise the new account's cloud progress could be
+   * mistaken for "stale" and silently overwritten.
    */
   /**
-   * Buluttan kayıt uygulandıktan sonra, sayfa yeniden yüklenene dek YEREL
-   * YAZMALARI DURDURUR.
+   * After a save is applied from the cloud, STOPS LOCAL WRITES until the page
+   * reloads.
    *
-   * Gerekçesi syncSave()'in ilk satırı: balık listesi kayıttan değil SAHNEDEN
-   * yeniden kurulur. Oturum ortasında yapılan bir geri yüklemede sahne hâlâ
-   * ESKİ kaydın balıklarını tutuyor olur; tek bir syncSave() çağrısı yeni
-   * indirilen balıkları eskileriyle ezer. location.reload() beforeunload'ı
-   * tetiklediği için bu çağrı KAÇINILMAZDIR — emülatörde birebir yaşandı:
-   * altın ve koleksiyon indi, 5 balık 2'ye düştü. Üstelik aynı fonksiyon
-   * markDirty()+maybeUpload() çağırdığından ezilmiş liste buluta da yazılıp
-   * diğer cihazın balıklarını silebilirdi.
+   * The reason is syncSave()'s first line: the fish list is rebuilt from the
+   * SCENE, not the save. In a mid-session restore, the scene still holds the
+   * OLD save's fish; a single syncSave() call would overwrite the newly
+   * downloaded fish with the old ones. This call is UNAVOIDABLE because
+   * location.reload() triggers beforeunload — this happened exactly this way
+   * on an emulator: coins and collection dropped, 5 fish became 2. Worse, since
+   * the same function calls markDirty()+maybeUpload(), the overwritten list
+   * would also get written to the cloud, deleting the other device's fish.
    */
   freezeForRestore(): void {
     this.frozen = true;
-    // İndirilen kaydı HEMEN diske yaz: applyCloud yalnızca bellekteki nesneyi
-    // değiştirir ve yeniden yükleme diskten okur — yazılmazsa geri yükleme
-    // sessizce kaybolur (emülatörde birebir yaşandı).
+    // Write the downloaded save to disk IMMEDIATELY: applyCloud only changes the
+    // in-memory object, and reload reads from disk — without this write the restore
+    // would silently vanish (happened exactly this way on an emulator).
     persist(this.save);
   }
 
   /**
-   * Açılış mühletini (CLOUD_STARTUP_GRACE_MS) AŞTIKTAN sonra gelen senkron
-   * sonucu. Oyun bu noktada çoktan oynanabilir durumdadır.
+   * Handles a sync result that arrives AFTER the startup grace period
+   * (CLOUD_STARTUP_GRACE_MS) has been EXCEEDED. The game is already playable by this point.
    *
-   * Eskiden böyle bir yol yoktu: mühlet aşılınca sonuç 'disabled' sayılıp
-   * atılıyordu ve açılış senkronu oturum başına bir kez çalıştığı için oyuncu
-   * ilerlemesini BİR DAHA hiç görmüyordu.
+   * There used to be no such path: once the grace period was exceeded, the
+   * result was treated as 'disabled' and discarded, and since the startup sync
+   * only runs once per session, the player would NEVER see their progress again.
    */
   private handleLateCloudSync(res: CloudSyncResult): void {
     this.cloudSync = res;
     if (res === 'restored') {
-      // Sahne eski kayıttan kuruldu. Yeniden yükleme hem doğru sahneyi kurar
-      // hem de init()'teki ayıklama/doğrulama adımlarını indirilen kayda
-      // uygular — geç gelen veri o adımları atlamış olmamalı.
+      // The scene was built from the old save. Reloading both rebuilds the correct
+      // scene and applies init()'s sanitation/validation steps to the downloaded
+      // save — data that arrives late shouldn't skip those steps.
       this.freezeForRestore();
       location.reload();
       return;
@@ -1812,25 +1811,25 @@ export class Game {
   async resyncCloudForNewAccount(): Promise<CloudSyncResult> {
     this.cloud.resetForNewAccount();
     this.cloudSync = await this.cloud.sync(this.save);
-    // Geri yükleme uygulandı: sahne artık bayat, hiçbir şey yazılmamalı.
+    // A restore was applied: the scene is now stale, nothing should be written.
     if (this.cloudSync === 'restored') this.freezeForRestore();
     return this.cloudSync;
   }
 
   syncSave(): void {
-    // Geri yükleme sonrası sahne BAYATTIR (hâlâ eski kaydın balıklarını tutar),
-    // bu yüzden balık listesi ondan yeniden kurulmaz. persist() yine de çalışır:
-    // indirilen kaydı diske yazan TEK yer burasıdır, yeniden yükleme onu okur.
+    // After a restore, the scene is STALE (still holds the old save's fish), so
+    // the fish list isn't rebuilt from it. persist() still runs though: this is
+    // the ONE place that writes the downloaded save to disk, which the reload reads back.
     if (!this.frozen) {
       this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
     }
     persist(this.save);
     this.services.social.updateScore?.(this.save);
-    // Dondurulmuşken buluta yazma: veri zaten buluttan geldi, rev'i boşuna
-    // ilerletmek diğer cihazı gereksiz yere "geride" gösterir.
+    // Don't write to the cloud while frozen: the data already came from the cloud,
+    // needlessly advancing rev would make the other device look "behind" for no reason.
     if (this.frozen) return;
-    // Yerel kayıt her zaman anında yazılır; buluta yazma kotayı korumak için
-    // kısıtlıdır (bkz. cloud-save.ts UPLOAD_THROTTLE_MS).
+    // The local save is always written instantly; cloud writes are throttled to
+    // conserve quota (see cloud-save.ts UPLOAD_THROTTLE_MS).
     this.cloud.markDirty();
     this.cloud.maybeUpload(this.save);
   }
