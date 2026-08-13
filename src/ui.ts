@@ -25,13 +25,13 @@ export function fmt(n: number): string {
   return String(n);
 }
 
-/** Firestore'dan gelen arkadaş adı gibi dış kaynaklı metinler innerHTML'e basılmadan önce
- * kaçışlanmalı — firestore.rules isim içeriğini kısıtlamıyor, sadece tip/uzunluk kontrol ediyor. */
+/** External text like a friend name from Firestore must be escaped before being inserted
+ * into innerHTML — firestore.rules doesn't restrict name content, only checks type/length. */
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
-/** Türün id'sinden -1..1 aralığında deterministik bir sapma üretir (fish.ts'teki idJitter ile eşleşir). */
+/** Produces a deterministic -1..1 offset from the species id (matches idJitter in fish.ts). */
 function idJitter(id: string, salt: number): number {
   let h = 0;
   const s = id + ':' + salt;
@@ -41,7 +41,7 @@ function idJitter(id: string, salt: number): number {
 
 const TAIL_PIVOT_X = -48;
 
-/** Kuyruk şeklinin SVG path 'd' verisi (fish.ts'teki drawTail ile eşleşir). */
+/** SVG path 'd' data for the tail shape (matches drawTail in fish.ts). */
 function tailPathD(H: number, FS: number, shape: Species['tailShape']): string {
   const ext = 34 * FS;
   const px = TAIL_PIVOT_X;
@@ -63,7 +63,7 @@ function tailPathD(H: number, FS: number, shape: Species['tailShape']): string {
   }
 }
 
-/** Sırt yüzgeci şeklinin SVG path 'd' verisi (fish.ts'teki dorsalStyle ile eşleşir). */
+/** SVG path 'd' data for the dorsal fin shape (matches dorsalStyle in fish.ts). */
 function dorsalPathD(H: number, FS: number, style: Species['dorsalStyle']): string {
   switch (style) {
     case 'flowing':
@@ -75,7 +75,7 @@ function dorsalPathD(H: number, FS: number, style: Species['dorsalStyle']): stri
   }
 }
 
-/** Burun/alın çıkıntısının SVG öğesi (fish.ts'teki snout ile eşleşir). */
+/** SVG element for the snout/forehead protrusion (matches snout in fish.ts). */
 function snoutSVG(H: number, snout: Species['snout'], color: string): string {
   switch (snout) {
     case 'long':
@@ -89,7 +89,7 @@ function snoutSVG(H: number, snout: Species['snout'], color: string): string {
   }
 }
 
-/** Tür için mini SVG önizlemesi (mağaza/koleksiyon kartları). */
+/** Mini SVG preview for a species (shop/collection cards). */
 export function fishSVG(sp: Species, size = 84, silhouette = false): string {
   const c = silhouette
     ? { body: '#a9b8c2', belly: '#c3cfd8', fin: '#93a5b1', accent: '#c3cfd8' }
@@ -139,7 +139,7 @@ export function fishSVG(sp: Species, size = 84, silhouette = false): string {
   </svg>`;
 }
 
-/** Dekor için mini SVG önizlemesi. */
+/** Mini SVG preview for a decor item. */
 export function decorSVG(d: DecorDef, size = 64): string {
   const c1 = hex(d.color), c2 = hex(d.color2);
   let body = '';
@@ -244,11 +244,11 @@ export class UI {
   private fishInfoTimer: number | null = null;
   private friendScoresCache: Record<string, number> = {};
   /**
-   * Akvaryum ekranında geri tuşuna basıldığında "çıkmak için tekrar bas"
-   * uyarısının geçerli olduğu ana kadar (epoch ms). Bkz. handleBack.
+   * Until when (epoch ms) the "press again to exit" warning is valid when the
+   * back button is pressed on the aquarium screen. See handleBack.
    */
   private exitArmedUntil = 0;
-  /** Mağaza fiyatları bir kez çekildi mi (bkz. renderShop 'pearls' dalı) */
+  /** Whether shop prices have already been fetched once (see renderShop 'pearls' branch) */
   private pricesLoaded = false;
 
   constructor(game: Game) {
@@ -319,11 +319,11 @@ export class UI {
     window.addEventListener('resize', () => this.syncBottomInset());
 
     this.refreshHUD();
-    // Geç gelen senkron için ÖNCE abone ol, sonra kontrol et: sonuç bu iki satır
-    // arasında düşerse abonelik kaçar ve çakışma hiç gösterilmez.
+    // Subscribe FIRST for late-arriving sync, then check: if the result lands
+    // between these two lines, the subscription would miss it and the conflict would never show.
     this.game.onLateConflict = () => this.showCloudConflict();
-    // Çakışma her şeyin önüne geçer: oyuncu hangi ilerlemeyle devam edeceğini
-    // seçmeden oynamaya başlarsa, seçmediği taraf üstüne yazılmış olabilir.
+    // A conflict takes priority over everything: if the player starts playing without
+    // choosing which progress to continue with, the side they didn't choose could get overwritten.
     if (this.game.cloudSync === 'conflict') this.showCloudConflict();
     else {
       this.showWelcome();
@@ -331,16 +331,16 @@ export class UI {
     }
   }
 
-  /** Zemin çizgisinin alt bar'ın üst kenarının bu kadar altına inmesine izin verilir: dekorun
-   *  yalnızca tabanı bar'ın arkasında kalır, üstü tam görünür. Aksi halde arada fazla kum boşluğu oluşuyor. */
+  /** How far below the bottom bar's top edge the floor line is allowed to drop: only the
+   *  base of decor stays behind the bar, the rest stays fully visible. Otherwise there's too much empty sand gap in between. */
   private static readonly FLOOR_OVERLAP = 28;
 
-  /** Alt bar'ın kapladığı yüksekliği ölçüp sahneye bildirir: zemin çizgisi bunun üstüne alınır,
-   *  böylece dekorlar bar'ın (ve onun yerini alan mod çubuğunun) altında kalmaz. */
+  /** Measures the height taken up by the bottom bar and reports it to the scene: the floor
+   *  line is placed above it, so decor doesn't end up beneath the bar (or the mode chip that replaces it). */
   private syncBottomInset(): void {
     const bar = this.root.querySelector<HTMLElement>('#bottombar');
     if (!bar) return;
-    // Mod aktifken alt bar gizli olabilir; ölçüm alınamazsa mevcut inset korunur.
+    // The bottom bar may be hidden while a mode is active; if the measurement can't be taken, the current inset is kept.
     const rect = bar.getBoundingClientRect();
     if (rect.height <= 0) return;
     this.game.setUiBottomInset(window.innerHeight - rect.top - UI.FLOOR_OVERLAP);
@@ -368,7 +368,7 @@ export class UI {
     else pop.classList.add('hidden');
   }
 
-  /** Yem seçiciyi güncel stoklarla yeniden çizer. */
+  /** Redraws the feed picker with current stock. */
   private renderFeedPop(): void {
     const pop = this.root.querySelector<HTMLElement>('#feed-pop')!;
     const s = this.game.save;
@@ -389,7 +389,7 @@ export class UI {
         pop.classList.add('hidden');
         this.showModeChip('');
         this.updateFeedChip(f);
-        // İpucu bir kez gösterildi: bundan sonra çubukta sadece yem adı/stok kalır.
+        // Hint has been shown once: from now on only the feed name/stock stays in the bar.
         if (!this.game.save.feedHintSeen) {
           this.game.save.feedHintSeen = true;
           this.game.syncSave();
@@ -399,8 +399,8 @@ export class UI {
     });
   }
 
-  /** Yem modu etiketini stok durumuyla günceller (her stoktan yiyişte çağrılır).
-   *  "suya dokunarak yemle" ipucu yalnızca ilk kez yem moduna girildiğinde eklenir. */
+  /** Updates the feed mode label with stock status (called every time stock is eaten from).
+   *  The "tap the water to feed" hint is only added the first time feed mode is entered. */
   updateFeedChip(f: FeedDef): void {
     const s = this.game.save;
     const stock = s.feedOwned[f.id] ?? 0;
@@ -413,10 +413,10 @@ export class UI {
   private showModeChip(label: string): void {
     this.root.querySelector('#mode-label')!.textContent = label;
     this.root.querySelector('#mode-chip')!.classList.remove('hidden');
-    this.root.classList.add('mode-active'); // alt barı gizle — zemin dokunulabilir olsun
+    this.root.classList.add('mode-active'); // hide the bottom bar — so the floor is touchable
   }
 
-  /** Yem/düzenleme modundan çık. */
+  /** Exit feed/edit mode. */
   exitModes(): void {
     this.game.setFeedType(null);
     this.game.setEditMode(false);
@@ -425,9 +425,9 @@ export class UI {
     this.root.classList.remove('mode-active');
   }
 
-  /** Envanterden çağrılır: dekor düzenleme modunu başlatır.
-   *  Çubukta yalnızca kısa etiket durur; ayrıntılı ipucu ilk girişte tek sefer toast olarak gösterilir
-   *  (uzun metin çubuğu büyütüp dekorun üstünü kapatıyordu). */
+  /** Called from the inventory: starts decor edit mode.
+   *  Only a short label stays in the bar; the detailed hint is shown once as a toast on first entry
+   *  (long text was growing the bar and covering the decor). */
   startEditMode(): void {
     this.closePanel();
     this.game.setEditMode(true);
@@ -439,19 +439,19 @@ export class UI {
     }
   }
 
-  /** Pasif gelir butonunu günceller (oyun döngüsünden ~saniyede 2 kez çağrılır). */
+  /** Updates the passive income button (called ~2 times per second from the game loop). */
   updateIncome(pot: number, ratePerHour: number): void {
     if (!this.root) return;
     const btn = this.root.querySelector<HTMLElement>('#collect-btn');
     if (!btn) return;
-    // Buton her zaman görünür — yetişkin balık yokken de 0 gösterir
+    // Button is always visible — shows 0 even when there are no adult fish
     btn.classList.remove('hidden');
     btn.classList.toggle('empty', pot < 1);
     this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
     this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}${tt('/sa')}`;
   }
 
-  /** Ekranda aynı anda duran en fazla bildirim sayısı — fazlası en eskiyi düşürür. */
+  /** Max number of toasts that stay on screen at once — excess drops the oldest. */
   private static readonly MAX_TOASTS = 3;
 
   toast(msg: string): void {
@@ -459,8 +459,8 @@ export class UI {
     t.className = 'toast';
     t.textContent = msg;
     this.toastHost.appendChild(t);
-    // Yığılmayı engelle: sınırın üstündeki en eski bildirimleri erkenden kapatmaya başla.
-    // Kapanmakta olanlar sayıma girmesin diye .dismissed ile işaretlenir.
+    // Prevent stacking: start closing the oldest toasts above the limit early.
+    // Marked with .dismissed so ones already closing aren't counted.
     const live = this.toastHost.querySelectorAll<HTMLElement>('.toast:not(.dismissed)');
     for (let i = 0; i < live.length - UI.MAX_TOASTS; i++) this.dismissToast(live[i]);
     setTimeout(() => t.classList.add('show'), 20);
@@ -475,17 +475,17 @@ export class UI {
   }
 
   /**
-   * Android geri tuşu/hareketi.
+   * Android back button/gesture.
    *
-   * Bu davranış eskiden hiç yoktu: geri tuşunu yakalayan eklenti kurulu
-   * olmadığı için oyuncu bir panelin (mağaza, envanter, görevler…) ortasındayken
-   * geri yapınca panel kapanmak yerine oyundan tamamen çıkıyordu.
+   * This behavior didn't exist before: since the plugin that captures the back
+   * button wasn't installed, pressing back in the middle of a panel (shop, inventory,
+   * quests…) would exit the app entirely instead of closing the panel.
    *
-   * Açık panel varsa yalnızca onu kapatır — paneller zaten ✕ ve arka plana
-   * dokunuşla kapanabildiği için bu mevcut davranışla tutarlı. Panel yoksa
-   * akvaryumdayız; kazara çıkışı önlemek için iki kez basılmasını ister.
+   * If a panel is open, it just closes that — consistent with existing behavior,
+   * since panels can already be closed via ✕ or tapping the backdrop. If there's no
+   * panel, we're in the aquarium; requires pressing twice to prevent accidental exit.
    *
-   * @returns uygulamadan çıkılması gerekiyorsa true
+   * @returns true if the app should exit
    */
   handleBack(): boolean {
     if (this.panelHost.childElementCount > 0) {
@@ -500,7 +500,7 @@ export class UI {
     return false;
   }
 
-  // ---------- panel çatısı ----------
+  // ---------- panel scaffolding ----------
 
   private closePanel(): void {
     if (this.fishInfoTimer !== null) {
@@ -535,7 +535,7 @@ export class UI {
     return wrap;
   }
 
-  // ---------- MAĞAZA ----------
+  // ---------- SHOP ----------
 
   private shopTabs(active: string) {
     return [
@@ -674,10 +674,10 @@ export class UI {
     this.bindShopTabs(el);
     const bodyEl = el.querySelector<HTMLElement>('.panel-body')!;
     if (keepScroll > 0) bodyEl.scrollTop = keepScroll;
-    // İnci sekmesindeki fiyatlar oyuncunun kendi para biriminde olmalı. Mağaza
-    // cevabı BEKLENMEZ — panel yedek etiketlerle hemen açılır, fiyatlar gelince
-    // sekme hâlâ açıksa tazelenir. Bir kez yüklenir; sekmeler arasında gidip
-    // gelmek yeniden istek yapmaz.
+    // Prices on the pearls tab should be in the player's own currency. The shop
+    // response is NOT awaited — the panel opens immediately with fallback labels
+    // and refreshes once prices arrive if the tab is still open. Loaded once;
+    // switching between tabs doesn't trigger a new request.
     if (tab === 'pearls' && !this.pricesLoaded) {
       void this.game.services.iap.loadPrices().then(() => {
         this.pricesLoaded = true;
@@ -687,7 +687,7 @@ export class UI {
 
     el.querySelectorAll<HTMLButtonElement>('.buy-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const st = bodyEl.scrollTop; // toplu alımlarda kaydırma konumunu koru
+        const st = bodyEl.scrollTop; // keep the scroll position across bulk purchases
         if (btn.dataset.sp) {
           const res = this.game.buyFish(btn.dataset.sp);
           if (!res.ok) audio.error();
@@ -741,7 +741,7 @@ export class UI {
     });
   }
 
-  // ---------- ENVANTER ----------
+  // ---------- INVENTORY ----------
 
   renderInventory(tab: 'fish' | 'feeds' | 'decor' | 'tanks'): void {
     const s = this.game.save;
@@ -753,7 +753,7 @@ export class UI {
     ];
     let body = '';
 
-    const flat: FishEarning[] = []; // satış butonları için satır referansları
+    const flat: FishEarning[] = []; // row references for sell buttons
     if (tab === 'fish') {
       const groups = this.game.earningsByTank();
       body = groups.map((g) => {
@@ -894,7 +894,7 @@ export class UI {
     });
   }
 
-  // ---------- SOSYAL ----------
+  // ---------- SOCIAL ----------
 
   renderSocial(tab: 'leaderboard' | 'friends', skipFriendScoreFetch = false): void {
     const s = this.game.save;
@@ -989,7 +989,7 @@ export class UI {
     });
   }
 
-  // ---------- DAHA / GÖREVLER / KOLEKSİYON / AYARLAR ----------
+  // ---------- MORE / QUESTS / COLLECTION / SETTINGS ----------
 
   private renderMore(): void {
     const el = this.panelShell(tt('☰ Menü'), `
@@ -1013,7 +1013,7 @@ export class UI {
     });
   }
 
-  /** Profil: oyuncu kimliği, ilerleme özeti ve ömür boyu istatistikler. */
+  /** Profile: player identity, progress summary, and lifetime stats. */
   private renderProfile(): void {
     const s = this.game.save;
     const st = s.stats;
@@ -1043,7 +1043,7 @@ export class UI {
     `);
   }
 
-  /** Kazanç raporu: toplam üretim, akvaryum başına alt toplam ve balık başına gelir. */
+  /** Earnings report: total output, per-tank subtotals, and per-fish income. */
   private renderEarnings(): void {
     const g = this.game;
     const groups = g.earningsByTank();
@@ -1261,7 +1261,7 @@ export class UI {
     });
   }
 
-  // ---------- bulut kaydı ----------
+  // ---------- cloud save ----------
 
   private cloudRowHTML(): string {
     if (!isAccountLinkingAvailable()) {
@@ -1275,9 +1275,9 @@ export class UI {
   }
 
   /**
-   * "Bağla" akışı. switched=true dönerse seçilen hesabın zaten bir kaydı var
-   * demektir; o hesabın ilerlemesiyle bu cihazdakini karşılaştırmak için bulut
-   * senkronu baştan çalıştırılır ve çakışma çıkarsa karar kullanıcıya bırakılır.
+   * "Link" flow. If switched=true is returned, it means the selected account already
+   * has a save; a cloud sync is run from scratch to compare that account's progress
+   * with this device's, and if a conflict comes up the decision is left to the user.
    */
   private async onLinkCloud(): Promise<void> {
     this.toast(tt('Google hesabına bağlanılıyor…'));
@@ -1292,8 +1292,8 @@ export class UI {
     const outcome = await this.game.resyncCloudForNewAccount();
     if (outcome === 'conflict') { this.showCloudConflict(); return; }
     if (outcome === 'restored') {
-      // Sahne mevcut kayıttan kurulduğu için geri yükleme sonrası yeniden
-      // başlatmak, yarı güncellenmiş bir durumla oynamaktan güvenli.
+      // Since the scene is built from the current save, restarting after a restore
+      // is safer than playing with a half-updated state.
       this.toast(tt('İlerlemen geri yüklendi, yeniden başlatılıyor…'));
       setTimeout(() => location.reload(), 1200);
       return;
@@ -1301,8 +1301,8 @@ export class UI {
     this.renderSettings();
   }
 
-  /** İki ilerlemeyi yan yana koyup seçtirir. Otomatik birleştirme YAPILMAZ:
-   *  iki ekonomiyi harmanlamak dengeyi bozar ve istismara açar. */
+  /** Puts two saves side by side and lets the player choose. Auto-merging is NOT done:
+   *  blending two economies breaks balance and opens the door to abuse. */
   showCloudConflict(): void {
     const c = this.game.cloud.conflictSummary;
     if (!c) return;
@@ -1334,8 +1334,8 @@ export class UI {
     el.querySelector('#keep-cloud')!.addEventListener('click', () => {
       audio.click();
       if (this.game.cloud.resolveKeepCloud(this.game.save)) {
-        // Sahne hâlâ eski kaydın balıklarını tutuyor; yeniden yükleme öncesi
-        // hiçbir yazma geçmemeli (bkz. Game.freezeForRestore).
+        // The scene still holds the old save's fish; no writes should happen
+        // before the reload (see Game.freezeForRestore).
         this.game.freezeForRestore();
         this.toast(tt('Buluttaki ilerleme yükleniyor…'));
         setTimeout(() => location.reload(), 1000);
@@ -1362,7 +1362,7 @@ export class UI {
     return tt('{n} gün önce', { n: Math.round(hours / 24) });
   }
 
-  // ---------- modallar ----------
+  // ---------- modals ----------
 
   private showEggReveal(egg: EggTier, sp: Species): void {
     const info = RARITY_INFO[sp.rarity];
@@ -1466,7 +1466,7 @@ export class UI {
     }, 500);
   }
 
-  /** Envanterden başka bir akvaryumdaki (uyuyan) balığın profilini açar — showFishInfo'nun canlı Fish gerektirmeyen karşılığı. */
+  /** Opens the profile of a (dormant) fish in another tank from the inventory — the counterpart to showFishInfo that doesn't require a live Fish. */
   private showDormantFishInfo(fs: FishSave): void {
     audio.click();
     const sp = speciesById(fs.sp);
@@ -1549,7 +1549,7 @@ export class UI {
     });
   }
 
-  /** İlk açılışta zorunlu, adım adım tutorial: dışarı tıklayarak kapatılamaz, "İleri" ile ilerler. */
+  /** Mandatory step-by-step tutorial on first launch: can't be dismissed by tapping outside, advances via "Next". */
   private runTutorial(): void {
     const s = this.game.save;
     if (s.tutorialDone) return;
