@@ -61,6 +61,13 @@ playBtn.addEventListener('click', () => {
     audio.sfx = game.save.sfx;
 
     await game.init(document.getElementById('canvas-wrap')!);
+    // game.init() içinde CLOUD_STARTUP_GRACE_MS penceresinde bir bulut senkronu
+    // sonuçlanmış olabilir; sync() `save` nesnesini YERİNDE değiştirir (bkz.
+    // cloud-save.ts), bu yüzden yukarıda okunan lang/music/sfx bayat kalmış
+    // olabilir — init() bittikten sonra gerçek son değerle yeniden uygulanır.
+    initLang(game.save.lang);
+    audio.music = game.save.music;
+    audio.sfx = game.save.sfx;
     ui.mount(document.getElementById('ui')!);
     mountedUI = ui;
 
