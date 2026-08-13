@@ -1,12 +1,14 @@
-// Firebase web config — arkadaş kodu doğrulaması için (bkz. FirebaseSocial, services.ts).
+// Firebase web config — for friend code verification (see FirebaseSocial, services.ts).
 //
-// Bu değerler RevenueCat public API key'i gibi client'a gömülü olması güvenli
-// tanımlayıcılardır, gizli tutulması gereken sırlar değildir — gerçek koruma
-// Firestore güvenlik kurallarında (bkz. firestore.rules), buradaki config'te değil.
+// These values are identifiers that are safe to embed in the client, like a
+// RevenueCat public API key — they're not secrets that need to be kept
+// hidden. The real protection lives in the Firestore security rules (see
+// firestore.rules), not in this config.
 //
-// Kurulum adımları README.md'deki "Arkadaş kodu doğrulama (Firebase)" bölümünde.
-// Placeholder'lar doldurulmadan isFirebaseConfigured() false döner ve oyun
-// LocalSocial'a (arkadaş kodu var mı diye hiç kontrol etmeyen yerel mod) düşer.
+// Setup steps are in the "Friend code verification (Firebase)" section of
+// README.md. Until the placeholders are filled in, isFirebaseConfigured()
+// returns false and the game falls back to LocalSocial (a local mode that
+// never checks whether a friend code exists).
 export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyBO6JaY-VGlWkUvKR6nh3kw5asK--eVS_k',
   authDomain: 'reefy-67ac5.firebaseapp.com',
