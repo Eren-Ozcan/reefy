@@ -2,20 +2,11 @@
 
 ## Pending
 
-### UI redesign — Release C, the only part not built yet
+### UI redesign — Release C, what is still open
 
-Releases A and B of the "game language" redesign are in (see Done). What is
-left needs schema changes, so it is deliberately held back.
+Releases A and B are in, and the egg hatch timer shipped with them (see Done).
+What is left below needs schema changes, so it is deliberately held back.
 
-- [ ] **Egg hatch timer and speed-up.** `hatchEgg()` (`src/game.ts`) is instant
-      today — no wait, no countdown, no speed-up. Adding one needs a
-      `pendingEggs: { tier, readyAt }[]` field, a `src/save.ts` migration, a
-      merge rule in `src/cloud-save.ts` for two devices with different pending
-      eggs, and a pearl price for skipping.
-      **Decision needed before any code:** apply it to a new, more valuable egg
-      tier, or retroactively to the existing ones? Retroactive *takes something
-      away* from players who have it instantly today. Recommendation: new tier,
-      leave the existing ones instant.
 - [ ] **Timed event ("Coral Festival").** `src/quests.ts` knows only two
       rhythms, `questsForDay()` and `weeklyQuestForWeek()`. A multi-day event
       that accrues points toward tiered rewards is a third one: needs an event
@@ -23,8 +14,9 @@ left needs schema changes, so it is deliberately held back.
       -tier state in the save, and a rule for unclaimed rewards at event end.
       Size the rewards against the fact that the local save is unsigned and
       clock tampering is deliberately out of scope — an event reward must not
-      be worth setting the clock forward for. Same applies to the Faz 10
-      speed-up price.
+      be worth setting the clock forward for. The Abyssal Egg already takes
+      this stance: the egg is paid for at purchase, so the clock can only skip
+      the speed-up surcharge, never the egg.
 
 ### Turkish returns
 
@@ -176,6 +168,32 @@ were already computed and already paying out.
   cannot drift apart.
 - Achievements got their own screen. The IA audit had found them at the bottom
   of the Quests scroll — reachable in principle, unseen in practice.
+
+### Egg hatch timer — Abyssal Egg (2026-08-18)
+
+The decision the roadmap was blocked on went to **a new tier, not retroactive**.
+The three original eggs (`bronz`, `gumus`, `altin`) still hatch instantly and
+their code path is untouched; the wait ships as a property of a fourth tier,
+`abis` (Abyssal Egg, 110 pearls, epic 60 / legendary 40, four hours), so nobody
+loses anything they had. Retroactive would have re-priced a purchase players
+already make — and the coin inflation it would have curbed was never measured
+as a problem.
+
+- `EggTier.hatchMs` is optional (`src/species.ts`). Undefined means "instant",
+  which is what makes the old path a no-op rather than a special case.
+- `save.pendingEggs: PendingEgg[]` with a `migrate()` guard; a save written
+  before this reads as an empty queue.
+- The species is rolled at COLLECT time, not at purchase, so the outcome never
+  sits in the save and the golden egg's pity counter stays single-sourced.
+- Speed-up costs one pearl per 12 minutes remaining (`SPEEDUP_MS_PER_PEARL`),
+  so a nearly-hatched egg is nearly free to finish — it sells impatience, not
+  the egg.
+- An incubating egg holds a tank slot (`reservedSlots`), or a player could buy
+  an egg, fill the tank while it hatches, and leave it homeless. Collecting
+  into a full tank fails without consuming the egg.
+- No `src/cloud-save.ts` change was needed after all: that file replaces the
+  whole save rather than merging fields, and `progressFingerprint()` is a
+  denylist, so `pendingEggs` entered the conflict comparison on its own.
 
 ### Language flipped to English (2026-08-18)
 
