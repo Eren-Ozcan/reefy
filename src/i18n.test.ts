@@ -10,7 +10,8 @@
 //    wrong strands a player in a language they cannot read.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AVAILABLE_LANGS, STORE_CURRENCY_KEY, detectLang, rememberStoreCurrency, t } from './i18n';
+import { AVAILABLE_LANGS, STORE_CURRENCY_KEY, detectLang, getLang, initLang, rememberStoreCurrency, t } from './i18n';
+import { defaultSave, parseSave } from './save';
 
 // Sources are pulled in through Vite's raw glob rather than node:fs, so the
 // test needs no Node type globals — the app's tsconfig deliberately exposes
@@ -71,6 +72,63 @@ describe('shipped languages', () => {
 
   it('falls back to the English key when a translation is absent', () => {
     expect(t('a string nobody has translated')).toBe('a string nobody has translated');
+  });
+});
+
+// The emulator found this one: a Turkish device showed a Turkish menu and an
+// English game, because the menu detects while the game reads the save. Every
+// save written during the English-only period carries lang 'en' that nobody
+// chose — the settings row was hidden — so honouring it as a preference locked
+// those players out of their own language permanently.
+describe('a saved language that was never chosen', () => {
+  const withLanguages = (tags: string[], fn: () => void) => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'languages');
+    Object.defineProperty(navigator, 'languages', { value: tags, configurable: true });
+    try {
+      fn();
+    } finally {
+      if (original) Object.defineProperty(navigator, 'languages', original);
+      else Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'languages');
+    }
+  };
+
+  beforeEach(() => localStorage.clear());
+
+  it('is ignored, so a Turkish device gets Turkish', () => {
+    withLanguages(['tr-TR'], () => {
+      initLang('en', false);
+      expect(getLang()).toBe('tr');
+    });
+  });
+
+  it('is honoured once the player actually picks it', () => {
+    withLanguages(['tr-TR'], () => {
+      initLang('en', true);
+      expect(getLang()).toBe('en');
+    });
+  });
+
+  it('defaults to not-chosen when the flag is missing entirely', () => {
+    withLanguages(['tr-TR'], () => {
+      initLang('en');
+      expect(getLang()).toBe('tr');
+    });
+  });
+
+  it('leaves a chosen Turkish in place on an English device', () => {
+    withLanguages(['en-US'], () => {
+      initLang('tr', true);
+      expect(getLang()).toBe('tr');
+    });
+  });
+
+  it('starts every new save as not-chosen', () => {
+    expect(defaultSave().langChosen).toBe(false);
+  });
+
+  it('reads a save written before the flag existed as not-chosen', () => {
+    const restored = parseSave(JSON.stringify({ v: 2, coins: 300, lang: 'en' }));
+    expect(restored!.langChosen).toBe(false);
   });
 });
 
