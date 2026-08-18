@@ -277,6 +277,48 @@ html, body {
 #bottombar button.active small { color: var(--accent); opacity: 0.8; }
 #bottombar button.has-badge small { color: var(--accent-2); }
 
+/* The current objective, one line above the dock. Previously this lived only inside
+   the Quests panel, so the bar filling was something the player never saw happen. */
+#next-goal {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 78px);
+  display: flex; align-items: center; gap: 12px;
+  width: min(96vw, 430px);
+  padding: 9px 14px;
+  background: var(--panel-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(4, 18, 24, 0.3);
+}
+#next-goal.hidden { display: none; }
+#ui.mode-active #next-goal { display: none; }
+
+.goal-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.goal-text {
+  font-size: 11.5px; font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.goal-bar { height: 5px; background: rgba(255, 255, 255, 0.12); border-radius: 999px; overflow: hidden; }
+.goal-bar > div {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, #4fdcc0, var(--accent));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.goal-reward {
+  display: flex; align-items: center; gap: 4px;
+  font-family: var(--font-num);
+  font-size: 12px; font-weight: 800; white-space: nowrap;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.07);
+  padding: 5px 11px; border-radius: 999px;
+}
+.goal-reward .icon { width: 14px; height: 14px; }
+.goal-reward .icon + .icon { margin-left: 4px; }
+#next-goal.ready .goal-bar > div { background: var(--accent-2); }
+#next-goal.ready .goal-reward { background: rgba(255, 138, 92, 0.2); }
+
 /* Scene actions live on the edge of the scene they act on, not in the dock, which
    is for destinations. */
 #siderail {

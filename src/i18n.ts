@@ -855,6 +855,8 @@ const TR: Record<string, string> = {
   'waiting in the vault': 'kasada bekliyor',
   'COLLECT': 'TOPLA',
   'Aquarium': 'Akvaryum',
+  'Next up': 'Sıradaki',
+  'Ready': 'Hazır',
   'You': 'Sen',
   'Arrange': 'Düzen',
   '{n} affordable': '{n} alınabilir',

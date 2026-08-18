@@ -253,6 +253,7 @@ export class UI {
    * back button is pressed on the aquarium screen. See handleBack.
    */
   private exitArmedUntil = 0;
+  private lastGoalReward = '';
   /** Whether shop prices have already been fetched once (see renderShop 'pearls' branch) */
   private pricesLoaded = false;
 
@@ -274,6 +275,13 @@ export class UI {
       <div id="siderail">
         <button data-rail="feed" title="${tt('Feed')}">${ICON_FEED}<span>${tt('Feed')}</span></button>
         <button data-rail="arrange" title="${tt('Arrange')}">${ICON_ARRANGE}<span>${tt('Arrange')}</span></button>
+      </div>
+      <div id="next-goal" class="hidden">
+        <div class="goal-main">
+          <span class="goal-text"></span>
+          <div class="goal-bar"><div></div></div>
+        </div>
+        <span class="goal-reward"></span>
       </div>
       <div id="bottombar">
         <button data-act="aquarium">${ICON_TANK}<span>${tt('Aquarium')}</span><small></small></button>
@@ -490,6 +498,9 @@ export class UI {
     host.classList.toggle('empty', pot < 1);
     this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
     this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}${tt('/hr')}`;
+    // This runs about twice a second from the game loop, which is the only tick that
+    // reliably follows quest progress — questEvent() does not refresh the HUD.
+    this.refreshDock();
   }
 
   /** Max number of toasts that stay on screen at once — excess drops the oldest. */
@@ -582,6 +593,32 @@ export class UI {
     set('you', `${tt('Lv')} ${s.level}`);
     const questBtn = this.root.querySelector('#bottombar button[data-act="quests"]');
     questBtn?.classList.toggle('has-badge', ready > 0);
+    this.refreshNextGoal();
+  }
+
+  /** The strip above the dock. Its whole point is that the current objective and the
+   *  bar filling toward it are visible without opening the Quests panel. */
+  private refreshNextGoal(): void {
+    const host = this.root.querySelector<HTMLElement>('#next-goal');
+    if (!host) return;
+    const goal = this.game.nextGoal();
+    if (!goal) { host.classList.add('hidden'); return; }
+    host.classList.remove('hidden');
+    const done = goal.progress >= goal.target;
+    host.classList.toggle('ready', done);
+    host.querySelector('.goal-text')!.textContent =
+      `${done ? tt('Ready') : tt('Next up')}: ${tt(goal.name)} · ${goal.progress}/${goal.target}`;
+    (host.querySelector('.goal-bar > div') as HTMLElement).style.width =
+      `${Math.round((100 * goal.progress) / goal.target)}%`;
+    // Rebuilt only when it actually changes: this method runs about twice a second and
+    // the reward markup carries inline SVG.
+    const reward = goal.pearls > 0
+      ? `${ICON_COIN}${fmt(goal.coins)}${ICON_PEARL}${goal.pearls}`
+      : `${ICON_COIN}${fmt(goal.coins)}`;
+    if (this.lastGoalReward !== reward) {
+      host.querySelector('.goal-reward')!.innerHTML = reward;
+      this.lastGoalReward = reward;
+    }
   }
 
   private panelShell(title: string, bodyHTML: string, tabs?: { id: string; label: string; active: boolean }[], blocking = false): HTMLElement {

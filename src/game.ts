@@ -979,6 +979,29 @@ export class Game {
     return n;
   }
 
+  /** The one goal worth surfacing on the scene: the nearest daily quest still in play,
+   *  preferring one already claimable so the reward is never left sitting unnoticed. */
+  nextGoal(): { name: string; progress: number; target: number; coins: number; pearls: number } | null {
+    const open = this.dailyQuests().filter((q) => !this.save.quests.claimed.includes(q.id));
+    if (!open.length) return null;
+    const withProgress = open.map((q) => ({
+      q,
+      p: Math.min(q.target, this.save.quests.progress[q.id] ?? 0),
+    }));
+    const done = withProgress.filter((x) => x.p >= x.q.target);
+    // Closest to finishing, so the strip tracks something the player is actually near.
+    const pick = (done.length ? done : withProgress).sort(
+      (a, b) => b.p / b.q.target - a.p / a.q.target,
+    )[0];
+    return {
+      name: pick.q.name,
+      progress: pick.p,
+      target: pick.q.target,
+      coins: pick.q.rewardCoins,
+      pearls: pick.q.rewardPearls,
+    };
+  }
+
   ensureQuestWeek(): void {
     const week = weekKeyFor(new Date());
     if (this.save.weeklyQuest.day !== week) {
