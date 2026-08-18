@@ -5,7 +5,11 @@ dist/
 Thumbs.db
 .vscode/
 *.log
+
+# Screenshots dropped at the repo root, plus any stray capture. Art the app actually
+# ships has to be exempt — it is imported by the source and a clone must build.
 *.png
+!src/icons/*.png
 
 # Private/local-only store & marketing assets (mirrored to private Eren-Ozcan/pictures repo)
 docs/store-assets-originals/
