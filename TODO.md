@@ -2,6 +2,60 @@
 
 ## Pending
 
+### UI redesign — Release C, the only part not built yet
+
+Releases A and B of the "game language" redesign are in (see Done). What is
+left needs schema changes, so it is deliberately held back.
+
+- [ ] **Egg hatch timer and speed-up.** `hatchEgg()` (`src/game.ts`) is instant
+      today — no wait, no countdown, no speed-up. Adding one needs a
+      `pendingEggs: { tier, readyAt }[]` field, a `src/save.ts` migration, a
+      merge rule in `src/cloud-save.ts` for two devices with different pending
+      eggs, and a pearl price for skipping.
+      **Decision needed before any code:** apply it to a new, more valuable egg
+      tier, or retroactively to the existing ones? Retroactive *takes something
+      away* from players who have it instantly today. Recommendation: new tier,
+      leave the existing ones instant.
+- [ ] **Timed event ("Coral Festival").** `src/quests.ts` knows only two
+      rhythms, `questsForDay()` and `weeklyQuestForWeek()`. A multi-day event
+      that accrues points toward tiered rewards is a third one: needs an event
+      calendar (embedded or remote), a points-per-`QuestEvent` mapping, claimed
+      -tier state in the save, and a rule for unclaimed rewards at event end.
+      Size the rewards against the fact that the local save is unsigned and
+      clock tampering is deliberately out of scope — an event reward must not
+      be worth setting the clock forward for. Same applies to the Faz 10
+      speed-up price.
+
+### Turkish returns
+
+- [ ] **Around 2026-08-25.** The game shipped English-only on 2026-08-18. The
+      Turkish translation was not discarded: the old EN dictionary was inverted
+      into a `TR` table in `src/i18n.ts`. Re-enabling is one line — add `'tr'`
+      to `AVAILABLE_LANGS`. The Settings language row renders itself from that
+      list and hides while there is nothing to choose.
+- [ ] Any new user-facing string needs its Turkish counterpart added to `TR` in
+      the same change, or Turkish comes back with holes. Watch for English-key
+      collisions: `'Next'` was already the tutorial button, so the goal strip
+      had to use `'Next up'`.
+
+### Store listing is now stale
+
+- [ ] **The closed-testing listing shows the old UI.** Every screenshot is the
+      old white-panel Turkish interface; the game is now a dark sheet language
+      in English. Listing text and screenshots both need redoing before any
+      wider rollout. Assets go to `docs/store-assets-originals/` and the private
+      `Eren-Ozcan/pictures` repo, never here (see CLAUDE.md).
+
+### Housekeeping
+
+- [ ] Test descriptions are still Turkish (`src/cloud-save.test.ts`,
+      `src/save.test.ts`, `src/game-sync.test.ts` — roughly 100 `it(...)`
+      strings). They do not ship, but the standing rule is that code and
+      comments are English.
+- [ ] Biome marks are raster PNGs (`src/icons/`) while the UI icons are inline
+      SVG (`src/icons.ts`). Deliberate — they are illustrations, not
+      affordances — but worth revisiting if they ever need to take a tint.
+
 ### Cloud save — leftovers after the end-to-end run
 
 The main flow is verified on a real account (see Done). What is left:
@@ -80,6 +134,71 @@ been ported to both sibling games:
       fall through to the "store not configured" path.
 
 ## Done
+
+### UI redesign — Releases A and B (2026-08-18)
+
+The approved "game language" direction: the aquarium never closes, panels sit
+over it as sheets, and the retention loop is visible instead of inferred.
+
+**Release A — the language itself.**
+
+- The panel work lands in `panelShell()`, which every screen already routes
+  through, so all 22 changed at once: grab handle, wider sheet radius, dark
+  glass, filled pill tabs, card surfaces on tokens instead of hardcoded `#fff`.
+- HUD became dark glass chips; the XP bar folded into the level as a
+  conic-gradient ring; a streak chip appeared — `save.streak` was already
+  tracked and already scaled the daily gift, it was just invisible.
+- Passive income moved to the centre-ish of the scene, then **off** dead centre
+  once the smoke run proved a DOM button there swallows the taps that feed fish
+  and clean dirt. It hides entirely during feed and arrange modes.
+- The dock gained an active-tab state (it had none) and a live status line per
+  label, backed by `Game.claimableQuests()` and `Game.affordableShopItems()`.
+  Feed and Arrange moved to a side rail — they act on the scene rather than
+  navigating. Social folded under **You**, which replaced More; Quests was
+  promoted to the dock.
+- The current objective now sits on a strip above the dock, refreshed from
+  `updateIncome()` because `questEvent()` records progress without redrawing
+  the HUD.
+- Typography: Fredoka and Nunito, bundled locally as variable woff2 rather than
+  linked — this ships in a Capacitor WebView, where a CDN request means no font
+  on a cold offline start. **Every figure is Nunito**: Fredoka has no
+  tabular-figure table at all and its digits vary by a third in width, so
+  counters would visibly jump.
+- Emoji left the fixed-height chrome: eight inline SVG icons for HUD and dock,
+  plus seven illustrated biome marks.
+
+**Release B — the retention loop.** None of it adds an incentive; all three
+were already computed and already paying out.
+
+- Offline earnings and the daily gift became one itemised return receipt.
+- The seven-day streak ladder is reachable from the HUD chip. The reward
+  formula moved into `Game.dailyGiftFor()` so the ladder and the grant path
+  cannot drift apart.
+- Achievements got their own screen. The IA audit had found them at the bottom
+  of the Quests scroll — reachable in principle, unseen in practice.
+
+### Language flipped to English (2026-08-18)
+
+Turkish text had been the dictionary key. 835 strings were codemodded to
+English across call sites and data tables, and the EN dictionary was inverted
+into a `TR` table rather than discarded. Verified lossless first: no two
+Turkish strings shared one English translation, so the inversion is
+unambiguous. Fixed three latent bugs on the way — a dictionary key with a typo
+that left one paragraph untranslated for English players, an untranslated decor
+adjective with no Turkish-specific letters, and percentages written in Turkish
+order (`%-35` instead of `-35%`).
+
+### Smoke run repaired (2026-08-18)
+
+`npm run smoke` had stopped completing well before the redesign; the IA change
+finished it off. It was hiding: no first-launch tutorial handling (a fresh
+Playwright context always gets one, and its backdrop eats the first click), the
+menu's 0.6s fade swallowing clicks, a `BlurFilter` assertion that outlived the
+feature it tested (`b9dd3bb` replaced the blur with grime on the glass), a
+decor drag grabbing a hardcoded `y` when decor sits on a sand surface that
+curves with `x`, and profile assertions still expecting Turkish labels. The
+dirt-cleaning step now asserts no UI covers the spot before tapping it, so a
+control parked over the scene fails loudly instead of silently eating taps.
 
 ### Cloud save — phase 3: the fresh-install fast path (2026-08-07)
 - [x] `hasProgress()` (`src/save.ts`) — decides whether the local save holds
