@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
@@ -22,31 +22,15 @@
     <div class="menu-card">
       <div class="logo-wrap"><div class="logo">🐠</div></div>
       <h1>Reefy</h1>
-      <p class="tagline">Kendi resifini kur, balıklarını büyüt,<br/>koleksiyonunu tamamla</p>
-      <button id="play-btn">▶&nbsp; Oyna</button>
+      <p class="tagline">Build your own reef, grow your fish,<br/>complete your collection</p>
+      <button id="play-btn">▶&nbsp; Play</button>
       <p class="menu-foot">v1.1.0 &nbsp;•&nbsp; reefy.games</p>
     </div>
   </div>
 
-  <script>
-    // main.ts (type=module) çalışana kadar çekilen ilk boyama İngilizce kullanıcılarda
-    // bir an Türkçe metin göstermesin diye (FOUC), dil senkron olarak burada çözülüyor.
-    (function () {
-      try {
-        var stored = localStorage.getItem('reefy-lang');
-        var lang = stored === 'tr' || stored === 'en'
-          ? stored
-          : (((navigator.language || '').toLowerCase().indexOf('tr') === 0) ? 'tr' : 'en');
-        document.documentElement.lang = lang;
-        if (lang === 'en') {
-          var tagline = document.querySelector('.tagline');
-          if (tagline) tagline.innerHTML = 'Build your own reef, grow your fish,<br/>complete your collection';
-          var playBtn = document.getElementById('play-btn');
-          if (playBtn) playBtn.innerHTML = '▶&nbsp; Play';
-        }
-      } catch (e) {}
-    })();
-  </script>
+  <!-- The menu markup above is authored in the source language, so the first paint
+       needs no synchronous language swap. Restore one here if a second language ships
+       and the pre-module flash of the wrong text becomes visible again. -->
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

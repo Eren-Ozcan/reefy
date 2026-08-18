@@ -69,7 +69,7 @@ export class StubAds implements AdsProvider {
   showRewarded(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
-      msg: t('Reklamlar Google Play / App Store sürümünde etkinleşir.'),
+      msg: t('Ads are enabled in the Google Play / App Store build.'),
     });
   }
 }
@@ -139,10 +139,10 @@ export class AdMobAds implements AdsProvider {
   }
 
   async showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }> {
-    if (!this.ready) return { ok: false, msg: t('Reklam sistemi henüz hazır değil, birazdan tekrar dene.') };
+    if (!this.ready) return { ok: false, msg: t("The ad system isn't ready yet, try again shortly.") };
     const now = Date.now();
     if (now - this.lastRewarded < REWARDED_COOLDOWN_MS) {
-      return { ok: false, msg: t('Az önce bir reklam izledin, biraz sonra tekrar dene.') };
+      return { ok: false, msg: t('You just watched an ad, try again in a bit.') };
     }
     let listener: { remove: () => Promise<void> } | null = null;
     try {
@@ -152,11 +152,11 @@ export class AdMobAds implements AdsProvider {
         rewarded = true;
       });
       await AdMob.showRewardVideoAd();
-      if (!rewarded) return { ok: false, msg: t('Reklamı tamamlamadan çıktın, ödül verilmedi.') };
+      if (!rewarded) return { ok: false, msg: t('You exited before finishing the ad, no reward given.') };
       this.lastRewarded = now;
-      return { ok: true, msg: t('Reklamı izledin! +{n} inci 🦪', { n: REWARDED_AD_PEARLS }), grantPearls: REWARDED_AD_PEARLS };
+      return { ok: true, msg: t('You watched the ad! +{n} pearls 🦪', { n: REWARDED_AD_PEARLS }), grantPearls: REWARDED_AD_PEARLS };
     } catch {
-      return { ok: false, msg: t('Şu anda gösterilecek reklam bulunamadı, daha sonra tekrar dene.') };
+      return { ok: false, msg: t('No ad is available right now, try again later.') };
     } finally {
       // If showRewardVideoAd() rejects (ad expired, network dropped), the
       // listener used to never get removed; on the next successful watch the

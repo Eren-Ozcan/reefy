@@ -16,22 +16,22 @@ export interface FeedDef {
 
 export const FEEDS: FeedDef[] = [
   {
-    id: 'standart', name: 'Standart Yem', emoji: '🍤', cost: 0,
+    id: 'standart', name: 'Basic Feed', emoji: '🍤', cost: 0,
     hunger: 0.35, bonusChance: 0, bonusAmount: 0,
     color: 0xc98a4b, color2: 0xe8b078,
-    desc: 'Ücretsiz, doyurucu. Bonus vermez.',
+    desc: 'Free and filling. No bonus.',
   },
   {
-    id: 'lezzet', name: 'Lezzet Yemi', emoji: '🦐', cost: 8,
+    id: 'lezzet', name: 'Tasty Feed', emoji: '🦐', cost: 8,
     hunger: 0.4, bonusChance: 0.15, bonusAmount: 0.03,
     color: 0xe86a5e, color2: 0xffb0a0,
-    desc: '%15 şansla satış fiyatına +%3 ekler.',
+    desc: '15% chance to add +3% to sale price.',
   },
   {
-    id: 'altin', name: 'Altın Yem', emoji: '✨', cost: 40,
+    id: 'altin', name: 'Golden Feed', emoji: '✨', cost: 40,
     hunger: 0.45, bonusChance: 0.3, bonusAmount: 0.06,
     color: 0xf0c040, color2: 0xffe9a0,
-    desc: '%30 şansla satış fiyatına +%6 ekler.',
+    desc: '30% chance to add +6% to sale price.',
   },
 ];
 

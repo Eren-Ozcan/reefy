@@ -79,7 +79,7 @@ export class Fish {
   get isAdult(): boolean { return this.progress >= 1; }
   get isSad(): boolean { return this.hunger < SAD_THRESHOLD; }
   get stageName(): string {
-    return this.progress >= 1 ? 'Yetişkin' : this.progress >= 0.5 ? 'Genç' : 'Yavru';
+    return this.progress >= 1 ? 'Adult' : this.progress >= 0.5 ? 'Young' : 'Baby';
   }
   get scaleFactor(): number { return 0.4 + 0.6 * Math.min(1, this.progress); }
 

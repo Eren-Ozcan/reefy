@@ -339,7 +339,7 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   // solely on the UI's input sanitization — sanitize here too as defense against HTML injection).
   const stripHtml = (v: string) => v.replace(/[<>&"']/g, '').trim();
   merged.playerName = stripHtml(merged.playerName) || base.playerName;
-  merged.fishes = merged.fishes.map((f) => ({ ...f, name: stripHtml(f.name) || 'Balık' }));
+  merged.fishes = merged.fishes.map((f) => ({ ...f, name: stripHtml(f.name) || 'Fish' }));
   if (merged.bestStreak === undefined) merged.bestStreak = merged.streak ?? 0;
   return merged;
 }

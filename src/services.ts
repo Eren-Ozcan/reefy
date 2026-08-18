@@ -33,7 +33,7 @@ export interface AuthProvider {
 }
 
 export class LocalAuth implements AuthProvider {
-  readonly platformLabel = t('Misafir (yerel kayıt)');
+  readonly platformLabel = t('Guest (local save)');
   constructor(private save: SaveData) {}
   current(): PlayerIdentity {
     return { id: this.save.friendCode, name: this.save.playerName, platform: 'local' };
@@ -41,7 +41,7 @@ export class LocalAuth implements AuthProvider {
   signIn(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
-      msg: t('Google Play Games / Game Center girişi mobil pakette etkinleşir. Şimdilik ilerlemen bu cihazda güvenle saklanıyor.'),
+      msg: t('Google Play Games / Game Center sign-in is enabled in the mobile build. For now your progress is safely stored on this device.'),
     });
   }
 }
@@ -85,9 +85,9 @@ export class NativeGameAuth implements AuthProvider {
       this.identity = { id: res.player_id, name: res.player_name, platform: this.platform };
       // Sync in-game name/identity with the native player name (local value stays as fallback).
       this.save.playerName = res.player_name || this.save.playerName;
-      return { ok: true, msg: t("{platform}'a giriş yapıldı: {name} 🎮", { platform: this.platformLabel, name: res.player_name }) };
+      return { ok: true, msg: t('Signed in to {platform}: {name} 🎮', { platform: this.platformLabel, name: res.player_name }) };
     } catch {
-      return { ok: false, msg: t('{platform} girişi başarısız. Hesabın cihazda oturum açık mı kontrol et.', { platform: this.platformLabel }) };
+      return { ok: false, msg: t('{platform} sign-in failed. Check whether your account is signed in on this device.', { platform: this.platformLabel }) };
     }
   }
 }
@@ -120,12 +120,12 @@ export interface IAPPack {
 // "one-time product" id restriction — these ids must match the store product
 // ids in RevenueCat/Play Billing exactly.
 export const IAP_PACKS: IAPPack[] = [
-  { id: 'pearls_s',  name: 'Avuç İnci',      pearls: 60,   bonus: '',          priceLabel: '$2.99',  emoji: '🫧' },
-  { id: 'pearls_m',  name: 'Kese İnci',      pearls: 170,  bonus: '+%15 bonus', priceLabel: '$6.99',  emoji: '👛' },
-  { id: 'pearls_l',  name: 'Sandık İnci',    pearls: 450,  bonus: '+%25 bonus', priceLabel: '$14.99', emoji: '🧰' },
-  { id: 'pearls_xl', name: 'Hazine İnci',    pearls: 1000, bonus: '+%40 bonus', priceLabel: '$29.99', emoji: '💎' },
-  { id: 'starter',   name: 'Başlangıç Paketi', pearls: 80, coins: 5000, bonus: '+5.000 altın', priceLabel: '$3.99', emoji: '🎁' },
-  { id: 'remove_ads', name: 'Reklamları Kaldır', pearls: 0, bonus: 'Geçiş reklamlarını kalıcı olarak kaldırır', priceLabel: '$5.99', emoji: '🚫', removesAds: true },
+  { id: 'pearls_s',  name: 'Handful of Pearls',  pearls: 60,   bonus: '',            priceLabel: '$2.99',  emoji: '🫧' },
+  { id: 'pearls_m',  name: 'Pouch of Pearls',    pearls: 170,  bonus: '+15% bonus',  priceLabel: '$6.99',  emoji: '👛' },
+  { id: 'pearls_l',  name: 'Chest of Pearls',    pearls: 450,  bonus: '+25% bonus',  priceLabel: '$14.99', emoji: '🧰' },
+  { id: 'pearls_xl', name: 'Treasure of Pearls', pearls: 1000, bonus: '+40% bonus',  priceLabel: '$29.99', emoji: '💎' },
+  { id: 'starter',   name: 'Starter Pack',       pearls: 80, coins: 5000, bonus: '+5,000 coins', priceLabel: '$3.99', emoji: '🎁' },
+  { id: 'remove_ads', name: 'Remove Ads', pearls: 0, bonus: 'Permanently removes interstitial ads', priceLabel: '$5.99', emoji: '🚫', removesAds: true },
 ];
 
 export interface IAPProvider {
@@ -143,13 +143,13 @@ export interface IAPProvider {
 }
 
 export class StubIAP implements IAPProvider {
-  readonly storeLabel = t('Web önizleme');
+  readonly storeLabel = t('Web preview');
   packs(): IAPPack[] { return IAP_PACKS; }
   loadPrices(): Promise<void> { return Promise.resolve(); }
   purchase(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
-      msg: t('Gerçek satın alma Google Play / App Store sürümünde etkinleşir. Bu önizlemede inci kazanmak için görevleri ve seviye ödüllerini kullanabilirsin.'),
+      msg: t('Real purchases are enabled in the Google Play / App Store build. In this preview, use quests and level rewards to earn pearls.'),
     });
   }
 }
@@ -263,20 +263,20 @@ export class RevenueCatIAP implements IAPProvider {
 
   async purchase(packId: string): Promise<{ ok: boolean; msg: string; grantPearls?: number; grantCoins?: number; grantRemovesAds?: boolean }> {
     const pack = IAP_PACKS.find((p) => p.id === packId);
-    if (!pack) return { ok: false, msg: t('Bilinmeyen paket.') };
+    if (!pack) return { ok: false, msg: t('Unknown pack.') };
     if (!this.configured) await this.ensureConfigured();
     if (!this.configured) {
-      return { ok: false, msg: t('{store} bağlantısı henüz kurulmadı. Lütfen daha sonra tekrar dene.', { store: this.storeLabel }) };
+      return { ok: false, msg: t("{store} connection isn't set up yet. Please try again later.", { store: this.storeLabel }) };
     }
     try {
       const storePackage = await this.findStorePackage(packId);
       if (!storePackage) {
-        return { ok: false, msg: t('Bu paket şu anda mağazada bulunamadı.') };
+        return { ok: false, msg: t("This pack isn't currently available in the store.") };
       }
       await Purchases.purchasePackage({ aPackage: storePackage });
       return {
         ok: true,
-        msg: t('{name} satın alındı! 🎉', { name: t(pack.name) }),
+        msg: t('{name} purchased! 🎉', { name: t(pack.name) }),
         grantPearls: pack.pearls,
         grantCoins: pack.coins,
         grantRemovesAds: pack.removesAds,
@@ -284,9 +284,9 @@ export class RevenueCatIAP implements IAPProvider {
     } catch (err) {
       const rcError = err as { code?: PURCHASES_ERROR_CODE; message?: string };
       if (rcError.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
-        return { ok: false, msg: t('Satın alma iptal edildi.') };
+        return { ok: false, msg: t('Purchase canceled.') };
       }
-      return { ok: false, msg: t('Satın alma başarısız: {err}', { err: rcError.message ?? t('bilinmeyen hata') }) };
+      return { ok: false, msg: t('Purchase failed: {err}', { err: rcError.message ?? t('unknown error') }) };
     }
   }
 }
@@ -319,13 +319,13 @@ export interface SocialProvider {
 const MAX_FRIENDS = 50;
 
 const BOTS = [
-  { name: 'MercanKral 🤖', mult: 3.2 },
-  { name: 'DerinMavi 🤖', mult: 2.1 },
-  { name: 'KaptanYosun 🤖', mult: 1.6 },
-  { name: 'İnciAvcısı 🤖', mult: 1.25 },
-  { name: 'BalonBalık 🤖', mult: 0.85 },
-  { name: 'MinikYüzgeç 🤖', mult: 0.5 },
-  { name: 'TembelDeniz 🤖', mult: 0.2 },
+  { name: 'CoralKing 🤖', mult: 3.2 },
+  { name: 'DeepBlue 🤖', mult: 2.1 },
+  { name: 'CaptainKelp 🤖', mult: 1.6 },
+  { name: 'PearlHunter 🤖', mult: 1.25 },
+  { name: 'PufferFish 🤖', mult: 0.85 },
+  { name: 'TinyFin 🤖', mult: 0.5 },
+  { name: 'LazySea 🤖', mult: 0.2 },
 ];
 
 /** The leaderboard compares the player's score against community bots. If a
@@ -340,7 +340,7 @@ function buildLocalLeaderboard(save: SaveData, friendScores: Record<string, numb
     isPlayer: false,
     isBot: true,
   }));
-  rows.push({ name: save.playerName + ' ' + t('(sen)'), score: save.stats.totalEarned, isPlayer: true, isBot: false });
+  rows.push({ name: save.playerName + ' ' + t('(you)'), score: save.stats.totalEarned, isPlayer: true, isBot: false });
   for (const f of save.friends) {
     const score = friendScores[f.code];
     rows.push({
@@ -358,10 +358,10 @@ function buildLocalLeaderboard(save: SaveData, friendScores: Record<string, numb
  * filter these out synchronously before hitting the network. */
 function validateFriendCode(save: SaveData, code: string): { c: string } | { msg: string } {
   const c = code.trim().toUpperCase();
-  if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { msg: t('Geçersiz kod. Örnek biçim: REEF-AB12C') };
-  if (c === save.friendCode) return { msg: t('Bu senin kendi kodun! 😄') };
-  if (save.friends.some((f) => f.code === c)) return { msg: t('Bu arkadaş zaten listende.') };
-  if (save.friends.length >= MAX_FRIENDS) return { msg: t('En fazla {n} arkadaş ekleyebilirsin.', { n: MAX_FRIENDS }) };
+  if (!/^REEF-[A-Z0-9]{5}$/.test(c)) return { msg: t('Invalid code. Example format: REEF-AB12C') };
+  if (c === save.friendCode) return { msg: t("That's your own code! 😄") };
+  if (save.friends.some((f) => f.code === c)) return { msg: t('This friend is already on your list.') };
+  if (save.friends.length >= MAX_FRIENDS) return { msg: t('You can add up to {n} friends.', { n: MAX_FRIENDS }) };
   return { c };
 }
 
@@ -372,7 +372,7 @@ function validateFriendCode(save: SaveData, code: string): { c: string } | { msg
  * isFirebaseConfigured), createServices() falls back to this provider.
  */
 export class LocalSocial implements SocialProvider {
-  readonly label = t('Yerel mod — çevrimiçi liderlik mobil sürümde');
+  readonly label = t('Local mode — online leaderboard in the mobile build');
 
   leaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {
     return buildLocalLeaderboard(save, friendScores);
@@ -385,10 +385,10 @@ export class LocalSocial implements SocialProvider {
   async addFriend(save: SaveData, code: string): Promise<{ ok: boolean; msg: string }> {
     const v = validateFriendCode(save, code);
     if (!('c' in v)) return { ok: false, msg: v.msg };
-    save.friends.push({ code: v.c, name: t('Dost') + ' ' + v.c.slice(5) });
+    save.friends.push({ code: v.c, name: t('Friend') + ' ' + v.c.slice(5) });
     return {
       ok: true,
-      msg: t('Arkadaş kodu kaydedildi! Çevrimiçi sürümde otomatik eşleşecek. 🤝'),
+      msg: t('Friend code saved! It will auto-match in the online build. 🤝'),
     };
   }
 }
@@ -408,7 +408,7 @@ export class LocalSocial implements SocialProvider {
  * fetched in a single query, each code is get'd individually.
  */
 export class FirebaseSocial implements SocialProvider {
-  readonly label = t('Firebase — arkadaş kodu doğrulanıyor');
+  readonly label = t('Firebase — friend code verification');
   // The app instance and anonymous session are shared with cloud-save.ts (see
   // firebase-app.ts) — a second initializeApp() would throw "app/duplicate-app".
   private db = firestore();
@@ -484,12 +484,12 @@ export class FirebaseSocial implements SocialProvider {
     await this.ready;
     try {
       const snap = await getDoc(doc(this.db, 'players', v.c));
-      if (!snap.exists()) return { ok: false, msg: t('Bu kod bulunamadı. Arkadaşının doğru kodu paylaştığından emin ol.') };
-      const name = (snap.data().name as string) || t('Dost') + ' ' + v.c.slice(5);
+      if (!snap.exists()) return { ok: false, msg: t("This code wasn't found. Make sure your friend shared the right code.") };
+      const name = (snap.data().name as string) || t('Friend') + ' ' + v.c.slice(5);
       save.friends.push({ code: v.c, name });
-      return { ok: true, msg: t('{name} arkadaş listene eklendi! 🤝', { name }) };
+      return { ok: true, msg: t('{name} added to your friends list! 🤝', { name }) };
     } catch {
-      return { ok: false, msg: t('Bağlantı sorunu oldu, daha sonra tekrar dene.') };
+      return { ok: false, msg: t('There was a connection issue, try again later.') };
     }
   }
 }

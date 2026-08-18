@@ -188,7 +188,7 @@ async function requestGoogleIdToken(): Promise<string | null> {
 
 export async function linkWithGoogle(): Promise<LinkResult> {
   if (!isAccountLinkingAvailable()) {
-    return { ok: false, msg: t('Hesap bağlama mobil sürümde kullanılabilir.') };
+    return { ok: false, msg: t('Account linking is available in the mobile version.') };
   }
   try {
     await ensureUid(); // make sure the anonymous session is open
@@ -196,7 +196,7 @@ export async function linkWithGoogle(): Promise<LinkResult> {
     // skipNativeAuth: only the account picker + credential; the JS SDK opens the session
     // (see the rationale in capacitor.config.ts).
     const idToken = await requestGoogleIdToken();
-    if (!idToken) return { ok: false, msg: t('Google girişi tamamlanmadı.') };
+    if (!idToken) return { ok: false, msg: t('Google sign-in was not completed.') };
 
     const credential: AuthCredential = GoogleAuthProvider.credential(idToken);
     const auth = firebaseAuth();
@@ -208,7 +208,7 @@ export async function linkWithGoogle(): Promise<LinkResult> {
         return {
           ok: true,
           switched: false,
-          msg: t('Hesabın bağlandı — ilerlemen artık diğer cihazlarında da açılabilir. ☁️'),
+          msg: t('Your account is linked — your progress can now be opened on your other devices. ☁️'),
         };
       } catch (e) {
         const code = (e as { code?: string } | null)?.code;
@@ -220,7 +220,7 @@ export async function linkWithGoogle(): Promise<LinkResult> {
           ok: true,
           switched: true,
           uid: signedIn.user.uid,
-          msg: t('Bu hesabın kayıtlı bir ilerlemesi var, ona geçildi.'),
+          msg: t('This account already has saved progress, switched to it.'),
         };
       }
     }
@@ -232,9 +232,9 @@ export async function linkWithGoogle(): Promise<LinkResult> {
       ok: true,
       switched: true,
       uid: signedIn.user.uid,
-      msg: t('Giriş yapıldı.'),
+      msg: t('Signed in.'),
     };
   } catch {
-    return { ok: false, msg: t('Google girişi başarısız oldu, daha sonra tekrar dene.') };
+    return { ok: false, msg: t('Google sign-in failed, please try again later.') };
   }
 }
