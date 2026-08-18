@@ -72,6 +72,10 @@ describe('ilerleme sayılan sinyaller', () => {
     expect(withChange((s) => { s.stats.eggsHatched = 1; })).toBe(true);
   });
 
+  it('incubating egg', () => {
+    expect(withChange((s) => { s.pendingEggs = [{ id: 1, tier: 'abis', readyAt: Date.now() + 1000 }]; })).toBe(true);
+  });
+
   it('yerleştirilen dekor sayacı', () => {
     expect(withChange((s) => { s.stats.decorPlacedCount = 1; })).toBe(true);
   });
@@ -537,6 +541,24 @@ describe('bozuk ve eksik veri', () => {
   it('eksik kayıtta gerçek ilerleme hâlâ görülür', () => {
     const restored = parseSave(JSON.stringify({ v: 2, coins: 5000 }));
     expect(hasProgress(restored!)).toBe(true);
+  });
+
+  it('a save written before the timed egg gets an empty queue, not undefined', () => {
+    const restored = parseSave(JSON.stringify({ v: 2, coins: 300 }));
+    expect(restored!.pendingEggs).toEqual([]);
+    expect(hasProgress(restored!)).toBe(false);
+  });
+
+  it('a non-array pendingEggs is replaced rather than trusted', () => {
+    const restored = parseSave(JSON.stringify({ v: 2, coins: 300, pendingEggs: 'x' }));
+    expect(restored!.pendingEggs).toEqual([]);
+  });
+
+  it('an incubating egg survives the cloud round trip', () => {
+    const s = defaultSave();
+    s.pendingEggs = [{ id: 3, tier: 'abis', readyAt: 1_800_000_000_000 }];
+    const restored = parseSave(JSON.stringify(s));
+    expect(restored!.pendingEggs).toEqual([{ id: 3, tier: 'abis', readyAt: 1_800_000_000_000 }]);
   });
 
   it('bozuk JSON parseSave tarafından reddedilir', () => {

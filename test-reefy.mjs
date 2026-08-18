@@ -81,7 +81,36 @@ await page.waitForTimeout(300);
 await page.locator('.buy-btn[data-iap]').first().click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/7-shop-iap.png' });
-await page.click('.close-btn');
+
+// Kuluçkalı yumurta: satın al -> hızlandır -> topla.
+// Web önizlemesinde gerçek satın alma yok (StubIAP), inci dev kancasından verilir.
+await page.evaluate(() => {
+  const g = window.__reefyGame;
+  g.save.pearls += 200;
+  g.ui.refreshHUD();
+});
+await page.click('.tab[data-tab="eggs"]');
+await page.waitForTimeout(300);
+const pearlsForEgg = Number((await page.locator('#hud-pearls').textContent()).trim());
+if (pearlsForEgg < 110) errors.push(`EGG: yeterli inci yok (${pearlsForEgg})`);
+const capBefore = (await page.locator('#hud-cap').textContent()).trim();
+await page.click('.buy-btn[data-egg="abis"]');
+await page.waitForTimeout(400);
+if (await page.locator('[data-egg-row]').count() === 0) errors.push('EGG: kuluçka satırı görünmedi');
+await page.screenshot({ path: out + '/7b-egg-hatching.png' });
+await page.locator('[data-speed-egg]').first().click();
+await page.waitForTimeout(400);
+await page.locator('[data-collect-egg]').first().click();
+await page.waitForTimeout(600);
+const reveal = await page.locator('.reveal-egg').count();
+if (reveal === 0) errors.push('EGG: toplama sonrası açılış ekranı gelmedi');
+await page.waitForTimeout(1400); // açılış animasyonu: balık ve buton 1.1sn sonra görünür
+await page.screenshot({ path: out + '/7c-egg-collected.png' });
+// Açılış ekranı mağaza panelinin YERİNE geçer; .reveal-ok ile kapanınca panel de kapanır.
+await page.click('.reveal-ok');
+await page.waitForTimeout(400);
+const capAfter = (await page.locator('#hud-cap').textContent()).trim();
+if (capBefore === capAfter) errors.push(`EGG: balık sayısı artmadı (${capBefore} -> ${capAfter})`);
 
 // Envanter: dekor sekmesine geç, dekoru yerleştir
 await page.click('#bottombar button[data-act="inventory"]');
