@@ -21,17 +21,13 @@ evidence for whether the numbers are right.
       points only when the active event's id differs; shipping the same id with
       new dates would hand returning players their old points.
 
-### Turkish returns
+### Turkish is back — one thing left to watch
 
-- [ ] **Around 2026-08-25.** The game shipped English-only on 2026-08-18. The
-      Turkish translation was not discarded: the old EN dictionary was inverted
-      into a `TR` table in `src/i18n.ts`. Re-enabling is one line — add `'tr'`
-      to `AVAILABLE_LANGS`. The Settings language row renders itself from that
-      list and hides while there is nothing to choose.
-- [ ] Any new user-facing string needs its Turkish counterpart added to `TR` in
-      the same change, or Turkish comes back with holes. Watch for English-key
-      collisions: `'Next'` was already the tutorial button, so the goal strip
-      had to use `'Next up'`.
+- [ ] **The store-currency signal has never run against a real store.** The
+      language guess reads the billing currency `loadPrices()` recorded on the
+      previous launch, and the web preview's `StubIAP` records nothing, so only
+      the device-language branch is exercised today. Worth confirming on a real
+      Play account once the next build is up.
 
 ### Store listing is now stale
 
@@ -43,10 +39,6 @@ evidence for whether the numbers are right.
 
 ### Housekeeping
 
-- [ ] Test descriptions are still Turkish (`src/cloud-save.test.ts`,
-      `src/save.test.ts`, `src/game-sync.test.ts` — roughly 100 `it(...)`
-      strings). They do not ship, but the standing rule is that code and
-      comments are English.
 - [ ] Biome marks are raster PNGs (`src/icons/`) while the UI icons are inline
       SVG (`src/icons.ts`). Deliberate — they are illustrations, not
       affordances — but worth revisiting if they ever need to take a tint.
@@ -55,15 +47,21 @@ evidence for whether the numbers are right.
 
 The main flow is verified on a real account (see Done). What is left:
 
-- [ ] **The two-devices-live rev race was never exercised.** Both directions are
-      now proven (see Done), but always with the other device idle. Two devices
-      writing inside the same window — A at rev 7 while B is still on 5 — is
-      still untested.
 - [ ] **Orphaned anonymous users.** The auth bug below created a new anonymous
       user on every launch, so `saves/` has a few stray documents. Harmless,
       but worth clearing out before launch so the collection is not misleading.
       The emulator runs added more: a document under a first-pass test account
       on top of the account the final run used.
+      **Blocked on tooling, not on a decision.** The Firebase CLI can delete a
+      known path but cannot LIST documents, and identifying which documents are
+      orphans needs admin credentials the CLI login does not provide (no gcloud
+      and no application-default credentials on this machine). Deleting without
+      being able to read the collection first would be guessing at live player
+      saves. Two ways forward: read the collection in the Firebase console and
+      delete by hand, or run a one-off `firebase-admin` script with a service
+      account key. Whichever comes first, the criterion is the same — a `saves/`
+      document whose uid has no matching `players/` record and whose payload is
+      an untouched starting save (`hasProgress()` false).
 
 ### Privacy policy and Data Safety
 
@@ -93,10 +91,11 @@ The main flow is verified on a real account (see Done). What is left:
       not qualify (it must name the app, show the steps prominently, and state
       what is kept and for how long). <https://yilkgames.com/account-deletion/>
       was written for it; `#data-only` is the data-without-account variant
-- [ ] **No in-app "delete my cloud save" affordance.** Deletion goes through
-      email today, which satisfies Play but is a poor experience — and
-      `firestore.rules` denies `delete` on both collections, so honouring such a
-      request means doing it from the console
+- [x] **In-app deletion — done (2026-08-19).** Settings → Delete my cloud data
+      removes the save document and the `players/{code}` record. `firestore.rules`
+      now allows `delete` on one's own document in both collections; the old
+      blanket denial protected nothing, since anyone able to write as that uid
+      could already overwrite the payload at rev+1
 
 ### Cloud save — remaining platforms
 
@@ -203,6 +202,42 @@ Details worth keeping:
 - The clock-tampering stance holds: the calendar is date-based, so a moved
   clock can only enter a window early — the points themselves still require
   real play.
+
+### Turkish returned, and the language guess changed (2026-08-19)
+
+`AVAILABLE_LANGS` is `['en', 'tr']` again. What changed beyond the one line:
+
+- The first launch's language now leans on the STORE account rather than the
+  handset. The Play/App Store account's country is not directly readable
+  without another plugin, but its billing currency is, so `loadPrices()`
+  records it and the NEXT launch reads it — prices arrive long after the first
+  frame, so awaiting them was never an option.
+- Turkish is chosen only on positive evidence; everything else gets English.
+  Guessing English wrong leaves a player in a language most can navigate,
+  guessing Turkish wrong strands them in one almost nobody can.
+- A time-zone signal was tried and dropped: Europe/Istanbul says where the
+  handset is, not what its owner reads, and it handed Turkish to a device
+  explicitly set to German.
+- `src/i18n.test.ts` now checks the TR table against every key the code asks
+  for. It found no gaps on the day it was written; the point is the next
+  feature.
+- The smoke run pins its locale explicitly. Without that it followed the
+  developer's machine — it failed an English assertion on a Turkish laptop the
+  moment the second language shipped.
+
+### The two-devices-live rev race, and the dead end it found (2026-08-19)
+
+The last untested cloud path turned out to hide a real one-session dead end.
+Device A writes rev 7 while B is still on 5; B's next upload asks for rev 6 and
+the rule rejects it. `rev` correctly stayed put — but `sync()` only ever ran at
+startup, so nothing re-read the cloud and B retried the same doomed revision
+every throttle window until the app was restarted. Its progress reached nobody
+in the meantime.
+
+A rejected write now marks the client stale, `syncSave()` routes that into a
+re-sync instead of another upload, and the sync resolves it the usual way:
+identical content settles silently, diverged content raises the conflict screen
+through the same late hook the startup path uses.
 
 ### Egg hatch timer — Abyssal Egg (2026-08-18)
 
