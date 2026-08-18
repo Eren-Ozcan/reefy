@@ -2092,6 +2092,32 @@ export class Game {
     if (res === 'conflict') this.onLateConflict?.();
   }
 
+  /**
+   * Re-syncs after another device's write left this one behind. Runs at most
+   * once at a time; the sync itself either settles silently (both devices hold
+   * the same progress) or raises the conflict screen through the same late
+   * hook the startup path uses.
+   */
+  private recoveringStale = false;
+
+  private async recoverFromStaleRev(): Promise<void> {
+    if (this.recoveringStale) return;
+    this.recoveringStale = true;
+    try {
+      const res = await this.cloud.sync(this.save);
+      this.cloudSync = res;
+      if (res === 'restored') {
+        // The scene still holds the old save's fish (see freezeForRestore).
+        this.freezeForRestore();
+        location.reload();
+        return;
+      }
+      if (res === 'conflict') this.onLateConflict?.();
+    } finally {
+      this.recoveringStale = false;
+    }
+  }
+
   async resyncCloudForNewAccount(): Promise<CloudSyncResult> {
     this.cloud.resetForNewAccount();
     this.cloudSync = await this.cloud.sync(this.save);
@@ -2120,6 +2146,10 @@ export class Game {
     // The local save is always written instantly; cloud writes are throttled to
     // conserve quota (see cloud-save.ts UPLOAD_THROTTLE_MS).
     this.cloud.markDirty();
+    // Another device wrote while this one was live, so the rev is behind and
+    // every further upload can only be rejected. Re-syncing is what resolves
+    // it; uploading again first would just burn a write.
+    if (this.cloud.isStale) { void this.recoverFromStaleRev(); return; }
     this.cloud.maybeUpload(this.save);
   }
 

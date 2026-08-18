@@ -59,14 +59,23 @@ vi.mock('./services', () => ({
   }),
 }));
 
+/** Whether the mocked cloud reports a rev left behind by another device. */
+let cloudStale = false;
+
 vi.mock('./cloud-save', () => ({
   CloudSave: class {
+    get isStale(): boolean { return cloudStale; }
     markDirty(): void { calls.push('markDirty'); }
     maybeUpload(): void { calls.push('maybeUpload'); }
     flush(): void { calls.push('flush'); }
     resetForNewAccount(): void { calls.push('resetForNewAccount'); }
     async sync(): Promise<CloudSyncResult> {
       calls.push('sync');
+      // Deliberately does NOT clear cloudStale, and yields once before
+      // resolving. The real sync() clears the flag on entry, which would make
+      // overlapping calls impossible to observe — and overlapping calls are
+      // exactly what the in-flight guard exists to stop.
+      await Promise.resolve();
       return cloudSyncResult;
     }
   },
@@ -111,10 +120,11 @@ beforeEach(() => {
   localStorage.clear();
   calls.length = 0;
   cloudSyncResult = 'in-sync';
+  cloudStale = false;
 });
 
-describe('normal (donmamış) syncSave', () => {
-  it('balık listesini SAHNEDEN kurar ve buluta yazar', () => {
+describe('syncSave when not frozen', () => {
+  it('builds the fish list FROM THE SCENE and writes to the cloud', () => {
     const game = midSessionRestore();
 
     game.syncSave();
@@ -126,8 +136,8 @@ describe('normal (donmamış) syncSave', () => {
   });
 });
 
-describe('geri yükleme sonrası donma', () => {
-  it('freezeForRestore() indirilen kaydı HEMEN diske yazar', () => {
+describe('freezing after a restore', () => {
+  it('freezeForRestore() writes the downloaded save to disk IMMEDIATELY', () => {
     // applyCloud only mutates the in-memory object; a reload reads from disk,
     // so if it isn't written the restore silently disappears.
     const game = midSessionRestore();
@@ -138,7 +148,7 @@ describe('geri yükleme sonrası donma', () => {
     expect(loadSave().fishes).toHaveLength(5);
   });
 
-  it('donmuşken bayat sahne indirilen balıkları EZMEZ', () => {
+  it('a stale scene does NOT overwrite the downloaded fish while frozen', () => {
     const game = midSessionRestore();
     game.freezeForRestore();
 
@@ -150,7 +160,7 @@ describe('geri yükleme sonrası donma', () => {
     expect(loadSave().fishes).toHaveLength(5);
   });
 
-  it('donmuşken de diske YAZAR — yoksa geri yükleme yeniden yüklemede yok olur', () => {
+  it('still WRITES to disk while frozen — otherwise the restore dies on reload', () => {
     const game = midSessionRestore();
     game.freezeForRestore();
     localStorage.clear(); // wipe what freezing wrote: syncSave must write everything from here on
@@ -161,7 +171,7 @@ describe('geri yükleme sonrası donma', () => {
     expect(loadSave().fishes).toHaveLength(5);
   });
 
-  it('donmuşken BULUTA yazılmaz — veri zaten buluttan geldi', () => {
+  it('does not write to the CLOUD while frozen — the data came from there', () => {
     const game = midSessionRestore();
     game.freezeForRestore();
     calls.length = 0;
@@ -172,7 +182,7 @@ describe('geri yükleme sonrası donma', () => {
     expect(calls).not.toContain('maybeUpload');
   });
 
-  it('donma kalıcıdır — art arda gelen syncSave çağrıları da yazmaz', () => {
+  it('stays frozen — later syncSave calls do not write either', () => {
     // In reality the 6-second timer keeps running until the reload happens.
     const game = midSessionRestore();
     game.freezeForRestore();
@@ -187,8 +197,55 @@ describe('geri yükleme sonrası donma', () => {
   });
 });
 
-describe('hesap değişiminde yeniden senkron', () => {
-  it('geri yükleme uygulandıysa donar', async () => {
+// Two devices live at once: the other one wrote first, so this device's rev is
+// behind and every upload it attempts can only be rejected. Before this, sync()
+// ran at startup only, so the session had no way back until the app restarted.
+describe('recovering from a rev another device moved past', () => {
+  it('re-syncs instead of uploading again', async () => {
+    const game = midSessionRestore();
+    cloudStale = true;
+
+    game.syncSave();
+    await vi.waitFor(() => expect(calls).toContain('sync'));
+
+    // The upload would be rejected for exactly the same reason as the last
+    // one; spending a write on it is the bug this replaces.
+    expect(calls).not.toContain('maybeUpload');
+  });
+
+  it('still writes the save to disk while recovering', () => {
+    const game = midSessionRestore();
+    cloudStale = true;
+
+    game.syncSave();
+
+    expect(loadSave().fishes).toHaveLength(2);
+  });
+
+  it('raises the conflict screen when the two devices really diverged', async () => {
+    const game = midSessionRestore();
+    cloudStale = true;
+    cloudSyncResult = 'conflict';
+    let raised = 0;
+    game.onLateConflict = () => { raised++; };
+
+    game.syncSave();
+    await vi.waitFor(() => expect(raised).toBe(1));
+  });
+
+  it('does not start a second recovery while one is in flight', async () => {
+    const game = midSessionRestore();
+    cloudStale = true;
+
+    game.syncSave();
+    game.syncSave();
+    game.syncSave();
+    await vi.waitFor(() => expect(calls.filter((c) => c === 'sync').length).toBe(1));
+  });
+});
+
+describe('re-syncing when the account changes', () => {
+  it('freezes when a restore was applied', async () => {
     cloudSyncResult = 'restored';
     const game = midSessionRestore();
 
@@ -201,7 +258,7 @@ describe('hesap değişiminde yeniden senkron', () => {
     expect(calls).not.toContain('maybeUpload');
   });
 
-  it('geri yükleme YOKSA donmaz — oyun normal çalışmaya devam eder', () => {
+  it('does NOT freeze without a restore — the game carries on normally', () => {
     cloudSyncResult = 'in-sync';
     const game = midSessionRestore();
 
@@ -220,7 +277,7 @@ describe('hesap değişiminde yeniden senkron', () => {
 // progress again. On two emulators it showed up as "B's progress never
 // reaches A"; measurements showed ensureUid took 2946 ms, i.e. it landed
 // 54 ms under the old single 3000 ms budget.
-describe('mühleti aşıp geç gelen açılış senkronu', () => {
+describe('a startup sync that misses the grace period and lands late', () => {
   /** handleLateCloudSync is intentionally private — never called from outside, a late result triggers it. */
   function late(game: InstanceType<typeof Game>, res: CloudSyncResult): void {
     (game as unknown as { handleLateCloudSync(r: CloudSyncResult): void }).handleLateCloudSync(res);
@@ -236,7 +293,7 @@ describe('mühleti aşıp geç gelen açılış senkronu', () => {
     });
   });
 
-  it("geç gelen 'restored' kaydı diske yazıp yeniden yükler", () => {
+  it("a late 'restored' writes the save to disk and reloads", () => {
     const game = midSessionRestore();
 
     late(game, 'restored');
@@ -247,7 +304,7 @@ describe('mühleti aşıp geç gelen açılış senkronu', () => {
     expect(loadSave().fishes).toHaveLength(5);
   });
 
-  it("geç gelen 'restored' sonrası sahne indirilen balıkları EZEMEZ", () => {
+  it("the scene cannot overwrite the downloaded fish after a late 'restored'", () => {
     // The reload doesn't happen instantly; beforeunload -> syncSave() runs in between.
     const game = midSessionRestore();
 
@@ -259,7 +316,7 @@ describe('mühleti aşıp geç gelen açılış senkronu', () => {
     expect(calls).not.toContain('maybeUpload');
   });
 
-  it("geç gelen 'conflict' çakışma ekranını açar, yeniden yüklemez", () => {
+  it("a late 'conflict' opens the conflict screen and does not reload", () => {
     const game = midSessionRestore();
     let shown = 0;
     game.onLateConflict = () => { shown++; };
@@ -271,7 +328,7 @@ describe('mühleti aşıp geç gelen açılış senkronu', () => {
     expect(game.cloudSync).toBe('conflict');
   });
 
-  it("geç gelen 'in-sync' oyunu rahatsız etmez", () => {
+  it("a late 'in-sync' leaves the game alone", () => {
     const game = midSessionRestore();
     let shown = 0;
     game.onLateConflict = () => { shown++; };
@@ -285,7 +342,7 @@ describe('mühleti aşıp geç gelen açılış senkronu', () => {
     expect(calls).toContain('maybeUpload');
   });
 
-  it('UI henüz abone olmadıysa çakışma yine de kaydedilir', () => {
+  it('records the conflict even when the UI has not subscribed yet', () => {
     // ui.ts subscribes first and checks afterward; even if the result lands
     // between those two lines, it must still be catchable by reading cloudSync.
     const game = midSessionRestore();
