@@ -2,21 +2,24 @@
 
 ## Pending
 
-### UI redesign — Release C, what is still open
+### Coral Festival — what the first run has to answer
 
-Releases A and B are in, and the egg hatch timer shipped with them (see Done).
-What is left below needs schema changes, so it is deliberately held back.
+The feature is built and shipped (see Done); what is left is not code. The
+first event runs **2026-08-24 to 2026-08-28** and it is the only source of
+evidence for whether the numbers are right.
 
-- [ ] **Timed event ("Coral Festival").** `src/quests.ts` knows only two
-      rhythms, `questsForDay()` and `weeklyQuestForWeek()`. A multi-day event
-      that accrues points toward tiered rewards is a third one: needs an event
-      calendar (embedded or remote), a points-per-`QuestEvent` mapping, claimed
-      -tier state in the save, and a rule for unclaimed rewards at event end.
-      Size the rewards against the fact that the local save is unsigned and
-      clock tampering is deliberately out of scope — an event reward must not
-      be worth setting the clock forward for. The Abyssal Egg already takes
-      this stance: the egg is paid for at purchase, so the clock can only skip
-      the speed-up surcharge, never the egg.
+- [ ] **Watch the point totals against the tiers.** The four tiers (150 / 400 /
+      900 / 1,800) were sized by estimate, not by measurement. If most players
+      finish all four on day two, the event stops being a reason to come back;
+      if nobody clears the third, the top tier is decoration.
+- [ ] **Decide on a remote calendar only after that.** `EVENTS` in
+      `src/events.ts` is embedded, so a new festival needs an app update. Moving
+      it to Firestore is worth it once the tuning is known — and it brings an
+      offline story and an "event vanished mid-run" case that are not worth
+      writing against unvalidated numbers.
+- [ ] **A second event needs new dates, not a reused id.** The save resets its
+      points only when the active event's id differs; shipping the same id with
+      new dates would hand returning players their old points.
 
 ### Turkish returns
 
@@ -168,6 +171,38 @@ were already computed and already paying out.
   cannot drift apart.
 - Achievements got their own screen. The IA audit had found them at the bottom
   of the Quests scroll — reachable in principle, unseen in practice.
+
+### Coral Festival — the third rhythm (2026-08-18)
+
+A multi-day event that accrues points from ordinary play toward tiers claimed
+one by one, next to the existing daily (`questsForDay`) and weekly
+(`weeklyQuestForWeek`) rhythms. Lives in its own `src/events.ts`.
+
+Both open questions went the conservative way:
+
+- **Embedded calendar, not remote.** Firebase is already wired up, but a remote
+  calendar adds an offline story and an "event vanished mid-run" case, and
+  neither is worth building before one event has shown whether the numbers work.
+- **A two-day grace window after the end** (`EVENT_GRACE_DAYS`). Losing a reward
+  that was actually earned reads as a bug rather than as urgency, and the closed
+  test has few enough players that one missed claim is loud feedback. Grace does
+  NOT extend scoring — `activeEvent()` closes on the end date and only
+  `claimableEvent()` stays open, which is the distinction the tests pin.
+
+Details worth keeping:
+
+- Scoring hangs off `questEvent()`, so every existing call site feeds the
+  festival and no action can be scored by the quests but missed by the event.
+- `earn` scores nothing: passive income accrues while the game is CLOSED, so
+  paying points for it would reward the opposite of showing up.
+- Event rewards are flat, unlike quests, which scale with level — the tiers are
+  sized against the whole event, so scaling them again would make a late-game
+  festival dwarf everything else.
+- Windows are compared as ISO day-key STRINGS, the same form the quests use.
+  There is no timestamp arithmetic anywhere in the file to get wrong.
+- The clock-tampering stance holds: the calendar is date-based, so a moved
+  clock can only enter a window early — the points themselves still require
+  real play.
 
 ### Egg hatch timer — Abyssal Egg (2026-08-18)
 
