@@ -43,8 +43,8 @@ out the paid version.
 
 Cloud save is part of how the game works and is not something you switch on. If
 you would prefer your progress never to leave the device, the app is not able to
-offer that today — you can, however, ask us to delete what has been stored (see
-"Keeping and deleting your data").
+offer that today — you can, however, delete what has been stored at any time,
+from within the game (see "Keeping and deleting your data").
 
 ## Linking a Google account
 
@@ -121,11 +121,19 @@ the app. Deleting the app does **not** delete the cloud copy — see below.
 We keep your cloud save for as long as the game is installed and in use, so it
 is there when you need it. Uninstalling removes the local copy only.
 
-To have your cloud save and your friend-code record deleted, write to
-erenozcaan@hotmail.com from — or telling us — the Google account you linked, or
-including your friend code if you never linked one. We will delete it and
-confirm. Data held by Google or RevenueCat on our behalf (your advertising ID,
-your purchase history) can also be managed from your Google account's privacy
+You can delete your cloud data yourself, from inside the game: **Settings →
+Delete my cloud data**. It removes the copy of your save in the cloud and your
+friend-code record, and takes effect immediately. The game on your device is
+left alone — if you also want that gone, "Delete all progress" in the same
+screen does it, and uninstalling removes it too.
+
+If you cannot reach that screen — the app will not start, or you have already
+uninstalled — write to erenozcaan@hotmail.com from, or telling us, the Google
+account you linked, or including your friend code if you never linked one. We
+will delete it and confirm.
+
+Data held by Google or RevenueCat on our behalf (your advertising ID, your
+purchase history) can also be managed from your Google account's privacy
 settings.
 
 ## Children's privacy

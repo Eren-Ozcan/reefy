@@ -506,6 +506,22 @@ await page.waitForTimeout(200);
   if (await trPage.locator('.lang-toggle').count() === 0) errors.push('LANG: ayarlarda dil satırı yok');
   await trPage.screenshot({ path: out + '/30-lang-settings.png' });
 
+  // Bulut verisi silme satırı: iki dokunuşla onay, ilk dokunuş sadece silahlar
+  const delBtn = trPage.locator('#cloud-delete');
+  if (await delBtn.count() === 0) errors.push('SIL: bulut verisi silme satırı yok');
+  else {
+    await delBtn.click();
+    await trPage.waitForTimeout(200);
+    const armedText = (await delBtn.textContent()).trim();
+    if (!armedText.includes('tekrar dokun')) errors.push(`SIL: ilk dokunuş onay istemedi (${armedText})`);
+    // Web önizlemesinde Firebase yapılandırması yok; onaylamak hata toast'ı
+    // vermeli ama SAYFAYI PATLATMAMALI — asıl sınanan bu.
+    await delBtn.click();
+    await trPage.waitForTimeout(1200);
+    if (await delBtn.count() === 0) errors.push('SIL: onay sonrası buton kayboldu');
+  }
+  await trPage.screenshot({ path: out + '/31-cloud-delete.png' });
+
   // İngilizce'ye geç — sayfa kendini yeniler
   await trPage.click('[data-lang="en"]');
   await trPage.waitForTimeout(2500);
