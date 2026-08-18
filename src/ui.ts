@@ -1283,6 +1283,48 @@ export class UI {
       ${blocks}`);
   }
 
+  /**
+   * The festival block, or '' when none is running. It goes ABOVE the dailies
+   * in renderQuests(): the event is the thing with a deadline on it, and it is
+   * the only part of that panel a player can permanently miss.
+   */
+  private festivalHTML(): string {
+    const def = this.game.visibleEvent();
+    if (!def) return '';
+    const s = this.game.save;
+    const pts = s.event.id === def.id ? s.event.points : 0;
+    const running = this.game.activeEvent() !== null;
+    const last = def.tiers[def.tiers.length - 1];
+    const rows = def.tiers.map((tier, i) => {
+      const claimed = s.event.id === def.id && s.event.claimed.includes(i);
+      const reached = pts >= tier.points;
+      return `
+        <div class="quest-row ${claimed ? 'claimed' : ''}">
+          <span class="q-emoji">${reached ? '🏆' : '🔒'}</span>
+          <div class="q-mid">
+            <div class="q-name">${tt('{n} points', { n: tier.points })}</div>
+            <div class="q-meta">🪙 ${fmt(tier.coins)}${tier.pearls ? ` + 🦪 ${tier.pearls}` : ''}</div>
+          </div>
+          ${claimed ? '<span class="q-done">✓</span>'
+            : reached ? `<button class="buy-btn" data-event-tier="${i}">${tt('Claim')}</button>`
+            : ''}
+        </div>`;
+    }).join('');
+    // Once the event is over, the header stops advertising a deadline and says
+    // what is actually true: the only thing left is collecting what was earned.
+    const head = running
+      ? tt('Ends {day}', { day: def.end })
+      : tt('Ended — claim what you earned');
+    return `
+      <h3 class="inv-head">${def.emoji} ${tt(def.name)}</h3>
+      <div class="festival">
+        <p class="card-desc">${tt(def.desc)}</p>
+        <div class="q-name">${tt('{n} festival points', { n: pts })} · <small>${head}</small></div>
+        <div class="bar"><div style="width:${Math.min(100, (100 * pts) / last.points)}%"></div></div>
+      </div>
+      ${rows}`;
+  }
+
   private renderQuests(): void {
     const s = this.game.save;
     const daily = this.game.dailyQuests();
@@ -1332,6 +1374,7 @@ export class UI {
     const achDone = ACHIEVEMENTS.filter((a) => s.achievementsClaimed.includes(a.id)).length;
 
     const el = this.panelShell(tt('Quests'), `
+      ${this.festivalHTML()}
       <h3 class="inv-head">${tt('Daily quests 🔥 Streak: {n} days', { n: s.streak })}</h3>
       ${dailyHTML}
       <h3 class="inv-head">${tt('Weekly quest')}</h3>
@@ -1351,6 +1394,13 @@ export class UI {
       btn.addEventListener('click', () => {
         const q = daily.find((x) => x.id === btn.dataset.claim)!;
         const res = this.game.claimQuest(q);
+        this.toast(res.msg);
+        if (res.ok) this.renderQuests();
+      });
+    });
+    el.querySelectorAll<HTMLButtonElement>('[data-event-tier]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const res = this.game.claimEventTier(Number(btn.dataset.eventTier));
         this.toast(res.msg);
         if (res.ok) this.renderQuests();
       });

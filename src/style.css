@@ -724,6 +724,17 @@ html, body {
 }
 .quest-row.claimed { opacity: 0.55; }
 .quest-row.weekly { outline: 2px solid #d9a83c; background: #3a3020; }
+/* The festival header block. It carries the running point total and the
+   deadline, so it reads as one banner rather than as another quest row. */
+.festival {
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
+  padding: 12px; margin-bottom: 8px;
+  outline: 2px solid var(--accent);
+  box-shadow: var(--card-shadow);
+}
+.festival .card-desc { min-height: 0; margin-bottom: 8px; }
+.festival .bar { height: 10px; margin-top: 7px; }
+.festival small { color: var(--ink-faint); font-weight: 600; }
 .q-emoji { font-size: 24px; flex-shrink: 0; }
 .q-mid { flex: 1; min-width: 0; }
 .q-name { font-size: 13px; font-weight: 700; }
