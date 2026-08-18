@@ -43,7 +43,12 @@ service cloud.firestore {
                             && (!('score' in resource.data)
                                 || request.resource.data.score <= resource.data.score + 10000000)));
 
-      allow delete: if false;
+      // Oyuncu kendi dokümanını silebilir: Play'in zorunlu kıldığı hesap
+      // silme akışı (bkz. https://yilkgames.com/account-deletion/) uygulama
+      // içinden yürüsün diye. Yalnız KENDİ uid'ine ait doküman —
+      // resource.data.uid kontrolü olmadan herhangi biri, elindeki bir
+      // arkadaş kodunun kaydını silebilirdi.
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
     // Bulut kaydı (bkz. src/cloud-save.ts). Doküman kimliği oyuncunun Firebase
@@ -73,8 +78,13 @@ service cloud.firestore {
                     && request.resource.data.schemaVersion is int
                     && request.resource.data.rev > resource.data.rev;
 
-      // Silme kapalı: kazara/kötü niyetli bir istekle ilerleme yok edilemesin.
-      allow delete: if false;
+      // Silme, yalnızca dokümanın sahibine açık. Önceden tamamen kapalıydı;
+      // gerekçe "kazara/kötü niyetli bir istekle ilerleme yok edilmesin"di,
+      // ama o koruma zaten yok: kendi uid'iyle yazabilen biri payload'ı
+      // rev+1 ile çöple de ezebilir. Silmeyi kapalı tutmanın tek gerçek
+      // etkisi, oyuncunun kendi verisini silmesini e-postayla yürüyen manuel
+      // bir sürece mahkûm etmekti.
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
   }
 }

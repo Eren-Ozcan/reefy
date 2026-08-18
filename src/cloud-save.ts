@@ -28,7 +28,7 @@
 //   idiom as ads.ts/billing.ts).
 
 import { Capacitor } from '@capacitor/core';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ensureUid, firestore } from './firebase-app';
 import { hasProgress, parseSave, progressFingerprint, SAVE_SCHEMA_VERSION, type SaveData } from './save';
 
@@ -153,6 +153,37 @@ export class CloudSave {
 
   private ref(uid: string) {
     return doc(firestore(), 'saves', uid);
+  }
+
+  /**
+   * Deletes this account's cloud document and forgets everything the device
+   * remembered about it. Play requires an account-deletion path, and routing
+   * it through email meant a human doing it from the console.
+   *
+   * The LOCAL save is deliberately untouched: this removes the copy in the
+   * cloud, not the player's game. "Delete all progress" is a separate,
+   * already-existing action, and merging the two would make one of them a
+   * trap.
+   *
+   * After deletion the state is exactly a first launch: rev 0 and dirty, so
+   * the next sync() finds no document and uploads the local save afresh —
+   * which is why the caller is expected to stop syncing (see game.ts
+   * deleteCloudSave) if the player's intent was for it to STAY deleted.
+   */
+  async deleteRemote(): Promise<boolean> {
+    const uid = await withTimeout(ensureUid(), AUTH_TIMEOUT_MS);
+    if (!uid) return false;
+    // withTimeout resolves to null on BOTH failure and timeout, and deleteDoc
+    // resolves to undefined on success — so success is mapped to `true`
+    // explicitly rather than being told apart from null by its type.
+    const done = await withTimeout(deleteDoc(this.ref(uid)).then(() => true), WRITE_TIMEOUT_MS);
+    if (!done) return false;
+    this.rev = 0;
+    this.dirty = true;
+    this.blocked = false;
+    this.pendingCloud = null;
+    this.lastUpload = 0;
+    return true;
   }
 
   /** Marks that there is a local change; runs every time syncSave() is called. */

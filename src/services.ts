@@ -11,7 +11,7 @@
 import { Capacitor } from '@capacitor/core';
 import { CapacitorGameConnect } from 'capacitor-game-connect-8';
 import { Purchases, PURCHASES_ERROR_CODE, type PurchasesPackage } from '@revenuecat/purchases-capacitor';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AdMobAds, StubAds, type AdsProvider } from './ads';
 import { ensureUid, firestore } from './firebase-app';
 import { isFirebaseConfigured } from './firebase-config';
@@ -318,6 +318,14 @@ export interface SocialProvider {
   /** Publishes the player document (friend code -> name/score). Cloud sync can
    *  change friendCode, so this MUST be called after sync. */
   publishPlayer?(): Promise<void>;
+  /**
+   * Removes the player document. Part of the in-app deletion path: the
+   * `players/{code}` record is the one genuinely public thing in the game (the
+   * display name behind a friend code), so deleting cloud data that left it
+   * standing would not be a deletion at all. Absent on providers with nothing
+   * published.
+   */
+  deletePlayer?(): Promise<boolean>;
 }
 
 /** Visit/gift rewards are given once per friend per day, so a cap is put on the
@@ -413,6 +421,20 @@ export class LocalSocial implements SocialProvider {
  * renderSocial) — since Firestore `list` is closed, the friend list can't be
  * fetched in a single query, each code is get'd individually.
  */
+/** Deletion is awaited by a button the player is watching, so every step of it
+ *  is bounded; a hung request has to surface as a failure, not as a spinner. */
+const DELETE_TIMEOUT_MS = 8000;
+
+/** Resolves to null on rejection OR timeout — the caller cannot tell the two
+ *  apart and does not need to: both mean "it did not happen". */
+function withDeadline<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    p.catch(() => null),
+    new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 export class FirebaseSocial implements SocialProvider {
   readonly label = t('Firebase — friend code verification');
   // The app instance and anonymous session are shared with cloud-save.ts (see
@@ -445,6 +467,27 @@ export class FirebaseSocial implements SocialProvider {
     } catch {
       /* no connection — fail silently, retried on the next launch */
     }
+  }
+
+  /**
+   * Deletes this player's published document. Returns false only when the
+   * write itself failed — a code that was never published is already in the
+   * state the caller wants, so it counts as success.
+   */
+  async deletePlayer(): Promise<boolean> {
+    // BOUNDED, unlike publishPlayer above. That one is fire-and-forget and can
+    // afford to hang; this one is awaited by a button the player is watching,
+    // and ensureUid() does not resolve at all when auth cannot be reached — the
+    // button would sit on "Deleting…" for the rest of the session.
+    const uid = await withDeadline(ensureUid(), DELETE_TIMEOUT_MS);
+    if (!uid) return false;
+    // The rules reject a delete on a document this uid does not own, and a
+    // document that was never published deletes cleanly — so a failure here
+    // means no network or someone else's code, not "nothing to delete".
+    return (await withDeadline(
+      deleteDoc(doc(this.db, 'players', this.save.friendCode)).then(() => true),
+      DELETE_TIMEOUT_MS,
+    )) === true;
   }
 
   leaderboard(save: SaveData, friendScores: Record<string, number> = {}): LeaderboardEntry[] {
