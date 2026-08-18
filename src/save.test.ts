@@ -72,6 +72,14 @@ describe('ilerleme sayılan sinyaller', () => {
     expect(withChange((s) => { s.stats.eggsHatched = 1; })).toBe(true);
   });
 
+  it('festival points', () => {
+    expect(withChange((s) => { s.event = { id: 'coral-festival-2026-08', points: 40, claimed: [] }; })).toBe(true);
+  });
+
+  it('a claimed festival tier, even at zero points', () => {
+    expect(withChange((s) => { s.event = { id: 'coral-festival-2026-08', points: 0, claimed: [0] }; })).toBe(true);
+  });
+
   it('incubating egg', () => {
     expect(withChange((s) => { s.pendingEggs = [{ id: 1, tier: 'abis', readyAt: Date.now() + 1000 }]; })).toBe(true);
   });
@@ -559,6 +567,24 @@ describe('bozuk ve eksik veri', () => {
     s.pendingEggs = [{ id: 3, tier: 'abis', readyAt: 1_800_000_000_000 }];
     const restored = parseSave(JSON.stringify(s));
     expect(restored!.pendingEggs).toEqual([{ id: 3, tier: 'abis', readyAt: 1_800_000_000_000 }]);
+  });
+
+  it('a save written before the first event gets an empty event state', () => {
+    const restored = parseSave(JSON.stringify({ v: 2, coins: 300 }));
+    expect(restored!.event).toEqual({ id: '', points: 0, claimed: [] });
+    expect(hasProgress(restored!)).toBe(false);
+  });
+
+  it('a hand-edited event state is repaired field by field, not trusted', () => {
+    const restored = parseSave(JSON.stringify({ v: 2, coins: 300, event: { points: 'x', claimed: 5 } }));
+    expect(restored!.event).toEqual({ id: '', points: 0, claimed: [] });
+  });
+
+  it('festival progress survives the cloud round trip', () => {
+    const s = defaultSave();
+    s.event = { id: 'coral-festival-2026-08', points: 420, claimed: [0, 1] };
+    const restored = parseSave(JSON.stringify(s));
+    expect(restored!.event).toEqual({ id: 'coral-festival-2026-08', points: 420, claimed: [0, 1] });
   });
 
   it('bozuk JSON parseSave tarafından reddedilir', () => {

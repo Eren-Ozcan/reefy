@@ -411,6 +411,67 @@ await page.screenshot({ path: out + '/26-profile.png' });
 await page.click('.close-btn');
 await page.waitForTimeout(200);
 
+// Mercan Şenliği: kendi saati sabitlenmiş AYRI bir sayfada.
+// Etkinlik takvimi tarihe bağlı; ana koşunun saatini kaydırmak günlük görev
+// gününü de kaydırırdı, o yüzden bu bölüm temiz bir bağlamda çalışır.
+{
+  const fest = await browser.newPage({ viewport: { width: 900, height: 640 } });
+  fest.on('pageerror', (e) => errors.push('FEST PAGEERROR: ' + e.message));
+  // setFixedTime, install DEĞİL: install zamanlayıcıları da durdurur ve oyun
+  // döngüsü hiç başlamaz. Etkinlik takvimi sadece new Date() okur.
+  await fest.clock.setFixedTime(new Date('2026-08-25T10:00:00Z'));
+  await fest.goto('http://localhost:5173/');
+  await fest.waitForTimeout(1200);
+  await fest.click('#play-btn');
+  await fest.waitForSelector('#menu.hidden', { timeout: 20000 });
+  await fest.waitForTimeout(800);
+  for (let i = 0; i < 8; i++) {
+    const next = fest.locator('.tutorial-next');
+    if (await next.count() === 0) break;
+    await next.first().click();
+    await fest.waitForTimeout(300);
+  }
+  const festWelcome = fest.locator('.welcome-ok');
+  if (await festWelcome.count()) await festWelcome.first().click();
+  await fest.waitForTimeout(400);
+
+  // Puanlama gerçekten questEvent üzerinden akıyor mu
+  const scored = await fest.evaluate(() => {
+    const g = window.__reefyGame;
+    g.save.event = { id: '', points: 0, claimed: [] };
+    g.questEvent('feed', 10);
+    return g.save.event;
+  });
+  if (scored.points !== 10) errors.push(`FEST: yemleme puanı işlenmedi (${JSON.stringify(scored)})`);
+  if (scored.id !== 'coral-festival-2026-08') errors.push(`FEST: etkinlik durumu kurulmadı (${scored.id})`);
+
+  // İki kademe açacak kadar puan ver, panelde talep et
+  const coinsBefore = await fest.evaluate(() => {
+    const g = window.__reefyGame;
+    g.save.event.points = 500;
+    g.ui.refreshHUD();
+    return g.save.coins;
+  });
+  await fest.click('#bottombar button[data-act="quests"]');
+  await fest.waitForTimeout(400);
+  if (await fest.locator('.festival').count() === 0) errors.push('FEST: şenlik bloğu görünmedi');
+  const tierBtns = await fest.locator('[data-event-tier]').count();
+  if (tierBtns !== 2) errors.push(`FEST: talep edilebilir kademe sayısı 2 değil (${tierBtns})`);
+  await fest.screenshot({ path: out + '/27-festival.png' });
+  await fest.locator('[data-event-tier]').first().click();
+  await fest.waitForTimeout(400);
+  const after = await fest.evaluate(() => ({
+    coins: window.__reefyGame.save.coins,
+    claimed: window.__reefyGame.save.event.claimed,
+  }));
+  if (after.coins <= coinsBefore) errors.push(`FEST: kademe ödülü yatmadı (${coinsBefore} -> ${after.coins})`);
+  if (after.claimed.length !== 1) errors.push(`FEST: kademe talep edilmiş olarak işaretlenmedi (${JSON.stringify(after.claimed)})`);
+  const leftBtns = await fest.locator('[data-event-tier]').count();
+  if (leftBtns !== 1) errors.push(`FEST: talep edilen kademe listeden düşmedi (${leftBtns})`);
+  await fest.screenshot({ path: out + '/28-festival-claimed.png' });
+  await fest.close();
+}
+
 // Kayıt doğrulaması
 await page.waitForTimeout(6500);
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('reefy-save-v1')));
