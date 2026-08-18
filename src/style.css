@@ -487,6 +487,10 @@ html, body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
 .card.locked { opacity: 0.65; }
+/* An egg the player already paid for. It sits in the same grid as the tiers
+   for sale, so it needs to read as "yours, in progress" at a glance. */
+.card.hatching { outline: 2px solid var(--accent); }
+.card.hatching .egg-left { font-size: 13px; font-weight: 700; color: var(--ink); }
 .card-art { line-height: 0; }
 .card-name { font-weight: 700; font-size: 14px; }
 .card-name.big { font-size: 20px; margin-top: 8px; }

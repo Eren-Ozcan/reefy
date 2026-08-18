@@ -30,6 +30,18 @@ export function fmt(n: number): string {
   return String(n);
 }
 
+/** Remaining wait as a countdown: `3s 12m` reads worse than `3h 12m`, so the
+ *  unit pair shown always starts at the largest non-zero unit. */
+function fmtLeft(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  if (h > 0) return `${h}${tt('h')} ${m}${tt('m')}`;
+  if (m > 0) return `${m}${tt('m')} ${sec}${tt('s')}`;
+  return `${sec}${tt('s')}`;
+}
+
 /** External text like a friend name from Firestore must be escaped before being inserted
  * into innerHTML — firestore.rules doesn't restrict name content, only checks type/length. */
 function escapeHtml(s: string): string {
@@ -592,13 +604,19 @@ export class UI {
       if (el) el.textContent = text;
     };
     set('aquarium', `${this.game.fishes.length}/${this.game.capacity}`);
-    set('shop', tt('{n} affordable', { n: this.game.affordableShopItems() }));
+    const eggsReady = this.game.readyEggs();
+    set('shop', eggsReady > 0
+      ? tt('{n} egg ready', { n: eggsReady })
+      : tt('{n} affordable', { n: this.game.affordableShopItems() }));
     set('inventory', bag > 0 ? tt('{n} items', { n: bag }) : '');
     set('quests', ready > 0 ? tt('{n} ready', { n: ready }) : '');
     set('you', `${tt('Lv')} ${s.level}`);
     const questBtn = this.root.querySelector('#bottombar button[data-act="quests"]');
     questBtn?.classList.toggle('has-badge', ready > 0);
+    const shopBtn = this.root.querySelector('#bottombar button[data-act="shop"]');
+    shopBtn?.classList.toggle('has-badge', eggsReady > 0);
     this.refreshNextGoal();
+    this.tickHatching();
   }
 
   /** The strip above the dock. Its whole point is that the current objective and the
@@ -674,6 +692,63 @@ export class UI {
     });
   }
 
+  /**
+   * Advances the countdowns of an open Eggs tab in place. Runs on the same
+   * ~2Hz beat as the rest of the dock; it only writes text, and re-renders
+   * the panel once, at the moment an egg becomes collectable, so the button
+   * turns into "Collect" without the player having to reopen the tab.
+   */
+  private tickHatching(): void {
+    const rows = this.root.querySelectorAll<HTMLElement>('[data-egg-row]');
+    if (rows.length === 0) return;
+    const now = Date.now();
+    let flipped = false;
+    for (const row of rows) {
+      const p = this.game.pendingEggs().find((e) => e.id === Number(row.dataset.eggRow));
+      if (!p) { flipped = true; continue; }
+      const left = p.readyAt - now;
+      // Only a row still SHOWING a countdown needs the re-render; asking
+      // "is it ready" alone would re-render on every tick forever once it is.
+      if (left <= 0) {
+        if (row.querySelector('[data-speed-egg]')) flipped = true;
+        continue;
+      }
+      const el = row.querySelector('.egg-left');
+      if (el) el.textContent = fmtLeft(left);
+      const btn = row.querySelector<HTMLElement>('[data-speed-egg]');
+      if (btn) btn.textContent = `🦪 ${this.game.eggSpeedUpCost(p)} · ${tt('Finish now')}`;
+    }
+    if (flipped) {
+      const body = this.root.querySelector<HTMLElement>('.panel-body');
+      this.renderShop('eggs', body?.scrollTop ?? 0);
+    }
+  }
+
+  /**
+   * The incubating queue, rendered above the egg tiers for sale. It is the
+   * only place a paid-for egg exists, so it comes first: a player who opens
+   * the tab to check on an egg should not have to scroll past the shop.
+   */
+  private hatchingHTML(): string {
+    const pending = this.game.pendingEggs();
+    if (pending.length === 0) return '';
+    const rows = pending.map((p) => {
+      const tier = this.game.eggList().find((e) => e.id === p.tier);
+      const left = p.readyAt - Date.now();
+      const action = left <= 0
+        ? `<button class="buy-btn" data-collect-egg="${p.id}">${tt('Collect')}</button>`
+        : `<button class="buy-btn" data-speed-egg="${p.id}">🦪 ${this.game.eggSpeedUpCost(p)} · ${tt('Finish now')}</button>`;
+      return `
+        <div class="card hatching" data-egg-row="${p.id}">
+          <div class="egg-emoji">${tier?.emoji ?? '🥚'}</div>
+          <div class="card-name">${tt(tier?.name ?? 'Egg')}</div>
+          <div class="card-meta egg-left">${left <= 0 ? tt('Ready!') : fmtLeft(left)}</div>
+          ${action}
+        </div>`;
+    }).join('');
+    return `<h3 class="dex-info">${tt('Incubating')}</h3><div class="grid">${rows}</div>`;
+  }
+
   renderShop(tab: 'fish' | 'eggs' | 'feeds' | 'decor' | 'tanks' | 'pearls', keepScroll = 0): void {
     const s = this.game.save;
     let body = '';
@@ -693,7 +768,7 @@ export class UI {
           </div>`;
       }).join('')}</div>`;
     } else if (tab === 'eggs') {
-      body = `<div class="grid">${this.game.eggList().map((egg) => {
+      body = this.hatchingHTML() + `<div class="grid">${this.game.eggList().map((egg) => {
         const odds = (Object.entries(egg.odds) as [Rarity, number][])
           .map(([r, p]) => `<div class="odd-row"><span style="color:${RARITY_INFO[r].color}">●</span> ${tt(RARITY_INFO[r].name)} <b>${p}%</b></div>`)
           .join('');
@@ -707,6 +782,7 @@ export class UI {
             <div class="card-desc">${tt(egg.desc)}</div>
             <div class="odds">${odds}</div>
             ${pity}
+            ${egg.hatchMs ? `<div class="pity">${tt('Hatches in {t}', { t: fmtLeft(egg.hatchMs) })}</div>` : ''}
             <button class="buy-btn" data-egg="${egg.id}">${cur} ${fmt(egg.cost)}</button>
           </div>`;
       }).join('')}</div>`;
@@ -814,7 +890,26 @@ export class UI {
           const egg = this.game.eggList().find((e) => e.id === btn.dataset.egg)!;
           const res = this.game.hatchEgg(egg);
           if (!res.ok) { audio.error(); this.toast(res.msg); return; }
+          // A timed egg has nothing to reveal yet — it goes into the queue above.
+          // Scrolled to the TOP, not to the kept position: the egg just bought
+          // now sits in the incubating queue above the tiers, and the buy
+          // button is at the bottom of the list — keeping the scroll would
+          // leave the player looking at the shop instead of their egg.
+          if (res.pending) { this.toast(res.msg); this.renderShop('eggs', 0); return; }
           this.showEggReveal(egg, res.species!);
+        } else if (btn.dataset.collectEgg) {
+          const id = Number(btn.dataset.collectEgg);
+          // Read the tier BEFORE collecting: collectEgg removes the queue entry.
+          const pending = this.game.pendingEggs().find((p) => p.id === id);
+          const egg = this.game.eggList().find((e) => e.id === pending?.tier);
+          const res = this.game.collectEgg(id);
+          if (!res.ok) { audio.error(); this.toast(res.msg); return; }
+          this.renderShop('eggs', st);
+          if (egg) this.showEggReveal(egg, res.species!);
+        } else if (btn.dataset.speedEgg) {
+          const res = this.game.speedUpEgg(Number(btn.dataset.speedEgg));
+          if (!res.ok) { audio.error(); this.toast(res.msg); return; }
+          this.renderShop('eggs', st);
         } else if (btn.dataset.feedpack) {
           const res = this.game.buyFeedPack(btn.dataset.feedpack);
           if (!res.ok) audio.error();
