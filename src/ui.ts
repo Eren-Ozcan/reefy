@@ -9,6 +9,7 @@ import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Speci
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
 import { AVAILABLE_LANGS, LANG_LABELS, Lang, getLang, setLang, t as tt } from './i18n';
+import { ICON_BAG, ICON_COIN, ICON_FEED, ICON_FISH, ICON_MENU, ICON_PEARL, ICON_SHOP, ICON_TROPHY } from './icons';
 import { isAccountLinkingAvailable, isLinked, linkedLabel, linkWithGoogle } from './firebase-app';
 import type { FishSave } from './save';
 
@@ -261,20 +262,20 @@ export class UI {
     root.innerHTML = `
       <div id="hud">
         <div class="hud-ring" id="hud-ring"><b id="hud-level"></b></div>
-        <div class="hud-chip">🪙 <b id="hud-coins"></b></div>
-        <div class="hud-chip">🦪 <b id="hud-pearls"></b></div>
-        <div class="hud-chip">🐟 <span id="hud-cap"></span></div>
+        <div class="hud-chip">${ICON_COIN}<b id="hud-coins"></b></div>
+        <div class="hud-chip">${ICON_PEARL}<b id="hud-pearls"></b></div>
+        <div class="hud-chip">${ICON_FISH}<span id="hud-cap"></span></div>
         <div class="hud-chip hud-tank" id="hud-tank" title="${tt('Switch tank')}"></div>
         <div class="hud-chip hud-streak hidden" id="hud-streak"></div>
       </div>
       <div id="bottombar">
-        <button data-act="feed">🍤<span>${tt('Feed')}</span></button>
-        <button data-act="shop">🛒<span>${tt('Shop')}</span></button>
-        <button data-act="inventory">🎒<span>${tt('Inventory')}</span></button>
-        <button data-act="social">🏆<span>${tt('Social')}</span></button>
-        <button data-act="more">☰<span>${tt('More')}</span></button>
+        <button data-act="feed">${ICON_FEED}<span>${tt('Feed')}</span></button>
+        <button data-act="shop">${ICON_SHOP}<span>${tt('Shop')}</span></button>
+        <button data-act="inventory">${ICON_BAG}<span>${tt('Inventory')}</span></button>
+        <button data-act="social">${ICON_TROPHY}<span>${tt('Social')}</span></button>
+        <button data-act="more">${ICON_MENU}<span>${tt('More')}</span></button>
       </div>
-      <button id="collect-btn" class="empty">🪙 <b id="collect-amount">0</b><span id="collect-rate">0${tt('/hr')}</span></button>
+      <button id="collect-btn" class="empty">${ICON_COIN}<b id="collect-amount">0</b><span id="collect-rate">0${tt('/hr')}</span></button>
       <div id="feed-pop" class="hidden"></div>
       <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">${tt('Done ✓')}</button></div>
       <div id="panel-host"></div>

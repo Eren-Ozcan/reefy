@@ -180,6 +180,14 @@ html, body {
   position: absolute; top: max(10px, env(safe-area-inset-top)); left: 12px; right: 12px;
   display: flex; gap: 8px; flex-wrap: wrap;
 }
+/* Inline icons: a fixed box so chip height never depends on the glyph, which is
+   exactly what emoji could not guarantee across platforms. */
+.icon {
+  width: 1.15em; height: 1.15em;
+  flex: none;
+  display: block;
+}
+
 .hud-chip {
   display: flex; align-items: center; gap: 6px;
   background: var(--panel-bg);
@@ -238,7 +246,7 @@ html, body {
   width: min(96vw, 430px);
 }
 #bottombar button {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
   border: none; background: transparent;
   font-size: 25px; cursor: pointer;
   padding: 8px 4px; border-radius: 14px;
@@ -250,6 +258,7 @@ html, body {
   font-size: 11px; font-weight: 600;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+#bottombar button .icon { width: 24px; height: 24px; }
 #bottombar button:hover { background: rgba(47, 158, 143, 0.12); }
 #bottombar button:active { transform: scale(0.93); }
 
