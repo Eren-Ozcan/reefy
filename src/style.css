@@ -1,13 +1,58 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --panel-bg: rgba(255, 255, 255, 0.92);
-  --ink: #1e3a45;
-  --ink-soft: #4d6b78;
-  --accent: #2f9e8f;
+  /* Panel surfaces: the game language is a dark glass sheet over the never-closing
+     scene, so --ink means "text on a panel" and is light. Light surfaces that survive
+     (the main menu card) use --ink-deep explicitly. */
+  --panel-bg: rgba(16, 44, 51, 0.94);
+  --card: #16383f;
+  --card-2: #1e474f;
+  --card-line: rgba(255, 255, 255, 0.07);
+  --ink: #e8f3f1;
+  --ink-soft: #93b3b6;
+  --ink-faint: #6d9199;
+  --ink-deep: #1e3a45;
+  --accent: #35c4ac;
+  --accent-deep: #1f8578;
   --accent-2: #ff8a5c;
   --radius: 18px;
-  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --sheet-radius: 26px;
+  --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+
+  /* Three typographic jobs. Fredoka carries the genre on titles, controls and names;
+     Nunito is built for the 11-15px labels where Fredoka would go mushy — and it also
+     takes every figure, because Fredoka has no tabular-figure table at all and its
+     digits differ in width by a third ("1" is 38 units where "2" is 57). Counters
+     that tick would visibly jump. Nunito's digits are uniform by default. */
+  --font-display: 'Fredoka', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-body: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-num: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  font-family: var(--font-body);
+}
+
+body { font-variant-numeric: tabular-nums; }
+
+/* Titles, controls and names — the display face. */
+#menu h1, #play-btn, .logo,
+.panel-head h2, .tutorial-card h2,
+#bottombar button span, #mode-chip, #mode-done,
+.buy-btn, .tgl, .tab, .close-btn,
+.card-name, .card-name.big, .inv-name, .inv-head,
+.feed-info b, .chip,
+.lb-name, .q-name, .dex-head, .dex-name,
+.profile-name, .conflict-card h3, .toast {
+  font-family: var(--font-display);
+}
+
+/* Anything whose digits change under the reader — HUD totals, the collect amount,
+   scores, prices, progress counters — stays on the uniform-width face. */
+.hud-chip, .hud-ring b, .hud-streak, #collect-btn,
+.inv-right, .inv-sub, .feed-cost,
+.lb-rank, .lb-score, .friend-code-box b,
+.q-done, .q-meta, .dex-count,
+.profile-code, .stat-val, .bonus-line, .pity {
+  font-family: var(--font-num);
 }
 
 html, body {
@@ -68,6 +113,7 @@ html, body {
   padding: 44px 52px;
   background: rgba(255, 255, 255, 0.55);
   border-radius: 28px;
+  color: var(--ink-deep); /* the menu card stays a light surface, unlike the in-game panels */
   backdrop-filter: blur(12px);
   box-shadow: 0 24px 60px rgba(20, 60, 75, 0.25), inset 0 1px 0 rgba(255,255,255,0.6);
   animation: float-in 0.8s ease both;
@@ -137,22 +183,47 @@ html, body {
 .hud-chip {
   display: flex; align-items: center; gap: 6px;
   background: var(--panel-bg);
+  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
   border-radius: 999px;
   padding: 7px 14px;
   font-size: 15px;
-  box-shadow: 0 4px 14px rgba(20, 60, 75, 0.18);
+  box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
 }
-.hud-level { gap: 8px; }
-.xpbar {
-  display: inline-block; width: 64px; height: 8px;
-  background: #dcE7ec; border-radius: 999px; overflow: hidden;
+
+/* Level ring: the XP bar becomes the ring itself, so the level reads as one
+   glanceable mark instead of a number plus a separate bar. --xp is set from JS. */
+.hud-ring {
+  position: relative; flex: none;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  /* The unfilled part of the track must be opaque: a translucent white would let the
+     bright water show through and read as a full ring. */
+  background: conic-gradient(var(--accent) calc(var(--xp, 0) * 1%), #23505c 0);
+  box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
+  transition: background 0.4s ease;
 }
-.xpbar > span {
-  display: block; height: 100%;
-  background: linear-gradient(90deg, #57c9a6, #2f9e8f);
-  border-radius: 999px;
-  transition: width 0.4s ease;
+.hud-ring::before {
+  content: ''; position: absolute; inset: 4px;
+  border-radius: 50%; background: var(--panel-bg);
 }
+.hud-ring b {
+  position: relative;
+  font-size: 15px; font-weight: 800; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Streak chip: the one warm mark in the HUD, so the retention loop is the thing
+   that stands out. Hidden below 2 days — a one-day streak isn't worth a badge. */
+.hud-streak {
+  background: var(--accent-2);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #46170a;
+  font-size: 13px; font-weight: 800;
+}
+.hud-streak.hidden { display: none; }
+.hud-streak small { font-weight: 700; opacity: 0.75; }
 
 /* ---------- Alt bar ---------- */
 
@@ -196,26 +267,43 @@ html, body {
   width: min(520px, 96vw);
   max-height: 76vh;
   background: var(--panel-bg);
-  backdrop-filter: blur(10px);
-  border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--ink);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
   display: flex; flex-direction: column;
   overflow: hidden;
   animation: slide-up 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.05);
-  box-shadow: 0 -12px 40px rgba(12, 40, 52, 0.35);
+  box-shadow: 0 -12px 44px rgba(4, 18, 24, 0.5);
 }
-.panel-head, .tabs { flex-shrink: 0; }
+.grabber, .panel-head, .tabs { flex-shrink: 0; }
+/* Sheet handle: signals the panel sits over the scene rather than replacing it. */
+.grabber {
+  width: 38px; height: 4px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 10px auto 2px;
+}
 @keyframes slide-up { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
 .panel-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 8px;
+  padding: 10px 20px 10px;
 }
-.panel-head h2 { font-size: 20px; color: var(--ink); }
+.panel-head h2 { font-size: 21px; color: var(--ink); letter-spacing: -0.2px; }
 .close-btn {
-  border: none; background: #e5edf1; color: var(--ink-soft);
+  border: none; background: var(--card-2); color: var(--ink-soft);
   width: 42px; height: 42px; border-radius: 50%;
   font-size: 16px; cursor: pointer; flex-shrink: 0;
 }
-.panel-body { padding: 10px 20px 24px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+.panel-body {
+  padding: 10px 20px 24px; overflow-y: auto; min-height: 0; flex: 1 1 auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.panel-body::-webkit-scrollbar { width: 6px; }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22); border-radius: 999px;
+}
 
 /* Zorunlu ilk açılış tutorial'ı — dışarı tıklayarak kapatılamaz */
 .tutorial-backdrop {
@@ -239,8 +327,8 @@ html, body {
 .tutorial-card h2 { font-size: 19px; color: var(--ink); margin-bottom: 10px; }
 .tutorial-card p { font-size: 14.5px; line-height: 1.5; color: var(--ink-soft); margin-bottom: 18px; }
 .tutorial-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
-.tutorial-dots .dot { width: 7px; height: 7px; border-radius: 50%; background: #cfe0e6; }
-.tutorial-dots .dot.active { background: #2f9e8f; width: 20px; border-radius: 4px; }
+.tutorial-dots .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
+.tutorial-dots .dot.active { background: var(--accent); width: 20px; border-radius: 4px; }
 .tutorial-next { width: 100%; }
 
 .grid {
@@ -249,11 +337,12 @@ html, body {
   gap: 12px;
 }
 .card {
-  background: #ffffff;
+  background: var(--card);
+  border: 1px solid var(--card-line);
   border-radius: 16px;
   padding: 12px 10px;
   text-align: center;
-  box-shadow: 0 3px 10px rgba(20, 60, 75, 0.1);
+  box-shadow: var(--card-shadow);
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
 .card.locked { opacity: 0.65; }
@@ -261,23 +350,23 @@ html, body {
 .card-name { font-weight: 700; font-size: 14px; }
 .card-name.big { font-size: 20px; margin-top: 8px; }
 .card-desc { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; min-height: 30px; }
-.card-meta { font-size: 11px; color: #7d95a0; }
+.card-meta { font-size: 11px; color: var(--ink-faint); }
 .chip {
   color: #fff; font-size: 10.5px; font-weight: 700;
   padding: 3px 10px; border-radius: 999px;
 }
 .buy-btn {
   border: none; cursor: pointer;
-  background: linear-gradient(180deg, #57c9a6, #2f9e8f);
-  color: #fff; font-weight: 700; font-size: 14.5px;
+  background: var(--accent);
+  color: #06282b; font-weight: 800; font-size: 14.5px;
   padding: 11px 20px; border-radius: 999px;
   min-height: 44px;
-  box-shadow: 0 4px 12px rgba(47, 158, 143, 0.4);
-  transition: transform 0.12s ease;
+  box-shadow: 0 4px 14px rgba(53, 196, 172, 0.25);
+  transition: transform 0.12s ease, background 0.12s ease;
 }
 .buy-btn:hover { transform: scale(1.04); }
 .buy-btn:active { transform: scale(0.96); }
-.buy-btn:disabled { background: #b8c7cf; box-shadow: none; cursor: default; transform: none; }
+.buy-btn:disabled { background: var(--card-2); color: var(--ink-faint); box-shadow: none; cursor: default; transform: none; }
 
 /* Pasif gelir toplama butonu — üst orta */
 #collect-btn {
@@ -315,10 +404,10 @@ html, body {
 #feed-pop.hidden { display: none; }
 .feed-opt {
   display: flex; align-items: center; gap: 10px;
-  border: none; cursor: pointer;
-  background: #fff; border-radius: 12px;
+  border: 1px solid var(--card-line); cursor: pointer;
+  background: var(--card); border-radius: 12px;
   padding: 9px 12px; text-align: left;
-  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+  box-shadow: var(--card-shadow);
   transition: transform 0.12s ease;
 }
 .feed-opt:hover { transform: scale(1.02); }
@@ -326,7 +415,7 @@ html, body {
 .feed-info { flex: 1; display: flex; flex-direction: column; }
 .feed-info b { font-size: 13.5px; color: var(--ink); }
 .feed-info small { font-size: 11px; color: var(--ink-soft); }
-.feed-cost { font-size: 12px; font-weight: 700; color: #b0894a; white-space: nowrap; }
+.feed-cost { font-size: 12px; font-weight: 700; color: #f0c46a; white-space: nowrap; }
 
 /* Mod aktifken alt bar gizlenir — zemindeki dekor ve su dokunulabilir kalır */
 #ui.mode-active #bottombar { display: none; }
@@ -344,13 +433,13 @@ html, body {
 #mode-chip.hidden { display: none; }
 #mode-done {
   border: none; cursor: pointer;
-  background: linear-gradient(180deg, #57c9a6, #2f9e8f);
-  color: #fff; font-weight: 700; font-size: 13px;
+  background: var(--accent);
+  color: #06282b; font-weight: 800; font-size: 13px;
   padding: 10px 28px; border-radius: 999px;
   min-height: 40px;
 }
 .edit-mode-btn { width: 100%; margin-bottom: 4px; }
-.bonus-line { color: #b0894a; font-weight: 700; }
+.bonus-line { color: #f0c46a; font-weight: 700; }
 
 /* Sekmeler — her zaman tamamı görünür, gerekirse alt satıra sarar */
 .tabs {
@@ -359,97 +448,98 @@ html, body {
 }
 .tab {
   border: none; cursor: pointer; white-space: nowrap;
-  background: #e2ebef; color: var(--ink-soft);
+  background: var(--card); color: var(--ink-soft);
   font-weight: 700; font-size: 13px;
   padding: 11px 14px; border-radius: 999px;
   min-height: 42px;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   flex: 1 1 auto; text-align: center;
 }
-.tab.active { background: linear-gradient(180deg, #57c9a6, #2f9e8f); color: #fff; }
+.tab:hover { background: var(--card-2); }
+.tab.active { background: var(--accent); color: #06282b; }
 @media (max-width: 420px) {
   .tab { font-size: 12px; padding: 10px 8px; }
 }
 
 /* HUD akvaryum çipi */
 .hud-tank { cursor: pointer; font-size: 13.5px; }
-.hud-tank .boost { color: #2f9e8f; }
-.inv-head .boost { color: #2f9e8f; font-weight: 800; }
-.boost-neg { color: #d9534f; font-weight: 800; }
-.dirt-badge { color: #a9762f; font-weight: 800; }
+.hud-tank .boost { color: var(--accent); }
+.inv-head .boost { color: var(--accent); font-weight: 800; }
+.boost-neg { color: #ff8177; font-weight: 800; }
+.dirt-badge { color: #e0a94f; font-weight: 800; }
 
 /* Envanter */
 .inv-head { font-size: 14px; color: var(--ink); margin: 14px 0 8px; }
 .inv-row {
   display: flex; align-items: center; gap: 10px;
-  background: #fff; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
   padding: 8px 12px; margin-bottom: 8px;
-  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+  box-shadow: var(--card-shadow);
 }
 .inv-row.clickable { cursor: pointer; }
 .inv-art { line-height: 0; flex-shrink: 0; }
 .inv-art.feed-art { font-size: 30px; line-height: 1; }
 .inv-name { flex: 1; font-size: 13.5px; font-weight: 600; }
-.inv-sub { display: block; font-size: 11px; font-weight: 600; color: #8ba4b0; margin-top: 2px; }
+.inv-sub { display: block; font-size: 11px; font-weight: 600; color: var(--ink-faint); margin-top: 2px; }
 .inv-right { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
 .inv-sell { white-space: nowrap; padding: 8px 14px; }
-.empty { font-size: 13px; color: #8ba4b0; padding: 8px 2px; }
+.empty { font-size: 13px; color: var(--ink-faint); padding: 8px 2px; }
 .tank-swatch {
   width: 100%; height: 56px; border-radius: 10px;
 }
 .tanks-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
-.card.active-tank { outline: 3px solid #2f9e8f; }
-.buy-btn.owned { background: #b8ccd4; box-shadow: none; }
+.card.active-tank { outline: 3px solid var(--accent); }
+.buy-btn.owned { background: var(--card-2); color: var(--ink-soft); box-shadow: none; }
 
 /* Liderlik */
 .lb { display: flex; flex-direction: column; gap: 6px; }
 .lb-row {
   display: flex; align-items: center; gap: 10px;
-  background: #fff; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
   padding: 10px 14px;
-  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+  box-shadow: var(--card-shadow);
   font-size: 14px;
 }
-.lb-row.me { outline: 2.5px solid #2f9e8f; background: #eafaf6; }
+.lb-row.me { outline: 2.5px solid var(--accent); background: var(--card-2); }
 .lb-rank { width: 38px; font-weight: 800; color: var(--ink-soft); }
 .lb-name { flex: 1; font-weight: 600; }
 .lb-score { font-weight: 700; color: var(--ink-soft); }
-.lb-code { font-size: 11px; color: #8ba4b0; margin-left: 6px; }
+.lb-code { font-size: 11px; color: var(--ink-faint); margin-left: 6px; }
 .friend-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .friend-actions .tgl { white-space: nowrap; }
 
 .friend-code-box {
   display: flex; align-items: center; gap: 10px;
-  background: #eaf4f8; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
   padding: 12px 14px; font-size: 14px; margin-bottom: 10px;
 }
 .friend-code-box b { font-size: 16px; letter-spacing: 1px; color: var(--ink); flex: 1; }
 .friend-add { display: flex; gap: 8px; margin-bottom: 6px; }
 .friend-add input {
-  flex: 1; border: 2px solid #d6e2e8; border-radius: 999px;
+  flex: 1; border: 2px solid var(--card-2); border-radius: 999px;
   padding: 9px 16px; font-size: 14px; font-weight: 700;
   letter-spacing: 1px; text-transform: uppercase;
-  outline: none; color: var(--ink); background: #fff;
+  outline: none; color: var(--ink); background: var(--card);
 }
-.friend-add input:focus { border-color: #57c9a6; }
+.friend-add input:focus { border-color: var(--accent); }
 
 /* Görevler */
 .quest-row {
   display: flex; align-items: center; gap: 10px;
-  background: #fff; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
   padding: 10px 12px; margin-bottom: 8px;
-  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+  box-shadow: var(--card-shadow);
 }
 .quest-row.claimed { opacity: 0.55; }
-.quest-row.weekly { outline: 2px solid #d9a83c; background: #fff8e8; }
+.quest-row.weekly { outline: 2px solid #d9a83c; background: #3a3020; }
 .q-emoji { font-size: 24px; flex-shrink: 0; }
 .q-mid { flex: 1; min-width: 0; }
 .q-name { font-size: 13px; font-weight: 700; }
 .q-desc { font-weight: 500; color: var(--ink-soft); }
-.q-meta { font-size: 11px; color: #8ba4b0; margin-top: 3px; }
-.q-done { font-size: 20px; color: #2f9e8f; font-weight: 800; }
+.q-meta { font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
+.q-done { font-size: 20px; color: var(--accent); font-weight: 800; }
 .quest-row .bar { height: 8px; margin-top: 5px; }
-.pity { font-size: 11.5px; font-weight: 700; color: #b0894a; }
+.pity { font-size: 11.5px; font-weight: 700; color: #f0c46a; }
 
 /* Daha menüsü */
 .more-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 10px 0 16px; }
@@ -457,20 +547,20 @@ html, body {
 /* Profil */
 .profile-head { text-align: center; padding: 6px 0 12px; }
 .profile-name { font-size: 20px; font-weight: 800; color: var(--ink); }
-.profile-code { font-size: 12px; font-weight: 700; color: #8ba4b0; letter-spacing: 1px; margin-top: 2px; }
+.profile-code { font-size: 12px; font-weight: 700; color: var(--ink-faint); letter-spacing: 1px; margin-top: 2px; }
 .stat-val { color: var(--ink); font-size: 14px; }
 .fish-rename input {
-  width: 140px; border: 2px solid #d6e2e8; border-radius: 999px;
+  width: 140px; border: 2px solid var(--card-2); border-radius: 999px;
   padding: 7px 12px; font-size: 13px; font-weight: 600;
-  outline: none; color: var(--ink); background: #fff; text-align: center;
+  outline: none; color: var(--ink); background: var(--card); text-align: center;
 }
-.fish-rename input:focus { border-color: #57c9a6; }
+.fish-rename input:focus { border-color: var(--accent); }
 .more-btn {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
-  border: none; cursor: pointer;
-  background: #fff; border-radius: 16px;
+  border: 1px solid var(--card-line); cursor: pointer;
+  background: var(--card); border-radius: 16px;
   font-size: 32px; padding: 18px 26px;
-  box-shadow: 0 3px 10px rgba(20, 60, 75, 0.1);
+  box-shadow: var(--card-shadow);
   color: var(--ink-soft);
   transition: transform 0.12s ease;
 }
@@ -480,12 +570,12 @@ html, body {
 /* Ayarlar isim düzenleme */
 .name-edit { display: flex; gap: 6px; }
 .name-edit input {
-  width: 130px; border: 2px solid #d6e2e8; border-radius: 999px;
+  width: 130px; border: 2px solid var(--card-2); border-radius: 999px;
   padding: 7px 12px; font-size: 13px; font-weight: 600;
-  outline: none; color: var(--ink); background: #fff;
+  outline: none; color: var(--ink); background: var(--card);
 }
-.name-edit input:focus { border-color: #57c9a6; }
-.buy-btn.iap { background: linear-gradient(180deg, #7fb2f0, #4a7fd6); box-shadow: 0 4px 12px rgba(74, 127, 214, 0.4); }
+.name-edit input:focus { border-color: var(--accent); }
+.buy-btn.iap { background: #74a9ee; color: #0a2340; box-shadow: 0 4px 14px rgba(116, 169, 238, 0.25); }
 
 /* Yumurtalar */
 .egg-emoji { font-size: 52px; animation: bob 2.6s ease-in-out infinite; }
@@ -520,9 +610,9 @@ html, body {
 .dex-count { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
 .dex-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .dex-card {
-  background: #fff; border-radius: 12px; padding: 8px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 8px;
   text-align: center; width: 86px;
-  box-shadow: 0 2px 8px rgba(20, 60, 75, 0.08);
+  box-shadow: var(--card-shadow);
 }
 .dex-card.unknown { opacity: 0.6; }
 .dex-name { font-size: 10.5px; font-weight: 600; color: var(--ink-soft); }
@@ -534,43 +624,43 @@ html, body {
 }
 .tgl {
   border: none; cursor: pointer;
-  background: #d6e2e8; color: var(--ink-soft);
+  background: var(--card-2); color: var(--ink-soft);
   font-weight: 700; font-size: 13.5px;
   padding: 10px 20px; border-radius: 999px;
   min-height: 42px;
 }
-.tgl.on { background: linear-gradient(180deg, #57c9a6, #2f9e8f); color: #fff; }
-.tgl.danger { background: #f3c1bb; color: #9c3d31; }
+.tgl.on { background: var(--accent); color: #06282b; }
+.tgl.danger { background: #5c2b26; color: #ffb3a6; }
 .set-links { display: flex; flex-direction: column; gap: 10px; padding: 12px 2px; }
 .set-links a { color: var(--accent); font-size: 14px; text-decoration: none; font-weight: 600; }
-hr { border: none; border-top: 1px solid #dfe9ee; margin: 6px 0; }
-.version { text-align: center; font-size: 11px; color: #8ba4b0; margin-top: 14px; }
+hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
+.version { text-align: center; font-size: 11px; color: var(--ink-faint); margin-top: 14px; }
 
 /* Bulut kaydı: ayarlardaki durum etiketi ve çakışma seçim ekranı */
 .set-note { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
-.set-note.ok { color: #2f9e8f; }
+.set-note.ok { color: var(--accent); }
 
 .conflict-grid { display: flex; gap: 10px; margin-top: 12px; }
 .conflict-card {
   flex: 1 1 0; min-width: 0;
-  background: #eef5f8; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 14px;
   padding: 14px 10px; text-align: center;
 }
 .conflict-card h3 { margin: 0 0 8px; font-size: 14px; color: var(--ink); }
 .conflict-card p { margin: 3px 0; font-size: 13px; color: var(--ink-soft); }
-.conflict-card p.muted { color: #8ba4b0; font-size: 11.5px; margin-bottom: 10px; }
+.conflict-card p.muted { color: var(--ink-faint); font-size: 11.5px; margin-bottom: 10px; }
 .conflict-card .buy-btn { width: 100%; padding: 10px 8px; font-size: 13px; }
 
 /* Balık bilgi */
 .fish-info { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .bar-row { width: 100%; max-width: 300px; text-align: left; font-size: 12.5px; color: var(--ink-soft); }
 .bar {
-  height: 12px; background: #dce7ec; border-radius: 999px;
+  height: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 999px;
   overflow: hidden; margin-top: 4px;
 }
 .bar > div {
   height: 100%; border-radius: 999px;
-  background: linear-gradient(90deg, #57c9a6, #2f9e8f);
+  background: linear-gradient(90deg, #4fdcc0, var(--accent));
   transition: width 0.4s ease;
 }
 .bar > div.hunger { background: linear-gradient(90deg, #ffc36e, #ff8a5c); }
