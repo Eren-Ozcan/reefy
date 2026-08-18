@@ -21,11 +21,14 @@ evidence for whether the numbers are right.
       points only when the active event's id differs; shipping the same id with
       new dates would hand returning players their old points.
 
-### RevenueCat has no products registered — purchases are dead today
+### RevenueCat has no offering — purchases are dead today
 
-Found on the emulator (2026-08-19) while trying to verify the store-currency
-signal. The SDK configures fine and reaches `api.revenuecat.com`, so the API
-key and the network are not the problem. `getOfferings()` fails with:
+Re-confirmed on the emulator (2026-08-19) while trying to verify the
+store-currency signal; the same error was already seen and noted during the
+Capacitor 8 upgrade on 2026-08-06, so this is a known gap being written down
+properly rather than a new discovery. The SDK configures fine and reaches
+`api.revenuecat.com`, so the API key and the network are not the problem.
+`getOfferings()` fails with:
 
 > ConfigurationError — You have configured the SDK with a Play Store API key,
 > but there are no Play Store products registered in the RevenueCat dashboard
@@ -38,14 +41,22 @@ every device right now, not just the emulator:
       the current offering, and there is no offering.
 - [ ] **Prices are not localized.** Every player, in every country, sees the
       hardcoded USD fallbacks from `IAP_PACKS` — the `$2.99` visible in the
-      emulator screenshot on a Turkish device.
+      emulator screenshot on a Turkish device, where Play itself holds ₺39,99
+      for that product.
 - [ ] **The store-currency language signal can never fire**, since it is read
       off a package that never arrives.
 
-The fix is dashboard configuration, not code: create the products in Play
-Console with the exact `IAP_PACKS` ids (`pearls_s`, `pearls_m`, `pearls_l`,
-`pearls_xl`, `starter`, `remove_ads`), register them in RevenueCat, and put
-them in the current offering with package identifiers matching those same ids.
+The fix is dashboard configuration, not code, and **only the RevenueCat half is
+missing**. The six Play Console products already exist and have been active in
+173 countries since 2026-07-26 — `pearls_s` (₺39,99), `pearls_m` (₺99,99),
+`pearls_l` (₺229,99), `pearls_xl` (₺449,99), `starter` (₺49,99), `remove_ads`
+(₺79,99). The USD figures in `IAP_PACKS` are only the offline fallback labels.
+
+What is left: import those products into RevenueCat (Android key is already
+live) and put them in the CURRENT offering, with each package identifier
+matching the product id exactly. `loadPrices()` and `findStorePackage()` both
+key off `pkg.identifier`, so a package named anything else silently matches
+nothing. iOS stays blocked behind an Apple Developer account.
 
 ### Turkish is back — one thing left to watch
 
