@@ -1,3 +1,4 @@
+import './fonts.css';
 import './style.css';
 import { audio } from './audio';
 import { Game } from './game';
@@ -11,10 +12,10 @@ if (foot) foot.textContent = `v${APP_VERSION} • reefy.games`;
 document.documentElement.lang = getLang();
 const tagline = document.querySelector('.tagline');
 if (tagline) {
-  tagline.innerHTML = t('Kendi resifini kur, balıklarını büyüt,\nkoleksiyonunu tamamla').replace('\n', '<br/>');
+  tagline.innerHTML = t('Build your own reef, grow your fish,\ncomplete your collection').replace('\n', '<br/>');
 }
 const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
-if (playBtn) playBtn.innerHTML = `▶&nbsp; ${t('Oyna')}`;
+if (playBtn) playBtn.innerHTML = `▶&nbsp; ${t('Play')}`;
 let started = false;
 /**
  * The UI that the back button talks to. Stays null until mount() is called —
