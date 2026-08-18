@@ -7,7 +7,8 @@ import { INCOME_CAP_HOURS, type FishEarning, type Game } from './game';
 import { ACHIEVEMENTS } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById } from './species';
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
-import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
+import { TANK_CAP_BONUS, TankDef } from './tanks';
+import { biomeIcon } from './biome-icons';
 import { AVAILABLE_LANGS, LANG_LABELS, Lang, getLang, setLang, t as tt } from './i18n';
 import {
   ICON_ARRANGE, ICON_BAG, ICON_COIN, ICON_FEED, ICON_FISH, ICON_MENU, ICON_PEARL,
@@ -393,7 +394,7 @@ export class UI {
     const dirtBadge = this.game.dirtPct(s.activeTank) > 0
       ? ` <b class="dirt-badge" title="${tt('Dirty — tap to clean the glass')}">🧹 -${this.game.dirtPct(s.activeTank)}%</b>` : '';
     const boostBadge = boost !== 0 ? ` <b class="${boost > 0 ? 'boost' : 'boost-neg'}">${boost > 0 ? '+' : ''}${boost}%</b>` : '';
-    this.hudTank.innerHTML = `${BIOME_INFO[activeTank.biome].emoji} ${tt(activeTank.name)}${boostBadge}${dirtBadge}`;
+    this.hudTank.innerHTML = `${biomeIcon(activeTank.biome)} ${tt(activeTank.name)}${boostBadge}${dirtBadge}`;
   }
 
   /** The streak is already tracked and already scales the daily gift; this only makes it
@@ -743,7 +744,7 @@ export class UI {
         return `
           <div class="card ${locked ? 'locked' : ''}">
             ${tankSwatch(t)}
-            <div class="card-name">${BIOME_INFO[t.biome].emoji} ${tt(t.name)}</div>
+            <div class="card-name">${biomeIcon(t.biome)} ${tt(t.name)}</div>
             ${rarityChip(t.rarity)}
             <div class="card-desc">${tt(t.desc)}</div>
             <div class="card-meta">${tt('+{n}% growth & income', { n: t.growthBonus })}${TANK_CAP_BONUS[t.rarity] ? ` • ${tt('🐟 +{n} capacity', { n: TANK_CAP_BONUS[t.rarity] })}` : ''}${locked ? ` • ${tt('Lv')} ${t.unlockLevel}` : ''}</div>
@@ -886,7 +887,7 @@ export class UI {
             }).join('')
           : `<p class="empty">${tt('No fish in this tank.')}</p>`;
         return `
-          <h3 class="inv-head">${BIOME_INFO[g.tank.biome].emoji} ${tt(g.tank.name)} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}${tt('/hr')}` : ''}${g.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -${g.dirtPct}%</span>` : ''}</h3>
+          <h3 class="inv-head">${biomeIcon(g.tank.biome)} ${tt(g.tank.name)} — 🐟 ${g.count}/${this.game.capacityFor(g.tank.id)}${g.perHour > 0 ? ` • 🪙 ${fmt(g.perHour)}${tt('/hr')}` : ''}${g.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -${g.dirtPct}%</span>` : ''}</h3>
           ${rows}`;
       }).join('');
     } else if (tab === 'feeds') {
@@ -941,7 +942,7 @@ export class UI {
           return `
             <div class="card ${active ? 'active-tank' : ''}">
               ${tankSwatch(t)}
-              <div class="card-name">${BIOME_INFO[t.biome].emoji} ${tt(t.name)}</div>
+              <div class="card-name">${biomeIcon(t.biome)} ${tt(t.name)}</div>
               <div class="card-meta">${tt('🐟 {n}/{cap} fish • +{boost}% growth & income', { n: count, cap: this.game.capacityFor(t.id), boost: this.game.tankBoostPct(t.id) })}</div>
               ${active
                 ? `<button class="buy-btn owned" disabled>${tt('You are here 📍')}</button>`
@@ -1174,7 +1175,7 @@ export class UI {
             </div>`).join('')
         : `<p class="empty">${tt('No fish in this tank.')}</p>`;
       return `
-        <h3 class="inv-head">${BIOME_INFO[grp.tank.biome].emoji} ${tt(grp.tank.name)}
+        <h3 class="inv-head">${biomeIcon(grp.tank.biome)} ${tt(grp.tank.name)}
           — 🪙 ${fmt(grp.perHour)}${tt('/hr')}${grp.boostPct > 0 ? ` <span class="boost">+${grp.boostPct}%</span>` : ''}${grp.dirtPct > 0 ? ` <span class="dirt-badge">🧹 -${grp.dirtPct}%</span>` : ''}</h3>
         ${rows}`;
     }).join('');
@@ -1515,7 +1516,7 @@ export class UI {
           const full = count >= cap;
           return `
             <button class="tgl move-btn" data-move="${t.id}" ${full ? 'disabled' : ''}>
-              <span>${BIOME_INFO[t.biome].emoji} ${tt(t.name)}</span>
+              <span>${biomeIcon(t.biome)} ${tt(t.name)}</span>
               <small>${tt('🐟 {n}/{cap}{boost}{full}', { n: count, cap, boost: boost > 0 ? tt(' • +{n}%', { n: boost }) : '', full: full ? tt(' • full') : '' })}</small>
             </button>`;
         }).join('')}</div>`

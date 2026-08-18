@@ -33,14 +33,16 @@ export const TANK_CAP_BONUS: Record<Rarity, number> = {
   common: 0, uncommon: 2, rare: 4, epic: 7, legendary: 10,
 };
 
-export const BIOME_INFO: Record<Biome, { name: string; emoji: string }> = {
-  tropik:    { name: 'Tropical',     emoji: '🏝️' },
-  lagun:     { name: 'Lagoon',      emoji: '🌺' },
-  derin:     { name: 'Deep Sea', emoji: '🌌' },
-  magara:    { name: 'Cave',     emoji: '🪨' },
-  kutup:     { name: 'Polar',      emoji: '❄️' },
-  gunbatimi: { name: 'Sunset', emoji: '🌅' },
-  mistik:    { name: 'Mystic',     emoji: '🔮' },
+/** Biome labels. The mark that goes with each one lives in biome-icons.ts — it used
+ *  to be an emoji here, which rendered at a different size on every platform. */
+export const BIOME_INFO: Record<Biome, { name: string }> = {
+  tropik:    { name: 'Tropical' },
+  lagun:     { name: 'Lagoon' },
+  derin:     { name: 'Deep Sea' },
+  magara:    { name: 'Cave' },
+  kutup:     { name: 'Polar' },
+  gunbatimi: { name: 'Sunset' },
+  mistik:    { name: 'Mystic' },
 };
 
 export const TANKS: TankDef[] = [

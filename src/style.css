@@ -187,6 +187,14 @@ html, body {
   flex: none;
   display: block;
 }
+/* Biome marks are illustrations rather than glyphs, so they carry a touch more size
+   and sit on the text baseline where they appear inside a heading. */
+.biome-icon {
+  width: 1.35em; height: 1.35em;
+  display: inline-block;
+  vertical-align: -0.3em;
+  object-fit: contain;
+}
 
 .hud-chip {
   display: flex; align-items: center; gap: 6px;
