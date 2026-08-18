@@ -13,14 +13,27 @@ await page.waitForTimeout(1200);
 await page.screenshot({ path: out + '/1-menu.png' });
 
 await page.click('#play-btn');
-await page.waitForTimeout(2600);
+// The menu fades out over 0.6s and keeps swallowing clicks for the whole transition,
+// so wait for the class AND for the fade to finish before touching anything.
+await page.waitForSelector('#menu.hidden', { timeout: 20000 });
+await page.waitForTimeout(800);
+
+// A fresh browser context has no save, so the first-launch tutorial always runs, and
+// its backdrop swallows every click until it is stepped through. It is mounted after
+// the menu goes, hence the wait above rather than a fixed sleep from the Play click.
+for (let i = 0; i < 12; i++) {
+  const next = page.locator('.tutorial-next');
+  if (!(await next.count())) break;
+  await next.click();
+  await page.waitForTimeout(350);
+}
 const welcomeOk = page.locator('.welcome-ok');
 if (await welcomeOk.count()) await welcomeOk.click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/2-aquarium.png' });
 
 // Besle: ücretli yem seç, 3 kez suya dokun, tam maliyet düşümünü HUD'dan doğrula
-await page.click('#bottombar button[data-act="feed"]');
+await page.click('#siderail button[data-rail="feed"]');
 await page.waitForTimeout(300);
 await page.click('.feed-opt[data-feed="lezzet"]');
 await page.waitForTimeout(300);
@@ -86,8 +99,18 @@ const decorBefore = await page.evaluate(() => {
   const save = JSON.parse(localStorage.getItem('reefy-save-v1'));
   return save.decorPlaced[save.activeTank][0].fx;
 });
-const dragY = 560;
 const fromX = decorBefore * 900;
+// Decor sits on the sand, whose surface curves with x, and its hit box runs upward
+// from there — so the grab point is read from the scene rather than hardcoded. The
+// mode chip sits bottom-centre during edit mode and would otherwise eat the drag.
+const dragY = await page.evaluate((x) => {
+  const g = window.__reefyGame;
+  const baseY = g ? g.sandSurfaceY(x) + 6 : 568;
+  const chip = document.getElementById('mode-chip');
+  const chipTop = chip && !chip.classList.contains('hidden')
+    ? chip.getBoundingClientRect().top : Infinity;
+  return Math.round(Math.min(baseY - 40, chipTop - 20));
+}, fromX);
 const toX = fromX < 450 ? fromX + 300 : fromX - 300;
 await page.mouse.move(fromX, dragY);
 await page.mouse.down();
@@ -107,7 +130,9 @@ await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/9-decor-placed.png' });
 
 // Sosyal
-await page.click('#bottombar button[data-act="social"]');
+await page.click('#bottombar button[data-act="you"]');
+await page.waitForTimeout(300);
+await page.click('.more-btn[data-go="social"]');
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/10-leaderboard.png' });
 await page.click('.tab[data-tab="friends"]');
@@ -119,20 +144,18 @@ await page.screenshot({ path: out + '/11-friends.png' });
 await page.click('.close-btn');
 
 // Daha: Görevler + Koleksiyon + Ayarlar
-await page.click('#bottombar button[data-act="more"]');
-await page.waitForTimeout(300);
-await page.click('.more-btn[data-go="quests"]');
+await page.click('#bottombar button[data-act="quests"]');
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/12-quests.png' });
 await page.click('.close-btn');
 
-await page.click('#bottombar button[data-act="more"]');
+await page.click('#bottombar button[data-act="you"]');
 await page.click('.more-btn[data-go="collection"]');
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/13-collection.png' });
 await page.click('.close-btn');
 
-await page.click('#bottombar button[data-act="more"]');
+await page.click('#bottombar button[data-act="you"]');
 await page.click('.more-btn[data-go="settings"]');
 await page.waitForTimeout(300);
 await page.screenshot({ path: out + '/14-settings.png' });
@@ -210,7 +233,7 @@ const pack = await page.evaluate(() => ({
 if (coinsBeforePack - pack.coins !== 70 || pack.stock !== 10) {
   throw new Error(`Yem paketi hatalı: ${coinsBeforePack} -> ${pack.coins}, stok ${pack.stock} (beklenen -70, 10)`);
 }
-await page.click('#bottombar button[data-act="feed"]');
+await page.click('#siderail button[data-rail="feed"]');
 await page.waitForTimeout(300);
 await page.click('.feed-opt[data-feed="lezzet"]');
 await page.waitForTimeout(200);
@@ -237,7 +260,7 @@ await page.click('.close-btn');
 await page.waitForTimeout(200);
 
 // Kazanç raporu
-await page.click('#bottombar button[data-act="more"]');
+await page.click('#bottombar button[data-act="you"]');
 await page.waitForTimeout(300);
 await page.click('.more-btn[data-go="earnings"]');
 await page.waitForTimeout(400);
@@ -296,11 +319,30 @@ if (dirty.dirtPct <= 0 || dirty.growthMult >= 1) {
   throw new Error(`Kirlilik cezası uygulanmadı: dirtPct=${dirty.dirtPct}, growthMult=${dirty.growthMult}`);
 }
 await page.waitForTimeout(300);
-const blurred = await page.evaluate(() => (window.__reefyGame.app.stage.children[0].filters || []).length > 0);
-if (!blurred) throw new Error('Kirli akvaryumda cam bulanıklık filtresi uygulanmadı');
+// This used to assert a BlurFilter on the whole scene. b9dd3bb replaced that with
+// grime drawn on the glass itself, so the check follows the dirt layer instead:
+// the fish and the scene are meant to stay sharp now.
+const grimy = await page.evaluate(() => {
+  const g = window.__reefyGame;
+  return { visible: g.grimeSprite.visible, alpha: g.grimeSprite.alpha, dirtDrawn: g.dirtG.visible };
+});
+if (!grimy.visible || grimy.alpha <= 0) {
+  throw new Error(`Kirli akvaryumda cam kiri çizilmedi: ${JSON.stringify(grimy)}`);
+}
 await page.screenshot({ path: out + '/23-dirty-tank.png' });
 
-await page.mouse.click(0.5 * dirty.w, 0.5 * dirty.h);
+// Aim at the spot on the left (fx 0.3) rather than the one dead centre: the collect
+// group is DOM sitting over the canvas, and a tap that lands on it never reaches the
+// scene. Guard it, so this fails loudly if UI is ever parked over the target again.
+const target = { x: 0.3 * dirty.w, y: 0.4 * dirty.h };
+const atTarget = await page.evaluate(
+  (t) => { const e = document.elementFromPoint(t.x, t.y); return e ? e.tagName + '.' + (e.className || '') : null; },
+  target,
+);
+if (!/CANVAS/.test(atTarget || '')) {
+  throw new Error(`Kir lekesinin üstünde UI var, dokunuş sahneye ulaşmıyor: ${atTarget}`);
+}
+await page.mouse.click(target.x, target.y);
 await page.waitForTimeout(300);
 const cleaned = await page.evaluate(() => {
   const g = window.__reefyGame;
@@ -310,27 +352,30 @@ if (cleaned.count !== 2 || cleaned.growthMult <= dirty.growthMult) {
   throw new Error(`Kir temizlenemedi: adet ${cleaned.count} (beklenen 2), growthMult ${dirty.growthMult} -> ${cleaned.growthMult}`);
 }
 await page.screenshot({ path: out + '/24-dirt-cleaned.png' });
-// Kalan lekeleri de temizle, cam netliğe dönmeli
-await page.mouse.click(0.3 * dirty.w, 0.4 * dirty.h);
+// Kalan lekeleri de temizle (0.3 yukarıda temizlendi), cam netliğe dönmeli
+await page.mouse.click(0.5 * dirty.w, 0.5 * dirty.h);
 await page.waitForTimeout(200);
 await page.mouse.click(0.7 * dirty.w, 0.35 * dirty.h);
 await page.waitForTimeout(300);
-const spotless = await page.evaluate(() => ({
-  count: window.__reefyGame.save.dirtSpots[window.__reefyGame.save.activeTank].length,
-  blurred: (window.__reefyGame.app.stage.children[0].filters || []).length > 0,
-}));
-if (spotless.count !== 0 || spotless.blurred) {
-  throw new Error(`Akvaryum tam temizlenemedi: kalan ${spotless.count}, blur ${spotless.blurred}`);
+const spotless = await page.evaluate(() => {
+  const g = window.__reefyGame;
+  return {
+    count: g.save.dirtSpots[g.save.activeTank].length,
+    grimeVisible: g.grimeSprite.visible && g.grimeSprite.alpha > 0,
+  };
+});
+if (spotless.count !== 0 || spotless.grimeVisible) {
+  throw new Error(`Akvaryum tam temizlenemedi: kalan ${spotless.count}, cam kiri ${spotless.grimeVisible}`);
 }
 await page.screenshot({ path: out + '/25-tank-spotless.png' });
 
 // Profil: istatistikler satışları/yemlemeyi yansıtmalı
-await page.click('#bottombar button[data-act="more"]');
+await page.click('#bottombar button[data-act="you"]');
 await page.waitForTimeout(300);
 await page.click('.more-btn[data-go="profile"]');
 await page.waitForTimeout(400);
 const profileText = await page.locator('.panel-body').textContent();
-if (!profileText.includes('Satılan balık') || !profileText.includes('Temizlenen leke')) {
+if (!profileText.includes('Fish sold') || !profileText.includes('Dirt cleaned')) {
   throw new Error('Profil istatistikleri eksik görünüyor');
 }
 await page.screenshot({ path: out + '/26-profile.png' });
