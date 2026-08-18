@@ -1501,6 +1501,9 @@ export class UI {
         <a href="mailto:destek@reefy.games">✉️ destek@reefy.games</a>
       </div>
       <hr/>
+      <div class="set-row"><span>${tt('☁️ Delete my cloud data')}</span>
+        <button class="tgl danger" id="cloud-delete">${tt('Delete')}</button></div>
+      <p class="set-note-block">${tt('Removes the copy of your save in the cloud and your friend-code record. The game on this device is untouched.')}</p>
       <div class="set-row"><span>${tt('🗑️ Delete all progress')}</span><button class="tgl danger" data-t="reset">${tt('Reset')}</button></div>
       <p class="version">${tt('Reefy v{v} — made with love 🐠', { v: APP_VERSION })}</p>
     `);
@@ -1518,6 +1521,7 @@ export class UI {
       void this.game.services.auth.signIn().then((res) => this.toast(res.msg));
     });
     el.querySelector('#cloud-btn')?.addEventListener('click', () => void this.onLinkCloud());
+    this.bindCloudDelete(el);
     el.querySelectorAll<HTMLButtonElement>('[data-lang]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const l = btn.dataset.lang as Lang;
@@ -1546,6 +1550,48 @@ export class UI {
         } else if (t === 'reset') {
           if (confirm(tt('All progress will be deleted. Are you sure?'))) this.game.resetAll();
         }
+      });
+    });
+  }
+
+  /**
+   * Two taps, in place, rather than a confirm() dialog. The reset row still
+   * uses confirm() and can stay that way, but a native modal blocks the page
+   * hard enough that automation cannot get past it, and this is a path the
+   * smoke run needs to be able to drive.
+   */
+  private bindCloudDelete(el: HTMLElement): void {
+    const btn = el.querySelector<HTMLButtonElement>('#cloud-delete');
+    if (!btn) return;
+    let armed = false;
+    btn.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        btn.textContent = tt('Tap again to confirm');
+        btn.classList.add('armed');
+        // Disarms itself, so a stray tap does not sit primed indefinitely.
+        window.setTimeout(() => {
+          if (!armed) return;
+          armed = false;
+          btn.textContent = tt('Delete');
+          btn.classList.remove('armed');
+        }, 5000);
+        return;
+      }
+      armed = false;
+      btn.disabled = true;
+      btn.textContent = tt('Deleting…');
+      void this.game.deleteCloudData().then((res) => {
+        this.toast(res.msg);
+        if (!res.ok) {
+          btn.disabled = false;
+          btn.textContent = tt('Delete');
+          btn.classList.remove('armed');
+          audio.error();
+          return;
+        }
+        btn.textContent = tt('Deleted');
+        btn.classList.remove('armed');
       });
     });
   }

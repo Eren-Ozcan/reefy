@@ -2112,6 +2112,11 @@ export class Game {
     // Don't write to the cloud while frozen: the data already came from the cloud,
     // needlessly advancing rev would make the other device look "behind" for no reason.
     if (this.frozen) return;
+    // A player who just deleted their cloud data would otherwise see it
+    // reappear within the minute, because the delete leaves the device looking
+    // like a first launch. Uploads stay off for the rest of the session; a
+    // relaunch is an explicit enough act to count as opting back in.
+    if (this.cloudDeleted) return;
     // The local save is always written instantly; cloud writes are throttled to
     // conserve quota (see cloud-save.ts UPLOAD_THROTTLE_MS).
     this.cloud.markDirty();
@@ -2122,4 +2127,36 @@ export class Game {
     wipeSave();
     location.reload();
   }
+
+  /**
+   * Deletes everything this account has in the cloud: the save document and
+   * the published `players/{code}` record. Play requires an account-deletion
+   * path, and until now that path was an email to support and a human doing it
+   * from the Firestore console.
+   *
+   * It deliberately does NOT touch the local game. Removing the backup and
+   * wiping the player's aquarium are different intentions, and "Delete all
+   * progress" already covers the second one.
+   *
+   * Both halves are attempted even if the first fails, so a partial outcome
+   * cannot leave the public record standing while the save is gone — that is
+   * the half a player would care most about.
+   */
+  async deleteCloudData(): Promise<{ ok: boolean; msg: string }> {
+    const saveGone = await this.cloud.deleteRemote();
+    const social = this.services.social;
+    const playerGone = social.deletePlayer ? await social.deletePlayer() : true;
+    if (saveGone && playerGone) {
+      // The device now looks like a first launch to the cloud, so it would
+      // happily upload again on the next sync. Marking it stops that until
+      // the player opts back in by linking again.
+      this.cloudDeleted = true;
+      return { ok: true, msg: t('Your cloud data has been deleted.') };
+    }
+    return { ok: false, msg: t('Could not reach the cloud. Try again later.') };
+  }
+
+  /** Set once the player deletes their cloud data — suppresses further uploads
+   *  for the rest of the session (see syncSave). */
+  private cloudDeleted = false;
 }
