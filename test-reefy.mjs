@@ -2,7 +2,10 @@ import { chromium } from 'playwright';
 
 const out = process.argv[2] || '.';
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 900, height: 640 } });
+// Dil AÇIKÇA sabitlenir: artık iki dil var ve tespit cihazın diline bakıyor,
+// yani sabitlenmezse koşu geliştiricinin makinesinin diline göre değişirdi.
+// Türkçe'nin kendi ayağı aşağıda, kendi sayfasında.
+const page = await browser.newPage({ viewport: { width: 900, height: 640 }, locale: 'en-US' });
 
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -415,7 +418,7 @@ await page.waitForTimeout(200);
 // Etkinlik takvimi tarihe bağlı; ana koşunun saatini kaydırmak günlük görev
 // gününü de kaydırırdı, o yüzden bu bölüm temiz bir bağlamda çalışır.
 {
-  const fest = await browser.newPage({ viewport: { width: 900, height: 640 } });
+  const fest = await browser.newPage({ viewport: { width: 900, height: 640 }, locale: 'en-US' });
   fest.on('pageerror', (e) => errors.push('FEST PAGEERROR: ' + e.message));
   // setFixedTime, install DEĞİL: install zamanlayıcıları da durdurur ve oyun
   // döngüsü hiç başlamaz. Etkinlik takvimi sadece new Date() okur.
@@ -470,6 +473,47 @@ await page.waitForTimeout(200);
   if (leftBtns !== 1) errors.push(`FEST: talep edilen kademe listeden düşmedi (${leftBtns})`);
   await fest.screenshot({ path: out + '/28-festival-claimed.png' });
   await fest.close();
+}
+
+// Dil: Türk cihaz Türkçe açılmalı, ayarlardan İngilizce'ye geçilebilmeli
+{
+  const trPage = await browser.newPage({ viewport: { width: 900, height: 640 }, locale: 'tr-TR' });
+  trPage.on('pageerror', (e) => errors.push('LANG PAGEERROR: ' + e.message));
+  await trPage.goto('http://localhost:5173/');
+  await trPage.waitForTimeout(1200);
+  const playLabel = (await trPage.locator('#play-btn').textContent()).trim();
+  if (!playLabel.includes('Oyna')) errors.push(`LANG: tr-TR cihazda menü Türkçe değil (${playLabel})`);
+  await trPage.screenshot({ path: out + '/29-lang-tr.png' });
+
+  await trPage.click('#play-btn');
+  await trPage.waitForSelector('#menu.hidden', { timeout: 20000 });
+  await trPage.waitForTimeout(800);
+  for (let i = 0; i < 8; i++) {
+    const next = trPage.locator('.tutorial-next');
+    if (await next.count() === 0) break;
+    await next.first().click();
+    await trPage.waitForTimeout(300);
+  }
+  const trWelcome = trPage.locator('.welcome-ok');
+  if (await trWelcome.count()) await trWelcome.first().click();
+  await trPage.waitForTimeout(400);
+
+  // Dil satırı iki dil varken görünmeli
+  await trPage.click('#bottombar button[data-act="you"]');
+  await trPage.waitForTimeout(300);
+  await trPage.click('.more-btn[data-go="settings"]');
+  await trPage.waitForTimeout(400);
+  if (await trPage.locator('.lang-toggle').count() === 0) errors.push('LANG: ayarlarda dil satırı yok');
+  await trPage.screenshot({ path: out + '/30-lang-settings.png' });
+
+  // İngilizce'ye geç — sayfa kendini yeniler
+  await trPage.click('[data-lang="en"]');
+  await trPage.waitForTimeout(2500);
+  const enLabel = (await trPage.locator('#play-btn').textContent()).trim();
+  if (!enLabel.includes('Play')) errors.push(`LANG: İngilizce'ye geçiş sonrası menü İngilizce değil (${enLabel})`);
+  const storedLang = await trPage.evaluate(() => localStorage.getItem('reefy-lang'));
+  if (storedLang !== 'en') errors.push(`LANG: seçim kaydedilmedi (${storedLang})`);
+  await trPage.close();
 }
 
 // Kayıt doğrulaması
