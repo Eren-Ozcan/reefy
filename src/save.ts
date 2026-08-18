@@ -24,6 +24,17 @@ export interface DirtSpot {
   kind: 0 | 1;  // visual variant
 }
 
+/**
+ * An egg bought but not yet hatched. The species is deliberately NOT rolled
+ * here: rolling at collect time keeps the outcome out of the save entirely,
+ * and lets the golden egg's pity counter stay a single source of truth.
+ */
+export interface PendingEgg {
+  id: number;      // local, monotonic — only needs to be unique within one save
+  tier: string;    // EggTier id
+  readyAt: number; // epoch ms
+}
+
 export interface QuestState {
   day: string;                       // day the quests were generated
   progress: Record<string, number>;  // questId -> progress
@@ -60,6 +71,7 @@ export interface SaveData {
     decorPlacedCount: number;
     totalCleaned: number;
   };
+  pendingEggs: PendingEgg[]; // eggs incubating right now (tiers with a hatchMs)
   pityCounter: number;   // golden egg legendary pity counter
   streak: number;        // consecutive day streak (resets if a day is missed)
   bestStreak: number;    // highest streak reached so far — achievements use this, it never resets
@@ -128,6 +140,7 @@ export function defaultSave(): SaveData {
     quests: { day: '', progress: {}, claimed: [] },
     weeklyQuest: { day: '', progress: {}, claimed: [] },
     achievementsClaimed: [],
+    pendingEggs: [],
     stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0, totalCleaned: 0 },
     pityCounter: 0,
     streak: 0,
@@ -215,6 +228,7 @@ export function hasProgress(s: SaveData): boolean {
     if (Object.values(q.progress).some((n) => n > 0)) return true;
   }
 
+  if (s.pendingEggs.length > 0) return true;
   if (s.pityCounter > 0) return true;
   if (s.streak > 1 || s.bestStreak > 1) return true;
   if (s.cleanRewardCount > 0) return true;
@@ -334,6 +348,9 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (merged.petDay === undefined) merged.petDay = '';
   if (!merged.friendGifts) merged.friendGifts = { day: '', gifted: [] };
   if (!merged.weeklyQuest) merged.weeklyQuest = { day: '', progress: {}, claimed: [] };
+  // Saves written before the Abyssal Egg have no field at all; an empty queue
+  // is the correct reading of "this player has nothing incubating".
+  if (!Array.isArray(merged.pendingEggs)) merged.pendingEggs = [];
   if (merged.lang !== 'tr' && merged.lang !== 'en') merged.lang = detectLang();
   // Saved free-text fields (localStorage can be edited directly; don't rely
   // solely on the UI's input sanitization — sanitize here too as defense against HTML injection).

@@ -512,6 +512,13 @@ export interface EggTier {
   currency: 'coins' | 'pearls';
   odds: Partial<Record<Rarity, number>>; // percent
   desc: string;
+  /**
+   * Incubation time. Left UNDEFINED on the three original tiers on purpose:
+   * they hatch instantly today, and adding a wait would take away something
+   * players already have. The wait ships as a property of a NEW, richer tier
+   * that nobody owned before, so it reads as a trade rather than a nerf.
+   */
+  hatchMs?: number;
 }
 
 export const EGGS: EggTier[] = [
@@ -530,7 +537,21 @@ export const EGGS: EggTier[] = [
     odds: { rare: 30, epic: 50, legendary: 20 },
     desc: 'Legends are born from this egg. Guaranteed legendary every 8th egg!',
   },
+  {
+    id: 'abis', name: 'Abyssal Egg', emoji: '🐚', cost: 110, currency: 'pearls',
+    odds: { epic: 60, legendary: 40 },
+    desc: 'The deep keeps no commons. Needs four hours to hatch — or a handful of pearls.',
+    hatchMs: 4 * 60 * 60 * 1000,
+  },
 ];
+
+/**
+ * Speed-up price: one pearl per this much remaining incubation, rounded up,
+ * so a nearly-hatched egg is nearly free to finish. At the Abyssal Egg's four
+ * hours that is 20 pearls from a standing start — well under its 110 pearl
+ * price, because the speed-up sells impatience, not the egg itself.
+ */
+export const SPEEDUP_MS_PER_PEARL = 12 * 60 * 1000;
 
 export const PITY_LIMIT = 8; // legendary-guarantee counter for the golden egg
 
