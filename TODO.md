@@ -23,11 +23,17 @@ evidence for whether the numbers are right.
 
 ### Turkish is back — one thing left to watch
 
-- [ ] **The store-currency signal has never run against a real store.** The
-      language guess reads the billing currency `loadPrices()` recorded on the
-      previous launch, and the web preview's `StubIAP` records nothing, so only
-      the device-language branch is exercised today. Worth confirming on a real
-      Play account once the next build is up.
+- [ ] **Does Google Play actually populate `currencyCode` for these products?**
+      Everything on this side of the boundary is now tested against a mock
+      shaped like the SDK (`src/store-currency.test.ts`): `loadPrices()` records
+      the currency, records nothing when the store is unreachable or silent, and
+      the recorded value reaches `detectLang()` and outranks the device language
+      in both directions. Changing the field name breaks those tests, which is
+      the point — a wrong name would otherwise look implemented and never fire.
+      What a mock cannot answer is whether the real store fills the field for
+      this app's offering. Check on the first build with a live Play account: a
+      Turkish account should leave `reefy-store-currency` set to `TRY` in
+      localStorage after the shop's Pearls tab has been opened once.
 
 ### Store listing is now stale
 
