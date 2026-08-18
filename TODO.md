@@ -21,6 +21,32 @@ evidence for whether the numbers are right.
       points only when the active event's id differs; shipping the same id with
       new dates would hand returning players their old points.
 
+### RevenueCat has no products registered — purchases are dead today
+
+Found on the emulator (2026-08-19) while trying to verify the store-currency
+signal. The SDK configures fine and reaches `api.revenuecat.com`, so the API
+key and the network are not the problem. `getOfferings()` fails with:
+
+> ConfigurationError — You have configured the SDK with a Play Store API key,
+> but there are no Play Store products registered in the RevenueCat dashboard
+> for your offerings.
+
+This is bigger than the language signal. Three things are non-functional on
+every device right now, not just the emulator:
+
+- [ ] **Purchases cannot complete.** `findStorePackage()` looks packages up in
+      the current offering, and there is no offering.
+- [ ] **Prices are not localized.** Every player, in every country, sees the
+      hardcoded USD fallbacks from `IAP_PACKS` — the `$2.99` visible in the
+      emulator screenshot on a Turkish device.
+- [ ] **The store-currency language signal can never fire**, since it is read
+      off a package that never arrives.
+
+The fix is dashboard configuration, not code: create the products in Play
+Console with the exact `IAP_PACKS` ids (`pearls_s`, `pearls_m`, `pearls_l`,
+`pearls_xl`, `starter`, `remove_ads`), register them in RevenueCat, and put
+them in the current offering with package identifiers matching those same ids.
+
 ### Turkish is back — one thing left to watch
 
 - [ ] **Does Google Play actually populate `currencyCode` for these products?**
@@ -31,9 +57,11 @@ evidence for whether the numbers are right.
       in both directions. Changing the field name breaks those tests, which is
       the point — a wrong name would otherwise look implemented and never fire.
       What a mock cannot answer is whether the real store fills the field for
-      this app's offering. Check on the first build with a live Play account: a
-      Turkish account should leave `reefy-store-currency` set to `TRY` in
-      localStorage after the shop's Pearls tab has been opened once.
+      this app's offering. Blocked behind the RevenueCat configuration above —
+      an emulator run confirmed the error path is correct (no currency recorded,
+      no crash) but could not exercise the success path. Once offerings exist,
+      check it with a live Turkish Play account: `reefy-store-currency` should
+      read `TRY` after the shop's Pearls tab has been opened once.
 
 ### Store listing is now stale
 
@@ -208,6 +236,20 @@ Details worth keeping:
 - The clock-tampering stance holds: the calendar is date-based, so a moved
   clock can only enter a window early — the points themselves still require
   real play.
+
+### A language nobody chose (2026-08-19)
+
+The emulator run found a bug that no unit test would have: on a Turkish device
+carrying a save from the English-only period, the menu came up Turkish and the
+game came up English. The menu detects; the game reads `save.lang`, and that
+field held an 'en' the player never chose — `detectLang()` was forced to return
+it while `AVAILABLE_LANGS` was `['en']`.
+
+Left alone, every Turkish player who installed in that window would have been
+stuck in English permanently, with no way out: the settings row that would fix
+it was behind the language they could not read. `langChosen` now separates a
+choice from a guess, and old saves default to "not chosen" — while one language
+shipped the row was hidden, so there were no real choices to lose.
 
 ### Turkish returned, and the language guess changed (2026-08-19)
 
