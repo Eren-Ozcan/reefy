@@ -6,26 +6,81 @@
  */
 export type Lang = 'tr' | 'en';
 
-/** Languages the game currently ships. Turkish is translated and kept in the table
- *  below, but not offered yet; adding 'tr' back here is all the settings toggle
- *  needs to reappear. */
-export const AVAILABLE_LANGS: readonly Lang[] = ['en'];
+/** Languages the game ships. Turkish returned on 2026-08-19. */
+export const AVAILABLE_LANGS: readonly Lang[] = ['en', 'tr'];
 
-/** Button labels for the settings language picker, keyed by language. */
-export const LANG_LABELS: Record<Lang, string> = { tr: 'Turkish', en: 'English' };
+/**
+ * Labels for the settings language picker. Deliberately in the language they
+ * NAME rather than translated: the player most likely to need this row is the
+ * one who cannot read the language currently on screen.
+ */
+export const LANG_LABELS: Record<Lang, string> = { tr: 'Türkçe', en: 'English' };
 
 const STORAGE_KEY = 'reefy-lang';
+/**
+ * Currency reported by the store on a previous launch (see services.ts
+ * loadPrices). It is the closest thing to the PLAY ACCOUNT's country the app
+ * can observe: the store bills in the account's currency regardless of what
+ * language the device is set to. Prices arrive well after the first frame, so
+ * it can only inform the NEXT launch — which is exactly why it is persisted
+ * rather than awaited.
+ */
+export const STORE_CURRENCY_KEY = 'reefy-store-currency';
 
 function isAvailable(l: string | undefined): l is Lang {
   return !!l && (AVAILABLE_LANGS as readonly string[]).includes(l);
 }
 
+/** Records the store's billing currency for the next launch's language guess. */
+export function rememberStoreCurrency(code: string): void {
+  if (!code) return;
+  try { localStorage.setItem(STORE_CURRENCY_KEY, code.toUpperCase()); } catch { /* storage may be disabled */ }
+}
+
+function storedStoreCurrency(): string {
+  try { return localStorage.getItem(STORE_CURRENCY_KEY) ?? ''; } catch { return ''; }
+}
+
+/**
+ * Turkish is chosen only on POSITIVE evidence of a Turkish player; everything
+ * else gets English. That asymmetry is the point — a wrong guess toward
+ * English leaves the player in a language nearly everyone can navigate, while
+ * a wrong guess toward Turkish strands them in one almost nobody can.
+ *
+ * The signals, strongest first:
+ *
+ * 1. The store's billing currency from a previous launch. The Play/App Store
+ *    account's country is not directly readable without another plugin, but
+ *    the account's CURRENCY is, and a Turkish account bills in TRY whatever
+ *    language the handset is set to.
+ * 2. The device language tags — 'tr' in any position, or any tag with the TR
+ *    region (a Turkish player whose phone is in English still gets 'en-TR').
+ *    A device that lists tags and none of them are Turkish DECIDES for
+ *    English: the player has already said what they read.
+ *
+ * The IANA time zone was tried as a third signal and removed. Europe/Istanbul
+ * says where the handset is, not what its owner reads — it handed Turkish to a
+ * device explicitly set to German, which is the exact failure the asymmetry
+ * above exists to prevent.
+ */
 export function detectLang(): Lang {
-  const nav = (typeof navigator !== 'undefined' && (navigator.language || (navigator as unknown as { userLanguage?: string }).userLanguage)) || '';
-  const guess: Lang = nav.toLowerCase().startsWith('tr') ? 'tr' : 'en';
-  // A preference for a language that isn't shipped yet falls back to the first
-  // available one rather than leaving the UI in an untranslated state.
-  return isAvailable(guess) ? guess : AVAILABLE_LANGS[0];
+  return looksTurkish() ? 'tr' : 'en';
+}
+
+function looksTurkish(): boolean {
+  const currency = storedStoreCurrency();
+  // The currency is the strongest signal, so it DECIDES rather than votes:
+  // a player billed in euros is not handed Turkish because of a leftover
+  // time zone, and one billed in lira keeps Turkish on an English handset.
+  if (currency) return currency === 'TRY';
+
+  const tags = typeof navigator !== 'undefined'
+    ? [...(navigator.languages ?? []), navigator.language ?? ''].filter(Boolean)
+    : [];
+  return tags.some((tag) => {
+    const low = tag.toLowerCase();
+    return low === 'tr' || low.startsWith('tr-') || low.endsWith('-tr');
+  });
 }
 
 function readStored(): Lang | undefined {
@@ -753,7 +808,7 @@ const TR: Record<string, string> = {
   '🎵 Music': '🎵 Müzik', 'On': 'Açık', 'Off': 'Kapalı',
   '🔊 Sound Effects': '🔊 Ses Efektleri',
   '📤 Tell your friends': '📤 Arkadaşlarına anlat', 'Share': 'Paylaş',
-  '🌐 Language': '🌐 dil / language',
+  '🌐 Language': '🌐 Dil / Language',
   '🗑️ Delete all progress': '🗑️ Tüm ilerlemeyi sil', 'Reset': 'Sıfırla',
   'Reefy v{v} — made with love 🐠': 'Reefy v{v} — sevgiyle yapıldı 🐠',
   'Name must be at least 3 characters': 'İsim en az 3 karakter olmalı',

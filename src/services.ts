@@ -15,7 +15,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AdMobAds, StubAds, type AdsProvider } from './ads';
 import { ensureUid, firestore } from './firebase-app';
 import { isFirebaseConfigured } from './firebase-config';
-import { t } from './i18n';
+import { rememberStoreCurrency, t } from './i18n';
 import type { SaveData } from './save';
 
 // ---------- Identity / sign-in ----------
@@ -248,6 +248,12 @@ export class RevenueCatIAP implements IAPProvider {
       for (const pkg of current.availablePackages) {
         const price = pkg.product?.priceString;
         if (price) this.livePrices[pkg.identifier] = price;
+        // The billing currency is the closest observable stand-in for the
+        // store ACCOUNT's country, which decides the language on the next
+        // launch (see i18n.ts detectLang). It arrives far too late to affect
+        // this session's first frame, which is why it is only recorded.
+        const currency = pkg.product?.currencyCode;
+        if (currency) rememberStoreCurrency(currency);
       }
     } catch {
       /* couldn't fetch prices — fallback labels stay, the store still opens */
