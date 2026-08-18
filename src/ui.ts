@@ -9,7 +9,10 @@ import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Speci
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { BIOME_INFO, TANK_CAP_BONUS, TankDef } from './tanks';
 import { AVAILABLE_LANGS, LANG_LABELS, Lang, getLang, setLang, t as tt } from './i18n';
-import { ICON_BAG, ICON_COIN, ICON_FEED, ICON_FISH, ICON_MENU, ICON_PEARL, ICON_SHOP, ICON_TROPHY } from './icons';
+import {
+  ICON_ARRANGE, ICON_BAG, ICON_COIN, ICON_FEED, ICON_FISH, ICON_MENU, ICON_PEARL,
+  ICON_QUEST, ICON_SHOP, ICON_TANK, ICON_TROPHY, ICON_YOU,
+} from './icons';
 import { isAccountLinkingAvailable, isLinked, linkedLabel, linkWithGoogle } from './firebase-app';
 import type { FishSave } from './save';
 
@@ -268,12 +271,16 @@ export class UI {
         <div class="hud-chip hud-tank" id="hud-tank" title="${tt('Switch tank')}"></div>
         <div class="hud-chip hud-streak hidden" id="hud-streak"></div>
       </div>
+      <div id="siderail">
+        <button data-rail="feed" title="${tt('Feed')}">${ICON_FEED}<span>${tt('Feed')}</span></button>
+        <button data-rail="arrange" title="${tt('Arrange')}">${ICON_ARRANGE}<span>${tt('Arrange')}</span></button>
+      </div>
       <div id="bottombar">
-        <button data-act="feed">${ICON_FEED}<span>${tt('Feed')}</span></button>
-        <button data-act="shop">${ICON_SHOP}<span>${tt('Shop')}</span></button>
-        <button data-act="inventory">${ICON_BAG}<span>${tt('Inventory')}</span></button>
-        <button data-act="social">${ICON_TROPHY}<span>${tt('Social')}</span></button>
-        <button data-act="more">${ICON_MENU}<span>${tt('More')}</span></button>
+        <button data-act="aquarium">${ICON_TANK}<span>${tt('Aquarium')}</span><small></small></button>
+        <button data-act="shop">${ICON_SHOP}<span>${tt('Shop')}</span><small></small></button>
+        <button data-act="inventory">${ICON_BAG}<span>${tt('Inventory')}</span><small></small></button>
+        <button data-act="quests">${ICON_QUEST}<span>${tt('Quests')}</span><small></small></button>
+        <button data-act="you">${ICON_YOU}<span>${tt('You')}</span><small></small></button>
       </div>
       <div id="collect" class="empty">
         <div class="collect-bubble">
@@ -302,11 +309,20 @@ export class UI {
       btn.addEventListener('click', () => {
         audio.click();
         const act = btn.dataset.act!;
-        if (act === 'feed') this.toggleFeedPop();
-        else if (act === 'shop') this.renderShop('fish');
+        if (act === 'aquarium') { this.dismissPanel(); return; }
+        this.setActiveTab(act);
+        if (act === 'shop') this.renderShop('fish');
         else if (act === 'inventory') this.renderInventory('fish');
-        else if (act === 'social') this.renderSocial('leaderboard');
-        else if (act === 'more') this.renderMore();
+        else if (act === 'quests') this.renderQuests();
+        else this.renderYou();
+      });
+    });
+
+    root.querySelectorAll<HTMLButtonElement>('#siderail button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        audio.click();
+        if (btn.dataset.rail === 'feed') this.toggleFeedPop();
+        else this.startEditMode();
       });
     });
 
@@ -363,6 +379,7 @@ export class UI {
     this.hudRing.title = `${tt('Lv')} ${s.level}`;
     this.hudCap.textContent = `${this.game.fishes.length}/${this.game.capacity}`;
     this.refreshStreakChip(s.streak);
+    this.refreshDock();
     const activeTank = this.game.activeTank;
     const boost = Math.round((this.game.growthMult - 1) * 100);
     const dirtBadge = this.game.dirtPct(s.activeTank) > 0
@@ -514,7 +531,7 @@ export class UI {
   handleBack(): boolean {
     if (this.panelHost.childElementCount > 0) {
       audio.click();
-      this.closePanel();
+      this.dismissPanel();
       return false;
     }
     const now = Date.now();
@@ -534,6 +551,39 @@ export class UI {
     this.panelHost.innerHTML = '';
   }
 
+  /** Closing back to the scene, as opposed to panelShell swapping one panel for the
+   *  next: the dock has to follow the player back to the Aquarium tab. */
+  private dismissPanel(): void {
+    this.closePanel();
+    this.setActiveTab('aquarium');
+  }
+
+  private setActiveTab(act: string): void {
+    this.root.querySelectorAll<HTMLButtonElement>('#bottombar button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.act === act);
+    });
+  }
+
+  /** Live status under each dock label, so a waiting reward or an affordable purchase
+   *  is visible without opening the panel that holds it. */
+  private refreshDock(): void {
+    const s = this.game.save;
+    const bag = Object.values(s.feedOwned ?? {}).reduce((n, q) => n + q, 0)
+      + Object.values(s.decorOwned ?? {}).reduce((n, q) => n + q, 0);
+    const ready = this.game.claimableQuests();
+    const set = (act: string, text: string) => {
+      const el = this.root.querySelector(`#bottombar button[data-act="${act}"] small`);
+      if (el) el.textContent = text;
+    };
+    set('aquarium', `${this.game.fishes.length}/${this.game.capacity}`);
+    set('shop', tt('{n} affordable', { n: this.game.affordableShopItems() }));
+    set('inventory', bag > 0 ? tt('{n} items', { n: bag }) : '');
+    set('quests', ready > 0 ? tt('{n} ready', { n: ready }) : '');
+    set('you', `${tt('Lv')} ${s.level}`);
+    const questBtn = this.root.querySelector('#bottombar button[data-act="quests"]');
+    questBtn?.classList.toggle('has-badge', ready > 0);
+  }
+
   private panelShell(title: string, bodyHTML: string, tabs?: { id: string; label: string; active: boolean }[], blocking = false): HTMLElement {
     this.closePanel();
     const wrap = document.createElement('div');
@@ -550,10 +600,10 @@ export class UI {
       </div>`;
     if (!blocking) {
       wrap.addEventListener('click', (e) => {
-        if (e.target === wrap) { audio.click(); this.closePanel(); }
+        if (e.target === wrap) { audio.click(); this.dismissPanel(); }
       });
       wrap.querySelector('.close-btn')!.addEventListener('click', () => {
-        audio.click(); this.closePanel();
+        audio.click(); this.dismissPanel();
       });
     }
     this.panelHost.appendChild(wrap);
@@ -1016,10 +1066,12 @@ export class UI {
 
   // ---------- MORE / QUESTS / COLLECTION / SETTINGS ----------
 
-  private renderMore(): void {
-    const el = this.panelShell(tt('☰ Menu'), `
+  /** The player hub. Social used to be its own dock tab and everything else hid behind
+   *  "More"; both belong to the same question — how am I doing — so they share one door. */
+  private renderYou(): void {
+    const el = this.panelShell(tt('You'), `
       <div class="more-grid">
-        <button class="more-btn" data-go="quests">📋<span>${tt('Quests')}</span></button>
+        <button class="more-btn" data-go="social">🏆<span>${tt('Social')}</span></button>
         <button class="more-btn" data-go="collection">📖<span>${tt('Collection')}</span></button>
         <button class="more-btn" data-go="earnings">📈<span>${tt('Earnings')}</span></button>
         <button class="more-btn" data-go="profile">👤<span>${tt('Profile')}</span></button>
@@ -1029,7 +1081,7 @@ export class UI {
       btn.addEventListener('click', () => {
         audio.click();
         const go = btn.dataset.go!;
-        if (go === 'quests') this.renderQuests();
+        if (go === 'social') this.renderSocial('leaderboard');
         else if (go === 'collection') this.renderCollection();
         else if (go === 'earnings') this.renderEarnings();
         else if (go === 'profile') this.renderProfile();

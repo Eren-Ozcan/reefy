@@ -258,7 +258,49 @@ html, body {
   font-size: 11px; font-weight: 600;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The status line under each label. Kept at a reserved height so the dock does not
+   change height as counts appear and disappear. */
+#bottombar button small {
+  font-family: var(--font-num);
+  font-size: 9.5px; font-weight: 700; line-height: 1;
+  min-height: 10px;
+  color: var(--ink-faint);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 #bottombar button .icon { width: 24px; height: 24px; }
+
+/* Which tab you are on had no indication at all before. */
+#bottombar button.active {
+  background: var(--card-2);
+  color: var(--accent);
+}
+#bottombar button.active small { color: var(--accent); opacity: 0.8; }
+#bottombar button.has-badge small { color: var(--accent-2); }
+
+/* Scene actions live on the edge of the scene they act on, not in the dock, which
+   is for destinations. */
+#siderail {
+  position: absolute; right: 12px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#siderail button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  color: var(--ink-soft);
+  cursor: pointer;
+  width: 56px; min-height: 56px;
+  padding: 8px 4px; border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
+  transition: transform 0.12s ease, color 0.12s ease;
+}
+#siderail button span { font-size: 9.5px; font-weight: 700; }
+#siderail button .icon { width: 22px; height: 22px; }
+#siderail button:hover { color: var(--accent); }
+#siderail button:active { transform: scale(0.94); }
+#ui.mode-active #siderail { display: none; }
 #bottombar button:hover { background: rgba(47, 158, 143, 0.12); }
 #bottombar button:active { transform: scale(0.93); }
 

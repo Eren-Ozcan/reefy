@@ -77,6 +77,34 @@ export const ICON_TROPHY = svg(
    <rect x="6.8" y="17.4" width="10.4" height="3" rx="1.5" fill="currentColor"/>`,
 );
 
+// The "you are here" tab: water line with a fish under it, not a house or a home
+// glyph, because the tab returns you to the tank rather than to a start screen.
+export const ICON_TANK = svg(
+  `<rect x="2.6" y="4.6" width="18.8" height="14.8" rx="3.4" fill="currentColor" opacity="0.35"/>
+   <path d="M2.6 10.4h18.8v5.6a3.4 3.4 0 0 1-3.4 3.4H6a3.4 3.4 0 0 1-3.4-3.4Z" fill="currentColor" opacity="0.8"/>
+   <ellipse cx="13" cy="14.4" rx="3.6" ry="2.4" fill="currentColor"/>
+   <path d="M9.6 14.4 7 12.2a5.4 5.4 0 0 1 0 4.4Z" fill="currentColor"/>`,
+);
+
+export const ICON_QUEST = svg(
+  `<rect x="4.4" y="4" width="15.2" height="17" rx="2.6" fill="currentColor" opacity="0.85"/>
+   <rect x="8.4" y="2.2" width="7.2" height="3.6" rx="1.8" fill="currentColor"/>
+   <path d="m8.2 11.6 1.8 1.8 3.6-3.8" fill="none" stroke="#0E2E36" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+   <rect x="8.2" y="15.6" width="7.6" height="1.8" rx="0.9" fill="#0E2E36" opacity="0.4"/>`,
+);
+
+export const ICON_YOU = svg(
+  `<circle cx="12" cy="8.2" r="3.9" fill="currentColor"/>
+   <path d="M4.4 20.4a7.6 7.6 0 0 1 15.2 0 1.2 1.2 0 0 1-1.2 1.2H5.6a1.2 1.2 0 0 1-1.2-1.2Z" fill="currentColor" opacity="0.85"/>`,
+);
+
+export const ICON_ARRANGE = svg(
+  `<rect x="3" y="3" width="7.6" height="7.6" rx="2.2" fill="currentColor"/>
+   <rect x="13.4" y="3" width="7.6" height="7.6" rx="2.2" fill="currentColor" opacity="0.6"/>
+   <rect x="3" y="13.4" width="7.6" height="7.6" rx="2.2" fill="currentColor" opacity="0.6"/>
+   <rect x="13.4" y="13.4" width="7.6" height="7.6" rx="2.2" fill="currentColor"/>`,
+);
+
 export const ICON_MENU = svg(
   `<rect x="4" y="6.2" width="16" height="2.6" rx="1.3" fill="currentColor"/>
    <rect x="4" y="10.7" width="16" height="2.6" rx="1.3" fill="currentColor"/>

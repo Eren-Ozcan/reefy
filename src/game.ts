@@ -966,6 +966,19 @@ export class Game {
     return questsForDay(this.save.quests.day);
   }
 
+  /** Quests finished but not yet claimed — the dock shows this so a waiting reward
+   *  never sits behind a closed panel. */
+  claimableQuests(): number {
+    let n = 0;
+    for (const q of this.dailyQuests()) {
+      if (this.save.quests.claimed.includes(q.id)) continue;
+      if ((this.save.quests.progress[q.id] ?? 0) >= q.target) n++;
+    }
+    const wq = this.weeklyQuest();
+    if (!this.save.weeklyQuest.claimed.includes(wq.id) && (this.save.weeklyQuest.progress[wq.id] ?? 0) >= wq.target) n++;
+    return n;
+  }
+
   ensureQuestWeek(): void {
     const week = weekKeyFor(new Date());
     if (this.save.weeklyQuest.day !== week) {
@@ -1754,6 +1767,26 @@ export class Game {
 
   shopFish(): Species[] {
     return SPECIES.filter((s) => s.buyPrice > 0 || s.pearlPrice);
+  }
+
+  /** How many shop entries the player could buy right now. Drives the dock's Shop
+   *  status, so "you can afford something" does not require opening the panel. */
+  affordableShopItems(): number {
+    const { coins, pearls, level } = this.save;
+    let n = 0;
+    for (const s of this.shopFish()) {
+      if (s.unlockLevel !== undefined && level < s.unlockLevel) continue;
+      if (s.buyPrice > 0 && coins >= s.buyPrice) n++;
+      else if (s.pearlPrice && pearls >= s.pearlPrice) n++;
+    }
+    for (const e of EGGS) {
+      if (e.currency === 'coins' ? coins >= e.cost : pearls >= e.cost) n++;
+    }
+    for (const t of TANKS) {
+      if (this.save.tanksOwned.includes(t.id) || level < t.unlockLevel) continue;
+      if (t.currency === 'coins' ? coins >= t.price : pearls >= t.price) n++;
+    }
+    return n;
   }
   eggList(): EggTier[] { return EGGS; }
   tankList(): TankDef[] { return TANKS; }

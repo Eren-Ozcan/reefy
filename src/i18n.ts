@@ -854,6 +854,12 @@ const TR: Record<string, string> = {
   'big reward tomorrow': 'yarın büyük ödül',
   'waiting in the vault': 'kasada bekliyor',
   'COLLECT': 'TOPLA',
+  'Aquarium': 'Akvaryum',
+  'You': 'Sen',
+  'Arrange': 'Düzen',
+  '{n} affordable': '{n} alınabilir',
+  '{n} items': '{n} ürün',
+  '{n} ready': '{n} hazır',
   'Fishing Boat Shipwreck': 'Balıkçı Teknesi Batık',
   'Galleon Shipwreck': 'Kalyon Batık',
 };
