@@ -1,19 +1,19 @@
 rules_version = '2';
 
-// Arkadaş kodu doğrulaması + liderlik skoru için (bkz. src/services.ts FirebaseSocial).
-// Tek koleksiyon: players/{code} — doküman ID'si oyuncunun REEF-XXXXX kodu.
+// Friend-code verification + leaderboard score (see src/services.ts FirebaseSocial).
+// One collection: players/{code} — the document id is the player's REEF-XXXXX code.
 //   { name: string, uid: string, updatedAt: Timestamp, score?: number }
 //
-// - get: herhangi bir signed-in (anonim) kullanıcı tek bir kodu doğrulayabilir.
-// - list: kapalı — tüm kodların taranmasını/enumerate edilmesini engeller.
-// - create/update: sadece kendi uid'ine ait dokümanı yazabilir.
-// - delete: kapalı.
+// - get: any signed-in (anonymous) user can verify a single code.
+// - list: closed — stops every code being scanned or enumerated.
+// - create/update: only the document belonging to your own uid.
+// - delete: only your own document (see the note at the rule).
 //
-// score alanı istemci tarafından hesaplanıyor (stats.totalEarned) — Cloud Functions
-// olmadan sunucu tarafında "gerçek" olduğu doğrulanamaz. Yine de tek istekte
-// mantıksız bir sayı yazılmasını (bkz. güvenlik testi: score=999999999) engellemek
-// için mutlak bir tavan ve update başına artış sınırı konur (en yüksek başarım
-// hedefi 60.000.000 — bkz. quests.ts a-earn60m).
+// The score field is computed on the client (stats.totalEarned) — without Cloud
+// Functions it cannot be verified server-side as "real". An absolute ceiling and
+// a per-update increase limit are still applied, to stop an absurd number being
+// written in one request (see the security test: score=999999999). The highest
+// achievement target is 60,000,000 — see quests.ts a-earn60m.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /players/{code} {
@@ -43,22 +43,21 @@ service cloud.firestore {
                             && (!('score' in resource.data)
                                 || request.resource.data.score <= resource.data.score + 10000000)));
 
-      // Oyuncu kendi dokümanını silebilir: Play'in zorunlu kıldığı hesap
-      // silme akışı (bkz. https://yilkgames.com/account-deletion/) uygulama
-      // içinden yürüsün diye. Yalnız KENDİ uid'ine ait doküman —
-      // resource.data.uid kontrolü olmadan herhangi biri, elindeki bir
-      // arkadaş kodunun kaydını silebilirdi.
+      // A player may delete their own document, so the account deletion Play
+      // requires (see https://yilkgames.com/account-deletion/) can run from
+      // inside the app. Only their OWN: without the resource.data.uid check,
+      // anyone holding a friend code could delete that player's record.
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
-    // Bulut kaydı (bkz. src/cloud-save.ts). Doküman kimliği oyuncunun Firebase
-    // UID'sidir — platforma özgü bir kimlik DEĞİL, böylece aynı hesap Android
-    // ve iOS'ta aynı kayda ulaşır.
+    // The cloud save (see src/cloud-save.ts). The document id is the player's
+    // Firebase UID — NOT a platform-specific identifier, so the same account
+    // reaches the same save on Android and iOS.
     //
-    // `rev` monotonik bir sayaçtır ve geriye gitmesi kural düzeyinde
-    // yasaklanır: uzun süre çevrimdışı kalmış (bayat) bir istemci, başka bir
-    // cihazın yazdığı daha yeni kaydı EZEMEZ. Bu garanti istemci mantığına
-    // bırakılmaz — istemci kodu her zaman eski/değiştirilmiş olabilir.
+    // `rev` is a monotonic counter and going backwards is forbidden at the rule
+    // level: a stale client that has been offline for a long time CANNOT
+    // overwrite the newer save another device wrote. This guarantee is not left
+    // to client logic — client code can always be old or modified.
     match /saves/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
 
@@ -78,12 +77,13 @@ service cloud.firestore {
                     && request.resource.data.schemaVersion is int
                     && request.resource.data.rev > resource.data.rev;
 
-      // Silme, yalnızca dokümanın sahibine açık. Önceden tamamen kapalıydı;
-      // gerekçe "kazara/kötü niyetli bir istekle ilerleme yok edilmesin"di,
-      // ama o koruma zaten yok: kendi uid'iyle yazabilen biri payload'ı
-      // rev+1 ile çöple de ezebilir. Silmeyi kapalı tutmanın tek gerçek
-      // etkisi, oyuncunun kendi verisini silmesini e-postayla yürüyen manuel
-      // bir sürece mahkûm etmekti.
+      // Deletion is open to the document's owner only. It used to be closed
+      // outright, on the reasoning that progress must not be destroyed by an
+      // accidental or malicious request — but that protection was already
+      // absent: anyone who can write as this uid can overwrite the payload
+      // with garbage at rev+1. The only real effect of keeping it closed was
+      // to force a player deleting their own data through a manual,
+      // email-driven process.
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
   }

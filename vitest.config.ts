@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
-// jsdom: sınanan modüller (save.ts, cloud-save.ts) localStorage ve navigator'a
-// doğrudan bakıyor — bunları elle taklit etmek yerine gerçek bir tarayıcı
-// ortamı verilir, testler arasında beforeEach ile temizlenir.
+// jsdom: the modules under test (save.ts, cloud-save.ts, i18n.ts) read
+// localStorage and navigator directly. Rather than hand-mocking those, they
+// get a real browser environment, cleared between tests with beforeEach.
 export default defineConfig({
   test: {
     environment: 'jsdom',

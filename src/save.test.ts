@@ -35,40 +35,40 @@ function withChange(mutate: (s: SaveData) => void): boolean {
   return hasProgress(s);
 }
 
-describe('dokunulmamış kayıt', () => {
-  it('varsayılan kayıtta ilerleme yoktur', () => {
+describe('an untouched save', () => {
+  it('has no progress in the default save', () => {
     expect(hasProgress(defaultSave())).toBe(false);
   });
 
-  it('varsayılanın rastgele alanları (ad, arkadaş kodu) ilerleme saydırmaz', () => {
+  it('does not count the default random fields, name and friend code, as progress', () => {
     // Every call generates a new name and code; none of them is a player choice.
     for (let i = 0; i < 25; i++) expect(hasProgress(defaultSave())).toBe(false);
   });
 
-  it('diskten okunan taze kayıt da bakir sayılır', () => {
+  it('counts a fresh save read from disk as untouched too', () => {
     persist(defaultSave());
     expect(hasProgress(loadSave())).toBe(false);
   });
 
-  it('kayıt hiç yokken üretilen varsayılan da bakirdir', () => {
+  it('counts the default built when no save exists as untouched', () => {
     expect(hasProgress(loadSave())).toBe(false);
   });
 });
 
-describe('ilerleme sayılan sinyaller', () => {
-  it('satılan balık', () => {
+describe('signals that count as progress', () => {
+  it('a fish sold', () => {
     expect(withChange((s) => { s.stats.totalSold = 1; })).toBe(true);
   });
 
-  it('kazanılan altın', () => {
+  it('coins earned', () => {
     expect(withChange((s) => { s.stats.totalEarned = 1; })).toBe(true);
   });
 
-  it('atılan yem', () => {
+  it('feed dropped', () => {
     expect(withChange((s) => { s.stats.totalFed = 1; })).toBe(true);
   });
 
-  it('çıkan yumurta', () => {
+  it('an egg hatched', () => {
     expect(withChange((s) => { s.stats.eggsHatched = 1; })).toBe(true);
   });
 
@@ -84,130 +84,130 @@ describe('ilerleme sayılan sinyaller', () => {
     expect(withChange((s) => { s.pendingEggs = [{ id: 1, tier: 'abis', readyAt: Date.now() + 1000 }]; })).toBe(true);
   });
 
-  it('yerleştirilen dekor sayacı', () => {
+  it('the decoration-placed counter', () => {
     expect(withChange((s) => { s.stats.decorPlacedCount = 1; })).toBe(true);
   });
 
-  it('temizlenen kir sayacı', () => {
+  it('the dirt-cleaned counter', () => {
     expect(withChange((s) => { s.stats.totalCleaned = 1; })).toBe(true);
   });
 
-  it('seviye', () => {
+  it('the level', () => {
     expect(withChange((s) => { s.level = 2; })).toBe(true);
   });
 
-  it('deneyim puanı', () => {
+  it('experience points', () => {
     expect(withChange((s) => { s.xp = 1; })).toBe(true);
   });
 
-  it('başlangıçtan farklı altın — hem fazlası hem eksiği', () => {
+  it('coins differing from the start, both more and less', () => {
     expect(withChange((s) => { s.coins = START_COINS + 1; })).toBe(true);
     expect(withChange((s) => { s.coins = START_COINS - 1; })).toBe(true);
   });
 
-  it('başlangıçtan farklı inci — hem fazlası hem eksiği', () => {
+  it('pearls differing from the start, both more and less', () => {
     expect(withChange((s) => { s.pearls = START_PEARLS + 1; })).toBe(true);
     expect(withChange((s) => { s.pearls = START_PEARLS - 1; })).toBe(true);
   });
 
-  it('balık sayısının değişmesi — hem artması hem azalması', () => {
+  it('a change in the fish count, both up and down', () => {
     expect(withChange((s) => { s.fishes = s.fishes.slice(0, START_FISH_COUNT - 1); })).toBe(true);
     expect(withChange((s) => { s.fishes = [...s.fishes, { ...s.fishes[0], seed: 99 }]; })).toBe(true);
   });
 
-  it('koleksiyona giren YENİ tür (açılış balıkları dışında)', () => {
+  it('a NEW species entering the collection, beyond the starting fish', () => {
     expect(withChange((s) => { s.collection = ['zebra-danio']; })).toBe(true);
   });
 
-  it('açılış balıklarının yanına eklenen yeni tür', () => {
+  it('a new species added alongside the starting fish', () => {
     expect(withChange((s) => {
       s.collection = [...s.fishes.map((f) => f.sp), 'zebra-danio'];
     })).toBe(true);
   });
 
-  it('alınan başarım ödülü', () => {
+  it('an achievement reward claimed', () => {
     expect(withChange((s) => { s.achievementsClaimed = ['ilk-satis']; })).toBe(true);
   });
 
-  it('ikinci akvaryum', () => {
+  it('a second tank', () => {
     expect(withChange((s) => { s.tanksOwned = [...s.tanksOwned, 'tank-derin-mavi']; })).toBe(true);
   });
 
-  it('stoktaki yem', () => {
+  it('feed in stock', () => {
     expect(withChange((s) => { s.feedOwned = { 'feed-basic': 3 }; })).toBe(true);
   });
 
-  it('sahip olunan dekor', () => {
+  it('decorations owned', () => {
     expect(withChange((s) => { s.decorOwned = { 'decor-kaya': 1 }; })).toBe(true);
   });
 
-  it('akvaryuma yerleştirilmiş dekor', () => {
+  it('decorations placed in a tank', () => {
     expect(withChange((s) => {
       s.decorPlaced[s.activeTank] = [{ def: 'decor-kaya', fx: 0.5 }];
     })).toBe(true);
   });
 
-  it('eklenen arkadaş', () => {
+  it('a friend added', () => {
     expect(withChange((s) => { s.friends = [{ code: 'REEF-ABCDE', name: 'Ali' }]; })).toBe(true);
   });
 
-  it('arkadaş ziyareti — sayaç', () => {
+  it('a friend visit, by the counter', () => {
     expect(withChange((s) => { s.friendVisits = { day: '2026-08-07', visited: [], count: 1 }; })).toBe(true);
   });
 
-  it('arkadaş ziyareti — ziyaret listesi', () => {
+  it('a friend visit, by the visited list', () => {
     expect(withChange((s) => {
       s.friendVisits = { day: '2026-08-07', visited: ['REEF-ABCDE'], count: 0 };
     })).toBe(true);
   });
 
-  it('arkadaşa gönderilen hediye', () => {
+  it('a gift sent to a friend', () => {
     expect(withChange((s) => {
       s.friendGifts = { day: '2026-08-07', gifted: ['REEF-ABCDE'] };
     })).toBe(true);
   });
 
-  it('günlük görev ilerlemesi', () => {
+  it('daily quest progress', () => {
     expect(withChange((s) => { s.quests.progress = { 'feed-5': 2 }; })).toBe(true);
   });
 
-  it('alınan günlük görev ödülü', () => {
+  it('a daily quest reward claimed', () => {
     expect(withChange((s) => { s.quests.claimed = ['feed-5']; })).toBe(true);
   });
 
-  it('haftalık görev ilerlemesi', () => {
+  it('weekly quest progress', () => {
     expect(withChange((s) => { s.weeklyQuest.progress = { 'sell-20': 3 }; })).toBe(true);
   });
 
-  it('alınan haftalık görev ödülü', () => {
+  it('a weekly quest reward claimed', () => {
     expect(withChange((s) => { s.weeklyQuest.claimed = ['sell-20']; })).toBe(true);
   });
 
-  it('efsanevi garanti sayacı', () => {
+  it('the legendary pity counter', () => {
     expect(withChange((s) => { s.pityCounter = 1; })).toBe(true);
   });
 
-  it('1 günden uzun seri — gerçek geri dönüş', () => {
+  it('a streak longer than one day, which shows a real return', () => {
     expect(withChange((s) => { s.streak = 2; })).toBe(true);
   });
 
-  it('1 günden uzun en iyi seri', () => {
+  it('a best streak longer than one day', () => {
     expect(withChange((s) => { s.bestStreak = 2; })).toBe(true);
   });
 
-  it('bugün ödüllü temizlenen leke', () => {
+  it('a rewarded dirt spot cleaned today', () => {
     expect(withChange((s) => { s.cleanRewardCount = 1; })).toBe(true);
   });
 
-  it('okşanan balık', () => {
+  it('a fish that was petted', () => {
     expect(withChange((s) => { s.petDay = '2026-08-07'; })).toBe(true);
   });
 
-  it('oyuncunun kendi seçtiği ad', () => {
+  it('a name the player chose themselves', () => {
     expect(withChange((s) => { s.playerName = 'Kaptan'; })).toBe(true);
   });
 
-  it('varsayılan ada benzeyen ama oyuncunun yazdığı ad', () => {
+  it('a player-typed name that merely resembles the default', () => {
     // If the digit count doesn't match, it couldn't have come from the default generator.
     expect(withChange((s) => { s.playerName = 'Misafir-12345'; })).toBe(true);
     expect(withChange((s) => { s.playerName = 'Misafir-12'; })).toBe(true);
@@ -215,33 +215,33 @@ describe('ilerleme sayılan sinyaller', () => {
   });
 });
 
-describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
-  it('son görülme zamanı', () => {
+describe('fields ignored on purpose — they must not break the fast path', () => {
+  it('the last-seen time', () => {
     expect(withChange((s) => { s.lastSeen = Date.now() + 86_400_000; })).toBe(false);
   });
 
-  it('biriken (henüz toplanmamış) pasif gelir', () => {
+  it('accumulated, not-yet-collected passive income', () => {
     // Grows on its own while the player is watching the screen; gets written to totalEarned when collected.
     expect(withChange((s) => { s.incomePot = 999; })).toBe(false);
   });
 
-  it('kendiliğinden çıkan kir lekeleri', () => {
+  it('dirt spots that appear on their own', () => {
     expect(withChange((s) => {
       s.dirtSpots[s.activeTank] = [{ id: 1, fx: 0.3, fy: 0.4, r: 1, kind: 0 }];
     })).toBe(false);
   });
 
-  it('balıkların büyüme ve tokluk değerleri', () => {
+  it('the growth and hunger values of the fish', () => {
     expect(withChange((s) => {
       for (const f of s.fishes) { f.progress = 1; f.hunger = 0; }
     })).toBe(false);
   });
 
-  it('balıklarda biriken satış bonusu', () => {
+  it('the sale bonus accumulated on a fish', () => {
     expect(withChange((s) => { s.fishes[0].bonus = 0.4; })).toBe(false);
   });
 
-  it('ilk açılışta kurulan gün sayacı ve 1 değerindeki seri', () => {
+  it('the day counter and a streak of 1, both set up on first launch', () => {
     // game.ts applyDailyGift: on first launch it sets up lastDaily/streak WITHOUT giving a gift.
     expect(withChange((s) => {
       s.lastDaily = '2026-08-07';
@@ -250,40 +250,40 @@ describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
     })).toBe(false);
   });
 
-  it('açılışta kurulan görev günü', () => {
+  it('the quest day, set up at launch', () => {
     expect(withChange((s) => {
       s.quests.day = '2026-08-07';
       s.weeklyQuest.day = '2026-08-03';
     })).toBe(false);
   });
 
-  it('sıfır ilerlemeli görev girdileri', () => {
+  it('quest entries whose progress is zero', () => {
     expect(withChange((s) => { s.quests.progress = { 'feed-5': 0 }; })).toBe(false);
   });
 
-  it('boş dekor listeleri', () => {
+  it('empty decoration lists', () => {
     expect(withChange((s) => { s.decorPlaced = { [s.activeTank]: [], 'tank-derin-mavi': [] }; })).toBe(false);
   });
 
-  it('ses ve müzik ayarları', () => {
+  it('the sound and music settings', () => {
     expect(withChange((s) => { s.music = false; s.sfx = false; })).toBe(false);
   });
 
-  it('dil tercihi', () => {
+  it('the language preference', () => {
     expect(withChange((s) => { s.lang = s.lang === 'tr' ? 'en' : 'tr'; })).toBe(false);
   });
 
-  it('bir kez gösterilen arayüz ipuçları', () => {
+  it('the one-time UI hints', () => {
     expect(withChange((s) => { s.feedHintSeen = true; s.editHintSeen = true; })).toBe(false);
   });
 
-  it('engelleyici giriş karuselinin kapatılması (tutorialDone)', () => {
+  it('dismissing the blocking intro carousel (tutorialDone)', () => {
     // The carousel appears as soon as the game opens and settings are only
     // reachable once it's dismissed; this does NOT mean "the player achieved something."
     expect(withChange((s) => { s.tutorialDone = true; })).toBe(false);
   });
 
-  it('kendi kendine yetişkin olan açılış balıkları koleksiyona girince', () => {
+  it('the starting fish entering the collection by growing up on their own', () => {
     // The two starter fish begin half-grown; even if the player does nothing,
     // they'll drop into the collection within a few minutes.
     expect(withChange((s) => {
@@ -292,19 +292,19 @@ describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
     })).toBe(false);
   });
 
-  it('ödüllü temizlik gününün kendisi (sayaç sıfırken)', () => {
+  it('the rewarded-cleanup day itself, while the counter is zero', () => {
     expect(withChange((s) => { s.cleanRewardDay = '2026-08-07'; })).toBe(false);
   });
 
-  it('arkadaş kodu', () => {
+  it('the friend code', () => {
     expect(withChange((s) => { s.friendCode = 'REEF-ZZZZZ'; })).toBe(false);
   });
 
-  it('reklamsız sürüm hakkı — zaten buluttan geri yüklenmez', () => {
+  it('the ad-free entitlement, which is never restored from the cloud anyway', () => {
     expect(withChange((s) => { s.adsRemoved = true; })).toBe(false);
   });
 
-  it('boş gün alanlı ziyaret/hediye defterleri', () => {
+  it('visit and gift ledgers with an empty day field', () => {
     expect(withChange((s) => {
       s.friendVisits = { day: '2026-08-07', visited: [], count: 0 };
       s.friendGifts = { day: '2026-08-07', gifted: [] };
@@ -321,7 +321,7 @@ describe('bilerek yok sayılan alanlar — hızlı yolu bozmamalı', () => {
 //    copies of the same save look different forever and the bug comes back.
 // 2. Every field that reflects the player's effort MUST break equality — a
 //    mistake here silently swallows the conflict, picking a side without asking.
-describe('ilerleme parmak izi', () => {
+describe('the progress fingerprint', () => {
   /** Two copies of the same save: the given mutation is applied to the second one. */
   function sameAfter(mutate: (s: SaveData) => void): boolean {
     const a = defaultSave();
@@ -330,12 +330,12 @@ describe('ilerleme parmak izi', () => {
     return progressFingerprint(a) === progressFingerprint(b);
   }
 
-  describe('aynı sayılması gerekenler', () => {
-    it('kaydın kendi kopyası', () => {
+  describe('what must count as the same', () => {
+    it('a copy of the save itself', () => {
       expect(sameAfter(() => {})).toBe(true);
     });
 
-    it('kendiliğinden ilerleyen alanların hepsi bir arada', () => {
+    it('every self-advancing field at once', () => {
       // State after a few minutes in the game — the player did nothing.
       expect(sameAfter((s) => {
         s.lastSeen += 300_000;
@@ -345,7 +345,7 @@ describe('ilerleme parmak izi', () => {
       })).toBe(true);
     });
 
-    it('cihaza ait ayarlar ve arayüz durumu', () => {
+    it('device-local settings and UI state', () => {
       expect(sameAfter((s) => {
         s.music = false;
         s.sfx = false;
@@ -356,11 +356,11 @@ describe('ilerleme parmak izi', () => {
       })).toBe(true);
     });
 
-    it('reklamsız sürüm hakkı — pakete zaten hiç girmez', () => {
+    it('the ad-free entitlement, which never enters the payload at all', () => {
       expect(sameAfter((s) => { s.adsRemoved = true; })).toBe(true);
     });
 
-    it('dizilerin sırası — balık listesi her syncSave\'de sahneden kurulur', () => {
+    it('array order — the fish list is rebuilt from the scene on every syncSave', () => {
       const a = defaultSave();
       a.collection = ['zebra-danio', 'lepistes'];
       a.friends = [{ code: 'REEF-AAAAA', name: 'Ali' }, { code: 'REEF-BBBBB', name: 'Bora' }];
@@ -377,7 +377,7 @@ describe('ilerleme parmak izi', () => {
       expect(progressFingerprint(b)).toBe(progressFingerprint(a));
     });
 
-    it('sıfır değerli girdi ile hiç olmayan girdi', () => {
+    it('a zero-valued entry versus an entry that is absent', () => {
       // When feed runs out {feed: 0} is left behind; on the other device that key doesn't exist at all.
       expect(sameAfter((s) => {
         s.feedOwned = { 'feed-basic': 0 };
@@ -387,7 +387,7 @@ describe('ilerleme parmak izi', () => {
       })).toBe(true);
     });
 
-    it('JSON turundan (buluta yaz - buluttan oku) geçmiş kayıt', () => {
+    it('a save that went through the JSON round trip, upload then download', () => {
       // cloud-save.ts does the comparison exactly like this: one side in memory,
       // the other side unpacked from the payload via parseSave().
       const s = defaultSave();
@@ -399,7 +399,7 @@ describe('ilerleme parmak izi', () => {
       expect(progressFingerprint(round!)).toBe(progressFingerprint(s));
     });
 
-    it('paketten çıkarılmış reklamsız hakkıyla birlikte JSON turu', () => {
+    it('the same round trip with the ad-free entitlement stripped out', () => {
       // A real upload strips the adsRemoved field; it comes back as false when read.
       const s = defaultSave();
       s.adsRemoved = true;
@@ -410,19 +410,19 @@ describe('ilerleme parmak izi', () => {
     });
   });
 
-  describe('farklı sayılması gerekenler', () => {
-    it('iki ayrı yeni kayıt (rastgele ad ve arkadaş kodu)', () => {
+  describe('what must count as different', () => {
+    it('two separate new saves, with random names and friend codes', () => {
       expect(progressFingerprint(defaultSave())).not.toBe(progressFingerprint(defaultSave()));
     });
 
-    it('para birimleri ve seviye', () => {
+    it('the currencies and the level', () => {
       expect(sameAfter((s) => { s.coins += 1; })).toBe(false);
       expect(sameAfter((s) => { s.pearls += 1; })).toBe(false);
       expect(sameAfter((s) => { s.xp += 1; })).toBe(false);
       expect(sameAfter((s) => { s.level += 1; })).toBe(false);
     });
 
-    it('balık kadrosundaki her değişiklik', () => {
+    it('every change to the fish roster', () => {
       expect(sameAfter((s) => { s.fishes.pop(); })).toBe(false);
       expect(sameAfter((s) => { s.fishes.push({ ...s.fishes[0], seed: 99 }); })).toBe(false);
       expect(sameAfter((s) => { s.fishes[0].name = 'Kaptan'; })).toBe(false);
@@ -430,21 +430,21 @@ describe('ilerleme parmak izi', () => {
       expect(sameAfter((s) => { s.fishes[0].bonus = 0.2; })).toBe(false);
     });
 
-    it('koleksiyon, başarımlar ve akvaryumlar', () => {
+    it('the collection, the achievements and the tanks', () => {
       expect(sameAfter((s) => { s.collection = ['zebra-danio']; })).toBe(false);
       expect(sameAfter((s) => { s.achievementsClaimed = ['ilk-satis']; })).toBe(false);
       expect(sameAfter((s) => { s.tanksOwned = [...s.tanksOwned, 'tank-derin-mavi']; })).toBe(false);
       expect(sameAfter((s) => { s.activeTank = 'tank-derin-mavi'; })).toBe(false);
     });
 
-    it('envanter ve yerleştirilmiş dekor', () => {
+    it('the inventory and the placed decorations', () => {
       expect(sameAfter((s) => { s.feedOwned = { 'feed-basic': 1 }; })).toBe(false);
       expect(sameAfter((s) => { s.decorOwned = { 'decor-kaya': 1 }; })).toBe(false);
       expect(sameAfter((s) => { s.decorPlaced[s.activeTank] = [{ def: 'decor-kaya', fx: 0.5 }]; })).toBe(false);
       expect(sameAfter((s) => { s.decorPlaced[s.activeTank] = [{ def: 'decor-kaya', fx: 0.6 }]; })).toBe(false);
     });
 
-    it('istatistiklerin her biri', () => {
+    it('each of the statistics', () => {
       expect(sameAfter((s) => { s.stats.totalSold = 1; })).toBe(false);
       expect(sameAfter((s) => { s.stats.totalEarned = 1; })).toBe(false);
       expect(sameAfter((s) => { s.stats.totalFed = 1; })).toBe(false);
@@ -453,7 +453,7 @@ describe('ilerleme parmak izi', () => {
       expect(sameAfter((s) => { s.stats.totalCleaned = 1; })).toBe(false);
     });
 
-    it('görev defterleri', () => {
+    it('the quest ledgers', () => {
       expect(sameAfter((s) => { s.quests.day = '2026-08-08'; })).toBe(false);
       expect(sameAfter((s) => { s.quests.progress = { 'feed-5': 2 }; })).toBe(false);
       expect(sameAfter((s) => { s.quests.claimed = ['feed-5']; })).toBe(false);
@@ -461,18 +461,18 @@ describe('ilerleme parmak izi', () => {
       expect(sameAfter((s) => { s.weeklyQuest.claimed = ['sell-20']; })).toBe(false);
     });
 
-    it('arkadaşlar, ziyaretler ve hediyeler', () => {
+    it('friends, visits and gifts', () => {
       expect(sameAfter((s) => { s.friends = [{ code: 'REEF-ABCDE', name: 'Ali' }]; })).toBe(false);
       expect(sameAfter((s) => { s.friendVisits = { day: 'x', visited: ['REEF-ABCDE'], count: 1 }; })).toBe(false);
       expect(sameAfter((s) => { s.friendGifts = { day: 'x', gifted: ['REEF-ABCDE'] }; })).toBe(false);
     });
 
-    it('kimlik alanları', () => {
+    it('the identity fields', () => {
       expect(sameAfter((s) => { s.playerName = 'Kaptan'; })).toBe(false);
       expect(sameAfter((s) => { s.friendCode = 'REEF-ZZZZZ'; })).toBe(false);
     });
 
-    it('gün/seri defterleri ve sayaçlar', () => {
+    it('the day and streak ledgers, and the counters', () => {
       expect(sameAfter((s) => { s.pityCounter = 1; })).toBe(false);
       expect(sameAfter((s) => { s.streak = 3; })).toBe(false);
       expect(sameAfter((s) => { s.bestStreak = 3; })).toBe(false);
@@ -484,7 +484,7 @@ describe('ilerleme parmak izi', () => {
   });
 });
 
-describe('cihazdan alınmış gerçek kayıt (regresyon)', () => {
+describe('a real save taken off a device (regression)', () => {
   // 2026-08-07, Android 14 emulator: FRESH install, entered the game, dismissed
   // the blocking intro carousel, did NOTHING else, waited ~2 minutes.
   // If this save isn't counted as "no progress," a player connecting a new
@@ -507,46 +507,46 @@ describe('cihazdan alınmış gerçek kayıt (regresyon)', () => {
     "lastSeen":1786133295173,"lastDaily":"2026-08-07","tutorialDone":true,
     "feedHintSeen":false,"editHintSeen":false,"adsRemoved":false,"lang":"en"}`;
 
-  it('dokunulmamış cihaz kaydı ilerleme SAYILMAZ', () => {
+  it('does NOT count an untouched device save as progress', () => {
     const s = parseSave(FRESH_DEVICE_SAVE);
     expect(s).not.toBeNull();
     expect(hasProgress(s!)).toBe(false);
   });
 
-  it('aynı kayıt tek bir yem atılınca ilerleme sayılır', () => {
+  it('counts the same save as progress once a single feed is dropped', () => {
     const s = parseSave(FRESH_DEVICE_SAVE)!;
     s.stats.totalFed = 1;
     expect(hasProgress(s)).toBe(true);
   });
 
-  it('aynı kayıt mağazadan balık alınınca ilerleme sayılır', () => {
+  it('counts the same save as progress once a fish is bought', () => {
     const s = parseSave(FRESH_DEVICE_SAVE)!;
     s.coins = 145;
     expect(hasProgress(s)).toBe(true);
   });
 });
 
-describe('bozuk ve eksik veri', () => {
-  it('buluttan gelen bakir kayıt bakir kalır', () => {
+describe('corrupt and incomplete data', () => {
+  it('keeps an untouched save from the cloud untouched', () => {
     const restored = parseSave(JSON.stringify(defaultSave()));
     expect(restored).not.toBeNull();
     expect(hasProgress(restored!)).toBe(false);
   });
 
-  it('buluttan gelen ilerlemeli kayıt ilerlemeli kalır', () => {
+  it('keeps a progressed save from the cloud progressed', () => {
     const s = defaultSave();
     s.level = 7;
     const restored = parseSave(JSON.stringify(s));
     expect(hasProgress(restored!)).toBe(true);
   });
 
-  it('yarım (alanları eksik) kayıt migrate sonrası çökmeden değerlendirilir', () => {
+  it('evaluates a half-written save after migrate without throwing', () => {
     const restored = parseSave(JSON.stringify({ v: 2, coins: 300 }));
     expect(restored).not.toBeNull();
     expect(() => hasProgress(restored!)).not.toThrow();
   });
 
-  it('eksik kayıtta gerçek ilerleme hâlâ görülür', () => {
+  it('still sees real progress in an incomplete save', () => {
     const restored = parseSave(JSON.stringify({ v: 2, coins: 5000 }));
     expect(hasProgress(restored!)).toBe(true);
   });
@@ -587,7 +587,7 @@ describe('bozuk ve eksik veri', () => {
     expect(restored!.event).toEqual({ id: 'coral-festival-2026-08', points: 420, claimed: [0, 1] });
   });
 
-  it('bozuk JSON parseSave tarafından reddedilir', () => {
+  it('has parseSave reject malformed JSON', () => {
     expect(parseSave('{bozuk')).toBeNull();
     expect(parseSave('null')).toBeNull();
   });
