@@ -3,11 +3,12 @@ import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
-import { FishSave, SaveData, loadSave, persist, wipeSave } from './save';
+import { FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
 import { Services, createServices } from './services';
 import {
-  EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById,
+  EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, SPEEDUP_MS_PER_PEARL,
+  Species, speciesById,
 } from './species';
 import { FEEDS, FISH_BONUS_CAP, FeedDef, feedById, feedPackById } from './feeds';
 import { Biome, TANKS, TANK_CAP_BONUS, TankDef, tankById } from './tanks';
@@ -1420,9 +1421,19 @@ export class Game {
     return { ok: true, msg: t('{qty} × {name} added to your bag! 🎒', { qty: p.qty, name: t(feedById(p.feed).name) }) };
   }
 
+  /**
+   * Fish already swimming PLUS eggs incubating: an incubating egg has been
+   * paid for and has to land somewhere, so it holds its slot. Without this a
+   * player could buy an egg and then fill the tank while it hatches, and the
+   * egg would have nowhere to go through no fault of their own.
+   */
+  private get reservedSlots(): number {
+    return this.fishes.length + this.save.pendingEggs.length;
+  }
+
   buyFish(spId: string): { ok: boolean; msg: string } {
     const sp = speciesById(spId);
-    if (this.fishes.length >= this.capacity) return { ok: false, msg: t('This tank is full ({cap} fish)', { cap: this.capacity }) };
+    if (this.reservedSlots >= this.capacity) return { ok: false, msg: t('This tank is full ({cap} fish)', { cap: this.capacity }) };
     if (sp.pearlPrice) {
       if (this.save.pearls < sp.pearlPrice) return { ok: false, msg: t('Not enough pearls') };
       this.save.pearls -= sp.pearlPrice;
@@ -1503,8 +1514,13 @@ export class Game {
     return { ok: false, msg: t('Fish not found') };
   }
 
-  hatchEgg(tier: EggTier): { ok: boolean; msg: string; species?: Species } {
-    if (this.fishes.length >= this.capacity) return { ok: false, msg: t('This tank is full ({cap} fish)', { cap: this.capacity }) };
+  /**
+   * Buys an egg. A tier WITHOUT `hatchMs` behaves exactly as it always has —
+   * pay, roll, fish in the tank, one tap. A tier WITH one only takes payment
+   * here and queues the egg; nothing is rolled until it is collected.
+   */
+  hatchEgg(tier: EggTier): { ok: boolean; msg: string; species?: Species; pending?: PendingEgg } {
+    if (this.reservedSlots >= this.capacity) return { ok: false, msg: t('This tank is full ({cap} fish)', { cap: this.capacity }) };
     if (tier.currency === 'coins') {
       if (this.save.coins < tier.cost) return { ok: false, msg: t('Not enough coins') };
       this.save.coins -= tier.cost;
@@ -1513,6 +1529,26 @@ export class Game {
       this.save.pearls -= tier.cost;
     }
 
+    if (tier.hatchMs) {
+      const egg: PendingEgg = { id: this.nextEggId(), tier: tier.id, readyAt: Date.now() + tier.hatchMs };
+      this.save.pendingEggs.push(egg);
+      this.syncSave();
+      this.ui.refreshHUD();
+      return { ok: true, msg: t('{name} is incubating.', { name: t(tier.name) }), pending: egg };
+    }
+
+    const sp = this.rollEggSpecies(tier);
+    return this.deliverEgg(sp);
+  }
+
+  /** Ids only need to be unique within one save; the largest in use plus one is enough. */
+  private nextEggId(): number {
+    return this.save.pendingEggs.reduce((n, e) => Math.max(n, e.id), 0) + 1;
+  }
+
+  /** Rolls a tier's odds. The golden egg's pity counter advances here, at the
+   *  moment the roll actually happens — i.e. at collect time for a timed egg. */
+  private rollEggSpecies(tier: EggTier): Species {
     let rarity: Rarity = 'common';
     if (tier.id === 'altin' && this.save.pityCounter >= PITY_LIMIT - 1) {
       rarity = 'legendary'; // guaranteed
@@ -1528,9 +1564,12 @@ export class Game {
     if (tier.id === 'altin') {
       this.save.pityCounter = rarity === 'legendary' ? 0 : this.save.pityCounter + 1;
     }
-
     const pool = SPECIES.filter((s) => s.rarity === rarity);
-    const sp = pool[Math.floor(Math.random() * pool.length)];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  /** The shared tail of both hatch paths: fish into the tank, stats, quests, sound. */
+  private deliverEgg(sp: Species): { ok: boolean; msg: string; species: Species } {
     this.spawnFish(this.newFishSave(sp));
     this.save.stats.eggsHatched++;
     this.questEvent('hatch', 1);
@@ -1538,6 +1577,65 @@ export class Game {
     this.syncSave();
     this.ui.refreshHUD();
     return { ok: true, msg: '', species: sp };
+  }
+
+  /** Eggs currently incubating, soonest first. */
+  pendingEggs(): PendingEgg[] {
+    return [...this.save.pendingEggs].sort((a, b) => a.readyAt - b.readyAt);
+  }
+
+  /** How many incubating eggs are ready to be collected right now. */
+  readyEggs(): number {
+    const now = Date.now();
+    return this.save.pendingEggs.filter((e) => e.readyAt <= now).length;
+  }
+
+  /**
+   * Pearls to finish an egg immediately — one per SPEEDUP_MS_PER_PEARL of
+   * remaining wait, rounded up, minimum one so the button is never free.
+   */
+  eggSpeedUpCost(egg: PendingEgg): number {
+    const left = egg.readyAt - Date.now();
+    if (left <= 0) return 0;
+    return Math.max(1, Math.ceil(left / SPEEDUP_MS_PER_PEARL));
+  }
+
+  speedUpEgg(id: number): { ok: boolean; msg: string } {
+    const egg = this.save.pendingEggs.find((e) => e.id === id);
+    if (!egg) return { ok: false, msg: t('That egg is gone.') };
+    const cost = this.eggSpeedUpCost(egg);
+    if (cost === 0) return { ok: true, msg: '' };
+    if (this.save.pearls < cost) return { ok: false, msg: t('Not enough pearls') };
+    this.save.pearls -= cost;
+    egg.readyAt = Date.now();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: '' };
+  }
+
+  /**
+   * Collects a ready egg into the active tank. The tank being full does NOT
+   * consume the egg — it stays queued until there is room.
+   *
+   * Readiness is a wall-clock comparison, so moving the device clock forward
+   * skips the wait. That is accepted, and it is why the speed-up is priced
+   * off remaining time rather than being the egg's real cost: the egg is paid
+   * for in full at purchase, and the only thing the clock can steal is the
+   * impatience surcharge.
+   */
+  collectEgg(id: number): { ok: boolean; msg: string; species?: Species } {
+    const idx = this.save.pendingEggs.findIndex((e) => e.id === id);
+    if (idx < 0) return { ok: false, msg: t('That egg is gone.') };
+    const egg = this.save.pendingEggs[idx];
+    if (egg.readyAt > Date.now()) return { ok: false, msg: t('This egg is still incubating.') };
+    if (this.fishes.length >= this.capacity) {
+      return { ok: false, msg: t('This tank is full ({cap} fish)', { cap: this.capacity }) };
+    }
+    const tier = EGGS.find((e) => e.id === egg.tier);
+    if (!tier) { this.save.pendingEggs.splice(idx, 1); return { ok: false, msg: t('That egg is gone.') }; }
+    const sp = this.rollEggSpecies(tier);
+    this.save.pendingEggs.splice(idx, 1);
+    return this.deliverEgg(sp);
   }
 
   // ---------- decor ----------
