@@ -41,6 +41,18 @@ export interface QuestState {
   claimed: string[];                 // rewards claimed today
 }
 
+/**
+ * Progress in the current timed event. `id` is what makes the reset safe: a
+ * different active event id means a different festival, so points and claims
+ * start over. It is NOT reset merely because no event is running, or the grace
+ * window after an event ends would have nothing left to pay out.
+ */
+export interface EventState {
+  id: string;        // EventDef id, '' when the player has not entered one yet
+  points: number;
+  claimed: number[]; // indexes into EventDef.tiers
+}
+
 export interface SaveData {
   v: number;
   coins: number;
@@ -62,6 +74,7 @@ export interface SaveData {
   friendGifts: { day: string; gifted: string[] };                  // friend codes gifted today
   quests: QuestState;
   weeklyQuest: QuestState; // here the "day" field holds this week's Monday date (week key)
+  event: EventState;       // timed event ("Coral Festival") points and claimed tiers
   achievementsClaimed: string[];
   stats: {
     totalSold: number;
@@ -139,6 +152,7 @@ export function defaultSave(): SaveData {
     friendGifts: { day: '', gifted: [] },
     quests: { day: '', progress: {}, claimed: [] },
     weeklyQuest: { day: '', progress: {}, claimed: [] },
+    event: { id: '', points: 0, claimed: [] },
     achievementsClaimed: [],
     pendingEggs: [],
     stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 0, totalCleaned: 0 },
@@ -229,6 +243,7 @@ export function hasProgress(s: SaveData): boolean {
   }
 
   if (s.pendingEggs.length > 0) return true;
+  if (s.event.points > 0 || s.event.claimed.length > 0) return true;
   if (s.pityCounter > 0) return true;
   if (s.streak > 1 || s.bestStreak > 1) return true;
   if (s.cleanRewardCount > 0) return true;
@@ -351,6 +366,11 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   // Saves written before the Abyssal Egg have no field at all; an empty queue
   // is the correct reading of "this player has nothing incubating".
   if (!Array.isArray(merged.pendingEggs)) merged.pendingEggs = [];
+  // Saves written before the first timed event carry no field at all.
+  if (!merged.event || typeof merged.event !== 'object') merged.event = { id: '', points: 0, claimed: [] };
+  if (typeof merged.event.id !== 'string') merged.event.id = '';
+  if (typeof merged.event.points !== 'number' || !Number.isFinite(merged.event.points)) merged.event.points = 0;
+  if (!Array.isArray(merged.event.claimed)) merged.event.claimed = [];
   if (merged.lang !== 'tr' && merged.lang !== 'en') merged.lang = detectLang();
   // Saved free-text fields (localStorage can be edited directly; don't rely
   // solely on the UI's input sanitization — sanitize here too as defense against HTML injection).
