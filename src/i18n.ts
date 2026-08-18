@@ -852,6 +852,8 @@ const TR: Record<string, string> = {
   '"No Diving"': '"Dalış Yasak"',
   '"Reefy"': '"Reefy"',
   'big reward tomorrow': 'yarın büyük ödül',
+  'waiting in the vault': 'kasada bekliyor',
+  'COLLECT': 'TOPLA',
   'Fishing Boat Shipwreck': 'Balıkçı Teknesi Batık',
   'Galleon Shipwreck': 'Kalyon Batık',
 };

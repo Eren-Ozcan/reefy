@@ -275,7 +275,14 @@ export class UI {
         <button data-act="social">${ICON_TROPHY}<span>${tt('Social')}</span></button>
         <button data-act="more">${ICON_MENU}<span>${tt('More')}</span></button>
       </div>
-      <button id="collect-btn" class="empty">${ICON_COIN}<b id="collect-amount">0</b><span id="collect-rate">0${tt('/hr')}</span></button>
+      <div id="collect" class="empty">
+        <div class="collect-bubble">
+          <b id="collect-amount">0</b>
+          <small id="collect-label">${tt('waiting in the vault')}</small>
+        </div>
+        <button id="collect-btn">${ICON_COIN}<span>${tt('COLLECT')}</span></button>
+        <div class="collect-rate" id="collect-rate"></div>
+      </div>
       <div id="feed-pop" class="hidden"></div>
       <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">${tt('Done ✓')}</button></div>
       <div id="panel-host"></div>
@@ -458,11 +465,12 @@ export class UI {
   /** Updates the passive income button (called ~2 times per second from the game loop). */
   updateIncome(pot: number, ratePerHour: number): void {
     if (!this.root) return;
-    const btn = this.root.querySelector<HTMLElement>('#collect-btn');
-    if (!btn) return;
-    // Button is always visible — shows 0 even when there are no adult fish
-    btn.classList.remove('hidden');
-    btn.classList.toggle('empty', pot < 1);
+    const host = this.root.querySelector<HTMLElement>('#collect');
+    if (!host) return;
+    // Always visible — shows 0 even when there are no adult fish, so the player
+    // learns where income lands before they own anything that produces it.
+    host.classList.remove('hidden');
+    host.classList.toggle('empty', pot < 1);
     this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
     this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}${tt('/hr')}`;
   }
