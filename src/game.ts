@@ -2,6 +2,7 @@ import { Application, Container, FillGradient, Graphics, Rectangle, Sprite, Text
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
+import { EventDef, EventTier, activeEvent, claimableEvent, tierReached } from './events';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
 import { FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
@@ -1003,6 +1004,8 @@ export class Game {
     }
     const wq = this.weeklyQuest();
     if (!this.save.weeklyQuest.claimed.includes(wq.id) && (this.save.weeklyQuest.progress[wq.id] ?? 0) >= wq.target) n++;
+    const ev = this.visibleEvent();
+    if (ev) n += this.eventClaimable(ev);
     return n;
   }
 
@@ -1067,6 +1070,107 @@ export class Game {
           this.ui.toast(t('🏅 Weekly quest complete: {name} — claim your reward from Quests!', { name: t(wq.name) }));
         }
       }
+    }
+
+    this.eventProgress(ev, n);
+  }
+
+  // ---------- timed event ----------
+
+  /** Today's day key, in the same UTC form ensureQuestDay() uses. */
+  private todayKey(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  /** The event scoring right now, or null when none is running. */
+  activeEvent(): EventDef | null {
+    return activeEvent(this.todayKey());
+  }
+
+  /**
+   * The event whose panel is worth showing: the running one, or one that ended
+   * within the grace window and still has an unclaimed tier. A finished event
+   * with nothing left to collect disappears rather than lingering as a row
+   * that does nothing.
+   */
+  visibleEvent(): EventDef | null {
+    const def = claimableEvent(this.todayKey());
+    if (!def) return null;
+    if (this.activeEvent()) return def;
+    if (this.save.event.id !== def.id) return null;
+    return this.eventClaimable(def) > 0 ? def : null;
+  }
+
+  /**
+   * Points and claims start over when a DIFFERENT event becomes active. Note
+   * what this deliberately does not do: it never resets just because no event
+   * is running, or the grace window would have nothing left to pay out.
+   */
+  private ensureEventState(def: EventDef): void {
+    if (this.save.event.id !== def.id) {
+      this.save.event = { id: def.id, points: 0, claimed: [] };
+    }
+  }
+
+  eventPoints(): number {
+    return this.save.event.points;
+  }
+
+  /** Tiers reached but not yet claimed — what the dock badge counts. */
+  eventClaimable(def: EventDef): number {
+    if (this.save.event.id !== def.id) return 0;
+    const reached = tierReached(def, this.save.event.points);
+    let n = 0;
+    for (let i = 0; i <= reached; i++) if (!this.save.event.claimed.includes(i)) n++;
+    return n;
+  }
+
+  /** The next tier still ahead of the player, or null once all are reached. */
+  nextEventTier(def: EventDef): EventTier | null {
+    const pts = this.save.event.id === def.id ? this.save.event.points : 0;
+    return def.tiers.find((tr) => pts < tr.points) ?? null;
+  }
+
+  claimEventTier(index: number): { ok: boolean; msg: string } {
+    const def = claimableEvent(this.todayKey());
+    if (!def) return { ok: false, msg: t('This festival has ended.') };
+    if (this.save.event.id !== def.id) return { ok: false, msg: t('This festival has ended.') };
+    const tier = def.tiers[index];
+    if (!tier) return { ok: false, msg: t('Unknown reward') };
+    if (this.save.event.points < tier.points) return { ok: false, msg: t('Not enough festival points yet.') };
+    if (this.save.event.claimed.includes(index)) return { ok: false, msg: t('Reward already claimed.') };
+    this.save.event.claimed.push(index);
+    // Event rewards are FLAT, unlike quests, which scale with level. The tiers
+    // are sized against the whole event rather than against one task, so
+    // multiplying them again would make a late-game festival dwarf everything.
+    this.save.coins += tier.coins;
+    this.save.pearls += tier.pearls;
+    audio.levelup();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return {
+      ok: true,
+      msg: t('+{coins} coins', { coins: tier.coins }) + (tier.pearls ? t(', +{n} pearls', { n: tier.pearls }) : ''),
+    };
+  }
+
+  /**
+   * Scores one gameplay event toward the running festival. Called from
+   * questEvent(), so every existing call site feeds the festival for free and
+   * no action can be scored by the quests but missed by the event.
+   */
+  private eventProgress(ev: QuestEvent, n: number): void {
+    const def = this.activeEvent();
+    if (!def) return;
+    const per = def.points[ev];
+    if (!per) return;
+    this.ensureEventState(def);
+    const before = tierReached(def, this.save.event.points);
+    this.save.event.points += per * n;
+    const after = tierReached(def, this.save.event.points);
+    if (after > before) {
+      audio.quest();
+      this.ui.toast(t('{emoji} Festival tier reached — claim it from Quests!', { emoji: def.emoji }));
     }
   }
 
