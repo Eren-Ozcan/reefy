@@ -130,6 +130,23 @@ export class CloudSave {
     return this.blocked && this.pendingCloud !== null;
   }
 
+  /**
+   * Set when a write is REJECTED BY THE RULE, which in practice means one
+   * thing: another device wrote in the meantime and this device's rev is now
+   * behind. Retrying the same rev can only be rejected again, so without a
+   * signal the session would keep failing every throttle window until the app
+   * was restarted — sync() only ever ran at startup.
+   *
+   * The caller re-runs sync(), which is what actually resolves it: identical
+   * content settles silently, genuinely diverged content raises the conflict
+   * screen.
+   */
+  private stale = false;
+
+  get isStale(): boolean {
+    return this.stale;
+  }
+
   /** The summary of the cloud save that the conflict screen will show. */
   get conflictSummary(): CloudSummary | null {
     return this.pendingCloud?.summary ?? null;
@@ -144,6 +161,7 @@ export class CloudSave {
    * makes the next sync() see both sides and let the user choose.
    */
   resetForNewAccount(): void {
+    this.stale = false;
     this.rev = 0;
     this.dirty = true;
     this.blocked = false;
@@ -197,6 +215,10 @@ export class CloudSave {
    * reference — services.ts providers hold onto the same object).
    */
   async sync(save: SaveData): Promise<CloudSyncResult> {
+    // Whatever this sync decides IS the answer to the staleness question, so
+    // the flag is cleared here rather than by the caller — leaving it to the
+    // caller would mean every future call site has to remember to.
+    this.stale = false;
     const uid = await withTimeout(ensureUid(), AUTH_TIMEOUT_MS);
     if (!uid) return 'disabled';
 
@@ -394,7 +416,11 @@ export class CloudSave {
       // could let the local save get ahead of the cloud and later overwrite
       // another device's genuinely newer progress without ever hitting the
       // conflict screen.
-      if (outcome === 'rejected') return false; // dirty stays set, rev stays UNCHANGED
+      if (outcome === 'rejected') {
+        // A rejection here is almost always a stale rev — see `stale` above.
+        this.stale = true;
+        return false; // dirty stays set, rev stays UNCHANGED
+      }
       this.rev = nextRev;
       if (outcome !== 'ok') return false; // timeout: dirty stays set, retried later
 

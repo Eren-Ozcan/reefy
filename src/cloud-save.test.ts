@@ -105,8 +105,8 @@ beforeEach(() => {
   getDocMock.mockReset().mockResolvedValue(noCloudDoc);
 });
 
-describe('bulut kaydı yokken', () => {
-  it('yerel kaydı yükler ve rev 1 yazar', async () => {
+describe('when there is no cloud save', () => {
+  it('uploads the local save and writes rev 1', async () => {
     const save = playedSave();
     const cloud = new CloudSave();
 
@@ -119,7 +119,7 @@ describe('bulut kaydı yokken', () => {
     expect(localStorage.getItem(REV_KEY)).toBe('1');
   });
 
-  it('yüklenen paketten reklamsız sürüm hakkını çıkarır', async () => {
+  it('strips the ad-free entitlement out of the uploaded payload', async () => {
     const save = playedSave();
     save.adsRemoved = true;
 
@@ -129,7 +129,7 @@ describe('bulut kaydı yokken', () => {
     expect(JSON.parse(written.payload)).not.toHaveProperty('adsRemoved');
   });
 
-  it('çakışma özetini payload açılmadan okunabilir biçimde yazar', async () => {
+  it('writes a summary the conflict screen can read without opening the payload', async () => {
     const save = playedSave();
     await new CloudSave().sync(save);
 
@@ -138,8 +138,8 @@ describe('bulut kaydı yokken', () => {
   });
 });
 
-describe('bulut geride ya da eşitken', () => {
-  it('yerel en az bulut kadar güncelse dokunmaz', async () => {
+describe('when the cloud is behind or level', () => {
+  it('leaves both sides alone when local is at least as current', async () => {
     localStorage.setItem(REV_KEY, '5');
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 5 }));
 
@@ -150,7 +150,7 @@ describe('bulut geride ya da eşitken', () => {
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('yerel güncel ama gönderilmemiş değişiklik varsa yükler', async () => {
+  it('uploads when local is current but has unsent changes', async () => {
     localStorage.setItem(REV_KEY, '5');
     localStorage.setItem(DIRTY_KEY, '1');
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 5 }));
@@ -160,8 +160,8 @@ describe('bulut geride ya da eşitken', () => {
   });
 });
 
-describe('bulut ilerideyken', () => {
-  it('yerelde gönderilmemiş değişiklik yoksa geri yükler', async () => {
+describe('when the cloud is ahead', () => {
+  it('restores when local has no unsent changes', async () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
     const save = playedSave();
@@ -174,7 +174,7 @@ describe('bulut ilerideyken', () => {
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('iki tarafta da ilerleme varsa KARAR VERMEZ, çakışma bildirir', async () => {
+  it('DECIDES NOTHING when both sides progressed — it reports a conflict', async () => {
     localStorage.setItem(DIRTY_KEY, '1');
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
@@ -190,7 +190,7 @@ describe('bulut ilerideyken', () => {
     });
   });
 
-  it('sunucu damgası yoksa özetteki zaman 0 kalır', async () => {
+  it('leaves the summary time at 0 when the server stamp is missing', async () => {
     localStorage.setItem(DIRTY_KEY, '1');
     getDocMock.mockResolvedValue({
       exists: () => true,
@@ -210,8 +210,8 @@ describe('bulut ilerideyken', () => {
   });
 });
 
-describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
-  it('bakir kayıt "değişmiş" işaretli olsa bile çakışma ekranı göstermez', async () => {
+describe('the fast path — when there is no local effort to sacrifice', () => {
+  it('shows no conflict screen for an untouched save, even one marked dirty', async () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
     const save = freshButDirty();
@@ -226,14 +226,14 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
     expect(localStorage.getItem(DIRTY_KEY)).toBe('0');
   });
 
-  it('geri yüklerken buluta yazmaz — buluttaki kayıt olduğu gibi kalır', async () => {
+  it('writes nothing to the cloud while restoring — the cloud copy stays intact', async () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
     await new CloudSave().sync(freshButDirty());
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('hızlı yolda da reklamsız sürüm hakkı buluttan GELMEZ', async () => {
+  it('still does NOT take the ad-free entitlement from the cloud', async () => {
     const cloudSave = advancedSave();
     cloudSave.adsRemoved = true; // even if it's set in the cloud (a manually tampered document)
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(cloudSave), rev: 4 }));
@@ -245,7 +245,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
     expect(save.adsRemoved).toBe(false);
   });
 
-  it('hızlı yolda cihazda SAHİP OLUNAN hak da kaybolmaz', async () => {
+  it('does not lose an entitlement the device already OWNS', async () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
     const save = freshButDirty();
@@ -255,7 +255,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
     expect(save.adsRemoved).toBe(true);
   });
 
-  it('en küçük gerçek ilerleme bile hızlı yolu KAPATIR', async () => {
+  it('CLOSES the fast path on even the smallest real progress', async () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
     const save = freshButDirty();
@@ -267,7 +267,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
     expect(save.stats.totalFed).toBe(1);
   });
 
-  it('buluttaki kayıt bozuksa yerel kayıt korunur', async () => {
+  it('keeps the local save when the cloud copy is corrupt', async () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: '{bozuk', rev: 4 }));
 
     const save = freshButDirty();
@@ -278,7 +278,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
     expect(localStorage.getItem(REV_KEY)).not.toBe('4');
   });
 
-  it('hesap değişiminden sonra (rev sıfırlanınca) da çalışır', async () => {
+  it('works after an account switch too, once rev has been reset', async () => {
     localStorage.setItem(REV_KEY, '30'); // the old account's counter
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
 
@@ -296,7 +296,7 @@ describe('hızlı yol — yerelde feda edilecek emek yokken', () => {
 // sync the cloud looked ahead while local looked "unsent" — the conflict
 // screen's two columns showed identical data. The rev counter knows "who
 // wrote last," not "what they wrote"; the content comparison closes that gap.
-describe('iki taraf aynı kayıtken', () => {
+describe('when both sides hold the same save', () => {
   /** Like a real upload: the ad-removal entitlement doesn't go into the payload. */
   function uploaded(s: SaveData): string {
     const copy: Record<string, unknown> = { ...s };
@@ -323,7 +323,7 @@ describe('iki taraf aynı kayıtken', () => {
     return drifted(shared);
   }
 
-  it('sürüklenmiş ama aynı olan kayıtta çakışma ekranı GÖSTERMEZ', async () => {
+  it('shows NO conflict screen for a drifted but identical save', async () => {
     const save = twoSidedSetup();
     const cloud = new CloudSave();
 
@@ -333,14 +333,14 @@ describe('iki taraf aynı kayıtken', () => {
     expect(cloud.conflictSummary).toBeNull();
   });
 
-  it('bulutun sayacını benimser — aynı çakışma her senkronda tekrarlanmaz', async () => {
+  it('adopts the cloud counter — the same conflict does not return every sync', async () => {
     const save = twoSidedSetup();
     await new CloudSave().sync(save);
 
     expect(localStorage.getItem(REV_KEY)).toBe('4');
   });
 
-  it('GERİ YÜKLEME YAPMAZ — yereldeki daha ileri durum ezilmez', async () => {
+  it('does NOT restore — a more advanced local state is not overwritten', async () => {
     // The fields we exclude from the comparison may have progressed locally.
     const save = twoSidedSetup();
     await new CloudSave().sync(save);
@@ -351,7 +351,7 @@ describe('iki taraf aynı kayıtken', () => {
     expect(save.dirtSpots[save.activeTank]).toHaveLength(1);
   });
 
-  it('buluta da yazmaz — sessiz çözümde hiçbir yazma tetiklenmez', async () => {
+  it('does not upload either — a silent resolution triggers no write at all', async () => {
     const save = twoSidedSetup();
     await new CloudSave().sync(save);
     await Promise.resolve();
@@ -359,7 +359,7 @@ describe('iki taraf aynı kayıtken', () => {
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('gönderilmemiş değişiklik korunur; sonraki yükleme bulutun üstüne yazar', async () => {
+  it('keeps unsent changes; the next upload lands on top of the cloud', async () => {
     const save = twoSidedSetup();
     const cloud = new CloudSave();
     await cloud.sync(save);
@@ -371,7 +371,7 @@ describe('iki taraf aynı kayıtken', () => {
     expect(written.rev).toBe(5); // on top of the cloud's 4
   });
 
-  it('cihazdaki reklamsız sürüm hakkı bu yolda da korunur', async () => {
+  it('keeps the device ad-free entitlement on this path as well', async () => {
     const save = twoSidedSetup();
     save.adsRemoved = true;
 
@@ -379,7 +379,7 @@ describe('iki taraf aynı kayıtken', () => {
     expect(save.adsRemoved).toBe(true);
   });
 
-  it('bulutta hak işaretli olsa bile (kurcalanmış doküman) yerele geçmez', async () => {
+  it('does not adopt an entitlement set in the cloud, tampered document or not', async () => {
     const shared = advancedSave();
     const tampered = { ...shared, adsRemoved: true };
     localStorage.setItem(DIRTY_KEY, '1');
@@ -392,7 +392,7 @@ describe('iki taraf aynı kayıtken', () => {
     expect(save.adsRemoved).toBe(false);
   });
 
-  it('tek altınlık gerçek fark bile ÇAKIŞMA olarak kalır', async () => {
+  it('stays a CONFLICT on a real difference of a single coin', async () => {
     const save = twoSidedSetup();
     save.coins += 1;
 
@@ -402,14 +402,14 @@ describe('iki taraf aynı kayıtken', () => {
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('yalnızca bir balığı farklı olan kayıt da çakışmadır', async () => {
+  it('treats a save differing by one fish as a conflict too', async () => {
     const save = twoSidedSetup();
     save.fishes.push({ ...save.fishes[0], seed: 99, name: 'Yeni' });
 
     await expect(new CloudSave().sync(save)).resolves.toBe('conflict');
   });
 
-  it('paket okunamıyorsa kuşkuda kalmaz, ÇAKIŞMA bildirir', async () => {
+  it('reports a CONFLICT rather than guessing when the payload is unreadable', async () => {
     localStorage.setItem(DIRTY_KEY, '1');
     getDocMock.mockResolvedValue(cloudDoc({ payload: '{bozuk', rev: 4 }));
 
@@ -422,7 +422,7 @@ describe('iki taraf aynı kayıtken', () => {
   });
 });
 
-describe('çakışma çözümü', () => {
+describe('resolving a conflict', () => {
   async function conflicted(): Promise<{ cloud: InstanceType<typeof CloudSave>; save: SaveData }> {
     localStorage.setItem(DIRTY_KEY, '1');
     getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 4 }));
@@ -432,7 +432,7 @@ describe('çakışma çözümü', () => {
     return { cloud, save };
   }
 
-  it('"buluttaki kalsın" seçimi kaydı uygular ve çakışmayı kapatır', async () => {
+  it('"keep the cloud one" applies that save and clears the conflict', async () => {
     const { cloud, save } = await conflicted();
 
     expect(cloud.resolveKeepCloud(save)).toBe(true);
@@ -441,7 +441,7 @@ describe('çakışma çözümü', () => {
     expect(localStorage.getItem(REV_KEY)).toBe('4');
   });
 
-  it('"bu cihaz kalsın" seçimi yereli buluttaki sürümün üstüne yazar', async () => {
+  it('"keep this device" writes local over the cloud revision', async () => {
     const { cloud, save } = await conflicted();
 
     await cloud.resolveKeepLocal(save);
@@ -452,7 +452,7 @@ describe('çakışma çözümü', () => {
     expect(written.rev).toBe(5); // on top of the cloud's 4
   });
 
-  it('çakışma çözülmeden hiçbir yazma geçmez', async () => {
+  it('lets no write through until the conflict is resolved', async () => {
     const { cloud, save } = await conflicted();
 
     cloud.markDirty();
@@ -464,8 +464,8 @@ describe('çakışma çözümü', () => {
   });
 });
 
-describe('yazmayı reddeden durumlar', () => {
-  it('buluttaki şema bu istemciden yeniyse hiç dokunmaz', async () => {
+describe('cases that refuse to write', () => {
+  it('touches nothing when the cloud schema is newer than this client', async () => {
     getDocMock.mockResolvedValue(
       cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 9, schemaVersion: SAVE_SCHEMA_VERSION + 1 }),
     );
@@ -477,7 +477,7 @@ describe('yazmayı reddeden durumlar', () => {
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('oturum açılamazsa sessizce devre dışı kalır', async () => {
+  it('goes quietly disabled when it cannot sign in', async () => {
     ensureUid.mockResolvedValue(null);
 
     await expect(new CloudSave().sync(playedSave())).resolves.toBe('disabled');
@@ -485,14 +485,14 @@ describe('yazmayı reddeden durumlar', () => {
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('doküman okunamazsa sessizce devre dışı kalır', async () => {
+  it('goes quietly disabled when the document cannot be read', async () => {
     getDocMock.mockRejectedValue(new Error('offline'));
 
     await expect(new CloudSave().sync(playedSave())).resolves.toBe('disabled');
     expect(setDocMock).not.toHaveBeenCalled();
   });
 
-  it('payload metin değilse geri yükleme denenmez', async () => {
+  it('does not attempt a restore when the payload is not text', async () => {
     getDocMock.mockResolvedValue(cloudDoc({ payload: { level: 9 }, rev: 4 }));
 
     const save = playedSave();
@@ -500,7 +500,7 @@ describe('yazmayı reddeden durumlar', () => {
     expect(save.level).toBe(3);
   });
 
-  it('yazma hatası dirty bayrağını KORUR — sonra tekrar denenir', async () => {
+  it('KEEPS the dirty flag on a write failure — it is retried later', async () => {
     setDocMock.mockRejectedValue(new Error('permission-denied'));
 
     const cloud = new CloudSave();
@@ -510,8 +510,72 @@ describe('yazmayı reddeden durumlar', () => {
   });
 });
 
-describe('kısıtlama (throttle)', () => {
-  it('art arda gelen maybeUpload çağrıları tek yazmaya iner', async () => {
+// Two devices live at the same time: A has already written rev 7 while B is
+// still on rev 5. B's next upload asks for rev 6, which the rule rejects
+// (`rev > resource.data.rev` is false). Every earlier test had the OTHER device
+// idle, so this path had never run.
+describe('two devices writing in the same window', () => {
+  it('does not advance rev when the write is rejected', async () => {
+    localStorage.setItem(REV_KEY, '5');
+    setDocMock.mockRejectedValue(new Error('permission-denied'));
+
+    const cloud = new CloudSave();
+    cloud.markDirty();
+    cloud.flush(playedSave());
+    await vi.waitFor(() => expect(setDocMock).toHaveBeenCalled());
+
+    // Advancing here would let the device climb past the cloud and later
+    // overwrite the other device's progress without any conflict screen.
+    expect(localStorage.getItem(REV_KEY)).toBe('5');
+    expect(localStorage.getItem(DIRTY_KEY)).not.toBe('0');
+  });
+
+  it('marks itself stale so the session can recover without a restart', async () => {
+    localStorage.setItem(REV_KEY, '5');
+    setDocMock.mockRejectedValue(new Error('permission-denied'));
+
+    const cloud = new CloudSave();
+    cloud.markDirty();
+    cloud.flush(playedSave());
+    await vi.waitFor(() => expect(cloud.isStale).toBe(true));
+  });
+
+  it('clears stale on the next sync, which is what resolves the rev', async () => {
+    localStorage.setItem(REV_KEY, '5');
+    setDocMock.mockRejectedValue(new Error('permission-denied'));
+    const cloud = new CloudSave();
+    cloud.markDirty();
+    cloud.flush(playedSave());
+    await vi.waitFor(() => expect(cloud.isStale).toBe(true));
+
+    // The other device's document, one revision ahead and with the same
+    // content: sync() settles it silently and the device carries on.
+    setDocMock.mockResolvedValue(undefined);
+    const save = playedSave();
+    getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(save), rev: 7 }));
+    await cloud.sync(save);
+
+    expect(cloud.isStale).toBe(false);
+    expect(localStorage.getItem(REV_KEY)).toBe('7');
+  });
+
+  it('raises a conflict when the other device wrote something genuinely different', async () => {
+    localStorage.setItem(REV_KEY, '5');
+    setDocMock.mockRejectedValue(new Error('permission-denied'));
+    const cloud = new CloudSave();
+    cloud.markDirty();
+    cloud.flush(playedSave());
+    await vi.waitFor(() => expect(cloud.isStale).toBe(true));
+
+    setDocMock.mockResolvedValue(undefined);
+    getDocMock.mockResolvedValue(cloudDoc({ payload: JSON.stringify(advancedSave()), rev: 7 }));
+    await expect(cloud.sync(playedSave())).resolves.toBe('conflict');
+    expect(cloud.hasConflict).toBe(true);
+  });
+});
+
+describe('throttling', () => {
+  it('collapses back-to-back maybeUpload calls into a single write', async () => {
     localStorage.setItem(REV_KEY, '2');
     const cloud = new CloudSave();
     const save = playedSave();
