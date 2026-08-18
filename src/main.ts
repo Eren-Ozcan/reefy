@@ -55,7 +55,7 @@ playBtn.addEventListener('click', () => {
 
   void (async () => {
     const game = new Game();
-    initLang(game.save.lang);
+    initLang(game.save.lang, game.save.langChosen);
     const ui = new UI(game);
     game.ui = ui;
 
@@ -67,7 +67,7 @@ playBtn.addEventListener('click', () => {
     // window; sync() mutates `save` IN PLACE (see cloud-save.ts), so the
     // lang/music/sfx read above may now be stale — reapply with the real
     // final value now that init() is done.
-    initLang(game.save.lang);
+    initLang(game.save.lang, game.save.langChosen);
     audio.music = game.save.music;
     audio.sfx = game.save.sfx;
     ui.mount(document.getElementById('ui')!);

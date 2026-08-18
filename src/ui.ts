@@ -1527,6 +1527,9 @@ export class UI {
         const l = btn.dataset.lang as Lang;
         if (l === lang) return;
         s.lang = l;
+        // From here on this is a CHOICE, and outranks detection on every
+        // future launch (see save.ts langChosen).
+        s.langChosen = true;
         setLang(l);
         this.game.syncSave();
         audio.click();

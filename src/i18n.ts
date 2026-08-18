@@ -107,11 +107,22 @@ export function setLang(l: Lang): void {
   try { localStorage.setItem(STORAGE_KEY, l); } catch { /* localStorage may be disabled */ }
 }
 
-/** A stored preference for a language that is no longer offered (a save from when
- *  Turkish shipped) resolves to an available one instead of being honoured. The
- *  saved value itself is left alone, so the preference returns with the language. */
-export function initLang(saved?: Lang): void {
-  current = isAvailable(saved) ? saved : detectLang();
+/**
+ * Applies the language once the save is loaded.
+ *
+ * The save's `lang` is honoured ONLY when the player actually chose it. A save
+ * written while the game shipped English-only carries `lang: 'en'` that nobody
+ * picked — the settings row was hidden, so there was nothing to pick — and
+ * treating that as a preference left Turkish players stuck in English on a
+ * Turkish device. Found on the emulator: the menu came up Turkish, from
+ * detectLang(), while the game came up English, from the save.
+ *
+ * A stored preference for a language no longer offered also falls back to
+ * detection. The saved value itself is left alone, so the preference returns
+ * if the language does.
+ */
+export function initLang(saved?: Lang, chosen = false): void {
+  current = chosen && isAvailable(saved) ? saved : detectLang();
 }
 
 /** English distinguishes singular from plural where Turkish doesn't, so the few

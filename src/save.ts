@@ -101,6 +101,14 @@ export interface SaveData {
   editHintSeen: boolean; // whether the decor edit hint has been shown once
   adsRemoved: boolean; // whether the "Remove ads" IAP has been purchased
   lang: Lang;
+  /**
+   * Whether `lang` is a CHOICE the player made, rather than a guess. Without
+   * this the two are indistinguishable, and a guess that was forced — every
+   * save written while the game shipped English-only got `lang: 'en'` because
+   * that was the only available language — reads later as a deliberate
+   * preference and locks the player out of their own language for good.
+   */
+  langChosen: boolean;
 }
 
 const KEY = 'reefy-save-v1';
@@ -172,6 +180,7 @@ export function defaultSave(): SaveData {
     editHintSeen: false,
     adsRemoved: false,
     lang: detectLang(),
+    langChosen: false,
   };
 }
 
@@ -372,6 +381,10 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   if (typeof merged.event.points !== 'number' || !Number.isFinite(merged.event.points)) merged.event.points = 0;
   if (!Array.isArray(merged.event.claimed)) merged.event.claimed = [];
   if (merged.lang !== 'tr' && merged.lang !== 'en') merged.lang = detectLang();
+  // Absent on every save written before the flag existed. false is the correct
+  // reading of those: while only one language shipped, the settings row was
+  // hidden, so no player was able to choose anything.
+  if (typeof merged.langChosen !== 'boolean') merged.langChosen = false;
   // Saved free-text fields (localStorage can be edited directly; don't rely
   // solely on the UI's input sanitization — sanitize here too as defense against HTML injection).
   const stripHtml = (v: string) => v.replace(/[<>&"']/g, '').trim();
