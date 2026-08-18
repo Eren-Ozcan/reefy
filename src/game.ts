@@ -942,14 +942,40 @@ export class Game {
       this.save.streak = this.save.lastDaily === yesterday ? this.save.streak + 1 : 1;
       this.save.bestStreak = Math.max(this.save.bestStreak, this.save.streak);
       this.save.lastDaily = today;
-      const giftCoins = 200 + 50 * Math.min(7, this.save.streak);
-      const giftPearls = this.save.streak % 7 === 0 ? 3 : 1;
-      this.save.coins += giftCoins;
-      this.save.pearls += giftPearls;
+      const gift = Game.dailyGiftFor(this.save.streak);
+      this.save.coins += gift.coins;
+      this.save.pearls += gift.pearls;
       this.offline.dailyGift = true;
-      this.offline.giftCoins = giftCoins;
-      this.offline.giftPearls = giftPearls;
+      this.offline.giftCoins = gift.coins;
+      this.offline.giftPearls = gift.pearls;
     }
+  }
+
+  /** The daily gift for a given streak length. Kept in one place so the streak sheet
+   *  can show what the next days pay without restating the formula. */
+  static dailyGiftFor(streak: number): { coins: number; pearls: number } {
+    return {
+      coins: 200 + 50 * Math.min(7, streak),
+      pearls: streak % 7 === 0 ? 3 : 1,
+    };
+  }
+
+  /** The seven days of the current streak cycle, so the reward ladder is visible
+   *  rather than something the player has to infer from a number that keeps rising. */
+  streakCycle(): { day: number; coins: number; pearls: number; state: 'done' | 'today' | 'ahead' }[] {
+    const streak = Math.max(1, this.save.streak);
+    const pos = ((streak - 1) % 7) + 1;
+    const cycleStart = streak - pos + 1;
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = i + 1;
+      const gift = Game.dailyGiftFor(cycleStart + i);
+      return {
+        day,
+        coins: gift.coins,
+        pearls: gift.pearls,
+        state: day < pos ? 'done' : day === pos ? 'today' : 'ahead',
+      };
+    });
   }
 
   // ---------- quests ----------

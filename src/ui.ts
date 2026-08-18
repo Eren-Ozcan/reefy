@@ -343,6 +343,10 @@ export class UI {
       audio.click();
       this.renderInventory('tanks');
     });
+    this.hudStreak.addEventListener('click', () => {
+      audio.click();
+      this.showStreak();
+    });
     root.querySelector('#collect-btn')!.addEventListener('click', () => {
       const res = this.game.collectIncome();
       this.toast(res.msg);
@@ -1224,7 +1228,48 @@ export class UI {
             : ''}
         </div>`;
 
-    const achHTML = ACHIEVEMENTS.map((a) => {
+    // Achievements used to sit at the bottom of this same scroll, which is where the
+    // IA audit found them: reachable in principle, never seen in practice. They get
+    // their own screen and a row here that says how many are waiting.
+    const achReady = ACHIEVEMENTS.filter(
+      (a) => a.check(s) >= a.target && !s.achievementsClaimed.includes(a.id),
+    ).length;
+    const achDone = ACHIEVEMENTS.filter((a) => s.achievementsClaimed.includes(a.id)).length;
+
+    const el = this.panelShell(tt('Quests'), `
+      <h3 class="inv-head">${tt('Daily quests 🔥 Streak: {n} days', { n: s.streak })}</h3>
+      ${dailyHTML}
+      <h3 class="inv-head">${tt('Weekly quest')}</h3>
+      ${weeklyHTML}
+      <button class="nav-row" id="go-achievements">
+        <span class="nav-row-main">
+          <b>${tt('Achievements')}</b>
+          <small>${tt('{done}/{total} unlocked', { done: achDone, total: ACHIEVEMENTS.length })}</small>
+        </span>
+        ${achReady > 0 ? `<span class="nav-row-badge">${tt('{n} ready', { n: achReady })}</span>` : '<span class="nav-row-chevron">›</span>'}
+      </button>`);
+    el.querySelector('#go-achievements')!.addEventListener('click', () => {
+      audio.click();
+      this.renderAchievements();
+    });
+    el.querySelectorAll<HTMLButtonElement>('[data-claim]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const q = daily.find((x) => x.id === btn.dataset.claim)!;
+        const res = this.game.claimQuest(q);
+        this.toast(res.msg);
+        if (res.ok) this.renderQuests();
+      });
+    });
+    el.querySelector('#weekly-claim')?.addEventListener('click', () => {
+      const res = this.game.claimWeeklyQuest();
+      this.toast(res.msg);
+      if (res.ok) this.renderQuests();
+    });
+  }
+
+  private renderAchievements(): void {
+    const s = this.game.save;
+    const rows = ACHIEVEMENTS.map((a) => {
       const cur = Math.min(a.target, a.check(s));
       const claimed = s.achievementsClaimed.includes(a.id);
       const done = cur >= a.target;
@@ -1242,31 +1287,12 @@ export class UI {
         </div>`;
     }).join('');
 
-    const el = this.panelShell(tt('📋 Quests'), `
-      <h3 class="inv-head">${tt('Daily quests 🔥 Streak: {n} days', { n: s.streak })}</h3>
-      ${dailyHTML}
-      <h3 class="inv-head">${tt('Weekly quest')}</h3>
-      ${weeklyHTML}
-      <h3 class="inv-head">${tt('Achievements')}</h3>
-      ${achHTML}`);
-    el.querySelectorAll<HTMLButtonElement>('[data-claim]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const q = daily.find((x) => x.id === btn.dataset.claim)!;
-        const res = this.game.claimQuest(q);
-        this.toast(res.msg);
-        if (res.ok) this.renderQuests();
-      });
-    });
-    el.querySelector('#weekly-claim')?.addEventListener('click', () => {
-      const res = this.game.claimWeeklyQuest();
-      this.toast(res.msg);
-      if (res.ok) this.renderQuests();
-    });
+    const el = this.panelShell(tt('Achievements'), rows);
     el.querySelectorAll<HTMLButtonElement>('[data-ach]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const res = this.game.claimAchievement(btn.dataset.ach!);
         this.toast(res.msg);
-        if (res.ok) this.renderQuests();
+        if (res.ok) this.renderAchievements();
       });
     });
   }
@@ -1646,24 +1672,88 @@ export class UI {
     }, 500);
   }
 
+  /**
+   * The streak ladder. The gift already grows with the streak and every seventh day
+   * already pays three pearls instead of one; none of that was visible anywhere, so
+   * this screen adds no incentive, it just shows the one that exists.
+   */
+  private showStreak(): void {
+    const s = this.game.save;
+    const cycle = this.game.streakCycle();
+    const cells = cycle.map((c) => `
+      <div class="streak-cell ${c.state}">
+        <span class="streak-day">${c.day}</span>
+        ${c.state === 'done'
+          ? '<span class="streak-tick">✓</span>'
+          : `<span class="streak-prize">${c.pearls >= 3 ? `${ICON_PEARL}${c.pearls}` : fmt(c.coins)}</span>`}
+      </div>`).join('');
+
+    const today = cycle.find((c) => c.state === 'today')!;
+    const toSeventh = 7 - today.day;
+
+    this.panelShell(tt('Daily streak'), `
+      <div class="streak">
+        <div class="streak-count"><b>${s.streak}</b><span>${tt('days in a row')}</span></div>
+        <div class="streak-strip">${cells}</div>
+        <p class="streak-note">${toSeventh > 0
+          ? tt('{n} more days until the rare egg reward', { n: toSeventh })
+          : tt('Seventh day — the big reward is today')}</p>
+        <div class="streak-best">${tt('Best streak')}<b>${s.bestStreak} ${tt('days')}</b></div>
+      </div>`);
+  }
+
+  /** Minutes as a duration a person would say out loud: "4h 12m", not "252 minutes". */
+  private awayLabel(mins: number): string {
+    if (mins < 60) return tt('{n}m', { n: mins });
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h < 24) return m ? tt('{h}h {m}m', { h, m }) : tt('{h}h', { h });
+    const d = Math.floor(h / 24);
+    const rh = h % 24;
+    return rh ? tt('{d}d {h}h', { d, h: rh }) : tt('{d}d', { d });
+  }
+
+  /**
+   * The return receipt. Offline earnings and the daily gift used to arrive as a
+   * stack of sentences; they are the same event — what happened while you were gone —
+   * so they read as one itemised slip instead.
+   */
   private showWelcome(): void {
     const o = this.game.offline;
     if (o.minutes < 3 && !o.dailyGift) return;
-    const parts: string[] = [];
+    const s = this.game.save;
+
+    const row = (label: string, value: string) =>
+      `<div class="receipt-row"><span>${label}</span><b>${value}</b></div>`;
+
+    let body = '';
     if (o.minutes >= 3) {
-      parts.push(tt('You were away for <b>{n} minutes</b> — your fish kept growing.', { n: o.minutes }));
-      if (o.grown > 0) parts.push(tt('🎉 <b>{n} fish</b> grew up, ready to sell!', { n: o.grown }));
-      if (o.income > 0) parts.push(tt("🪙 Your fish produced <b>{n} coins</b> for you — don't forget to collect!", { n: fmt(o.income) }));
+      body += `<div class="receipt-lede">${tt('You were away')} <b>${this.awayLabel(o.minutes)}</b></div>`;
+      if (o.income > 0) body += row(tt('Your fish produced'), `${ICON_COIN}${fmt(o.income)}`);
+      if (o.grown > 0) body += row(tt('Grew up'), String(o.grown));
+      const hungry = this.game.fishes.filter((f) => f.isSad).length;
+      if (hungry > 0) body += row(tt('Hungry now'), String(hungry));
     }
+
     if (o.dailyGift) {
-      parts.push(tt('🎁 Your daily gift: <b>+{coins} coins, +{pearls} pearls</b>', { coins: o.giftCoins, pearls: o.giftPearls }));
-      if (this.game.save.streak > 1) parts.push(tt('🔥 Streak: <b>{n} days</b> — keep it up and gifts grow bigger!', { n: this.game.save.streak }));
+      const streakLine = s.streak > 1
+        ? `<small>${tt('{n} day streak', { n: s.streak })}${s.streak % 7 === 0 ? ` · ${tt('seventh day bonus')}` : ''}</small>`
+        : '';
+      body += `
+        <div class="receipt-gift">
+          <div class="receipt-gift-head"><span>${tt('Daily gift')}</span>${streakLine}</div>
+          <div class="receipt-gift-value">
+            ${ICON_COIN}<b>+${fmt(o.giftCoins)}</b>
+            ${o.giftPearls > 0 ? `${ICON_PEARL}<b>+${o.giftPearls}</b>` : ''}
+          </div>
+        </div>`;
     }
-    const el = this.panelShell(tt('🌊 Welcome back!'), `
-      <div class="welcome">${parts.map((p) => `<p>${p}</p>`).join('')}
-      <button class="buy-btn welcome-ok">${tt('Dive into your tank 🐠')}</button></div>`);
+
+    const el = this.panelShell(tt('Welcome back'), `
+      <div class="receipt">${body}
+      <button class="buy-btn welcome-ok">${tt('Dive in')}</button></div>`);
     el.querySelector('.welcome-ok')!.addEventListener('click', () => {
-      audio.click(); this.closePanel();
+      audio.click(); this.dismissPanel();
     });
   }
 

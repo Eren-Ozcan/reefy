@@ -67,6 +67,9 @@ const PLURAL_EN: Record<string, (n: number) => string> = {
   'Daily quests 🔥 Streak: {n} days': (n) => `Daily quests 🔥 Streak: ${n} day${n === 1 ? '' : 's'}`,
   '🔥 Streak: <b>{n} days</b> — keep it up and gifts grow bigger!': (n) =>
     `🔥 Streak: <b>${n} day${n === 1 ? '' : 's'}</b> — keep it up and gifts grow bigger!`,
+  '{n} more days until the rare egg reward': (n) =>
+    `${n} more day${n === 1 ? '' : 's'} until the rare egg reward`,
+  '{n} day streak': (n) => `${n} day streak`,
 };
 
 /** Translates the English text (key) to the current language; replaces {var} patterns with vars. */
@@ -856,6 +859,27 @@ const TR: Record<string, string> = {
   'COLLECT': 'TOPLA',
   'Aquarium': 'Akvaryum',
   'Next up': 'Sıradaki',
+  'You were away': 'Yokken geçen süre',
+  'Your fish produced': 'Balıkların üretti',
+  'Grew up': 'Yetişkin oldu',
+  'Hungry now': 'Şu an aç',
+  'Daily gift': 'Günlük hediye',
+  'seventh day bonus': 'yedinci gün bonusu',
+  'Welcome back': 'Tekrar hoş geldin',
+  'Dive in': 'Akvaryuma dön',
+  '{n}m': '{n} dk',
+  '{h}h': '{h} sa',
+  '{h}h {m}m': '{h} sa {m} dk',
+  '{d}d': '{d} gün',
+  '{d}d {h}h': '{d} gün {h} sa',
+  'Daily streak': 'Günlük seri',
+  'days in a row': 'gün üst üste',
+  '{n} day streak': '{n} günlük seri',
+  '{n} more days until the rare egg reward': 'Nadir yumurta ödülüne {n} gün kaldı',
+  'Seventh day — the big reward is today': 'Yedinci gün — büyük ödül bugün',
+  'Best streak': 'En uzun seri',
+  'days': 'gün',
+  '{done}/{total} unlocked': '{done}/{total} açıldı',
   'Ready': 'Hazır',
   'You': 'Sen',
   'Arrange': 'Düzen',
