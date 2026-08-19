@@ -2,10 +2,13 @@
 
 ## Where to pick up
 
-Last session ended 2026-08-19 with the web demo live and everything pushed.
-Next, in the owner's stated order: the Play Console store listing, then a promo
-video, then getting that video and a refreshed README into this repo — all of it
-under "Presenting the game" below. iOS stays parked until the owner asks for it.
+Last session ended 2026-08-20 with the store listing drafted: a repeatable
+capture script, twelve phone-sized screenshots from a progressed save, and copy
+in both languages — all on disk, none of it in Play Console yet. Next, in the
+owner's stated order: finish the store listing in the Console (upload plus a
+feature graphic), then a promo video, then getting that video and a refreshed
+README into this repo — all under "Presenting the game" below. iOS stays parked
+until the owner asks for it.
 
 ## Pending
 
@@ -45,17 +48,26 @@ evidence for whether the numbers are right.
 
 ### Store listing is now stale
 
-- [ ] **The closed-testing listing shows the old UI.** Every screenshot is the
-      old white-panel Turkish interface; the game is now a dark sheet language.
-      Four raw screenshots of the redesigned UI (tank, shop, quests, earnings
-      report) were captured from a fresh save via `npm run dev` and pushed to
-      the private `Eren-Ozcan/pictures` repo (`pictures/reefy/`) — see CLAUDE.md
-      for why they don't live in this repo. **Still needed:** the listing copy
-      itself hasn't been touched, the screenshots are raw captures (not cropped
-      to Play's required dimensions or annotated), and nothing has been
-      uploaded to Play Console yet. The fresh save also has no fish variety or
-      decor, so a save with more progress would make a better hero shot than
-      what's there now.
+- [x] **Screenshots and copy now exist** (2026-08-20). The earlier captures were
+      unusable twice over: 1568x744 desktop landscape, which is outside Play's
+      2:1 aspect ratio limit, and taken from a fresh save with two fish and no
+      decor. `tools/capture-store-screenshots.mjs` replaces them — it seeds a
+      progressed save (full tank, seven placed decor items, a stocked
+      collection) and captures twelve 1080x2340 portrait shots against
+      `npm run dev`. Listing copy for both en-US and tr-TR, plus the
+      recommended eight-shot ordering, is in
+      `docs/store-assets-originals/listing-copy.md`. All of it is gitignored
+      here and mirrored to the private `Eren-Ozcan/pictures` repo — see
+      CLAUDE.md for why.
+- [ ] **Nothing is uploaded to Play Console yet.** The copy and screenshots are
+      drafts on disk; the live closed-testing listing is still the old one.
+- [ ] **No feature graphic.** Play wants 1024x500 and nothing has been made.
+- [ ] **Turkish screenshots are not captured.** The script pins `lang: 'en'` in
+      its seed, so the tr-TR listing would currently get English shots. Running
+      it with `lang: 'tr'` produces the set; whether the tr listing gets its own
+      screenshots at all is still a call to make.
+- [ ] **Decide on captions.** The captures are plain — no text overlays. Plain
+      reads honest, captioned converts better; not decided either way.
 
 ### Playable web demo
 
@@ -74,11 +86,10 @@ evidence for whether the numbers are right.
 None of this is code; all of it is what a stranger sees first. The demo is
 live, so for the first time there is something to point a link at.
 
-- [ ] **Play Console store listing.** Still the oldest gap here: the
-      closed-testing listing shows the pre-redesign white-panel Turkish UI.
-      Needs the copy rewritten, the screenshots cropped to Play's required
-      dimensions, and the whole set uploaded. Details and the state of the raw
-      captures are in "Store listing is now stale" above.
+- [ ] **Play Console store listing.** The drafts are done as of 2026-08-20 —
+      phone-sized screenshots from a progressed save, and copy in both
+      languages. What is left is a Console session: upload the set, paste the
+      copy, and make a feature graphic. See "Store listing is now stale" above.
 - [ ] **A promo video.** Wanted for both the store listing (Play takes a
       YouTube link) and the repo. Open questions to settle when it is made:
       whether it is a silent screen capture or narrated, and whether it is cut
