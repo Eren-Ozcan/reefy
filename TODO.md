@@ -1,5 +1,12 @@
 # Roadmap
 
+## Where to pick up
+
+Last session ended 2026-08-19 with the web demo live and everything pushed.
+Next, in the owner's stated order: the Play Console store listing, then a promo
+video, then getting that video and a refreshed README into this repo — all of it
+under "Presenting the game" below. iOS stays parked until the owner asks for it.
+
 ## Pending
 
 ### Coral Festival — what the first run has to answer
