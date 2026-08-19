@@ -2,13 +2,14 @@
 
 ## Where to pick up
 
-Last session ended 2026-08-20 with the store listing drafted: a repeatable
-capture script, twelve phone-sized screenshots from a progressed save, and copy
-in both languages — all on disk, none of it in Play Console yet. Next, in the
-owner's stated order: finish the store listing in the Console (upload plus a
-feature graphic), then a promo video, then getting that video and a refreshed
-README into this repo — all under "Presenting the game" below. iOS stays parked
-until the owner asks for it.
+Last session ended 2026-08-20 with the whole store listing produced: captioned
+screenshots and a feature graphic in both English and Turkish, plus the copy —
+all on disk under `docs/store-assets-originals/`, and mirrored to the private
+pictures repo. None of it is in Play Console yet, and uploading it is the only
+part nobody but the owner can do. After that, in the owner's stated order: a
+promo video, then getting that video and a refreshed README into this repo —
+both under "Presenting the game" below. iOS stays parked until the owner asks
+for it.
 
 ## Pending
 
@@ -59,15 +60,21 @@ evidence for whether the numbers are right.
       `docs/store-assets-originals/listing-copy.md`. All of it is gitignored
       here and mirrored to the private `Eren-Ozcan/pictures` repo — see
       CLAUDE.md for why.
-- [ ] **Nothing is uploaded to Play Console yet.** The copy and screenshots are
-      drafts on disk; the live closed-testing listing is still the old one.
-- [ ] **No feature graphic.** Play wants 1024x500 and nothing has been made.
-- [ ] **Turkish screenshots are not captured.** The script pins `lang: 'en'` in
-      its seed, so the tr-TR listing would currently get English shots. Running
-      it with `lang: 'tr'` produces the set; whether the tr listing gets its own
-      screenshots at all is still a call to make.
-- [ ] **Decide on captions.** The captures are plain — no text overlays. Plain
-      reads honest, captioned converts better; not decided either way.
+- [x] **Both languages, captioned, plus a feature graphic** (2026-08-20).
+      `npm run store:screens -- --lang=en|tr --captions` writes a raw set per
+      language and a captioned variant beside it; `npm run store:feature --
+      --lang=en|tr` writes the 1024x500 graphic Play will not publish without.
+      The caption goes ABOVE the phone, not over it — the game fills the frame
+      edge to edge, so an overlay band buries either the HUD or the bottom bar.
+      The feature graphic's background is the game itself run at 1024x500 with
+      the chrome hidden, with the wordmark on the left where the store's play
+      button will not land.
+- [ ] **Nothing is uploaded to Play Console yet.** Everything above is a draft
+      on disk; the live closed-testing listing is still the pre-redesign one.
+      This is the only remaining step and it needs a Console session.
+- [ ] **Decide whether tr-TR gets its own screenshots.** The Turkish set exists,
+      but Play also allows serving the English images to every locale — one set
+      is less to re-capture every time the UI moves.
 
 ### Playable web demo
 
@@ -86,10 +93,11 @@ evidence for whether the numbers are right.
 None of this is code; all of it is what a stranger sees first. The demo is
 live, so for the first time there is something to point a link at.
 
-- [ ] **Play Console store listing.** The drafts are done as of 2026-08-20 —
-      phone-sized screenshots from a progressed save, and copy in both
-      languages. What is left is a Console session: upload the set, paste the
-      copy, and make a feature graphic. See "Store listing is now stale" above.
+- [ ] **Play Console store listing.** Everything that can be produced outside
+      the Console is done as of 2026-08-20: captioned screenshots in both
+      languages, a feature graphic in both, and the copy. What is left is
+      purely a Console session — upload and paste. See "Store listing is now
+      stale" above.
 - [ ] **A promo video.** Wanted for both the store listing (Play takes a
       YouTube link) and the repo. Open questions to settle when it is made:
       whether it is a silent screen capture or narrated, and whether it is cut
