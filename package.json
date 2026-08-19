@@ -21,7 +21,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "icons": "node tools/generate-icons.mjs",
-    "smoke": "node test-reefy.mjs"
+    "smoke": "node test-reefy.mjs",
+    "store:screens": "node tools/capture-store-screenshots.mjs",
+    "store:feature": "node tools/make-feature-graphic.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
