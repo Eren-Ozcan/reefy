@@ -100,14 +100,17 @@ been ported to both sibling games:
       auth setup in `src/referral.ts`. The save is spread across ~13 `cengel-`
       prefixed localStorage keys and is collected through an allowlist;
       date-keyed hint entries are pruned to a one-week window.
-- [ ] **Little Grand Hotel** — Firestore over REST with `HTTPRequest` (Godot has
-      no official Firebase SDK); storage, conflict modal and rules are done.
-      **Still missing: Google account linking is not wired.** `cloud_save.gd`
-      exposes `set_google_id_token_provider()` but nothing ever calls it, so
-      `is_account_linking_available()` is always false and the save is anonymous
-      and device-bound — it survives a restart but not a reinstall or a new
-      device. Also needs the Play app-signing SHA-1 once the first bundle is
-      uploaded, or Google sign-in fails only in store builds.
+- [x] **Little Grand Hotel** — this entry was stale (corrected 2026-08-19,
+      checked against LGH's own repo/TODO). Google account linking is done and
+      has been since 2026-08-08: `cloud_save.gd` calls
+      `set_google_id_token_provider(_google_signin.request_id_token)`, backed
+      by `src/cloud/google_signin.gd` — a system-browser + PKCE flow
+      (RFC 8252/7636) in pure GDScript, no native plugin, one code path for
+      Android/iOS/desktop. Proven across two real devices. The SHA-1 blocker
+      this entry warned about doesn't apply to that design at all — it's a
+      `google-services.json`/native-SDK problem, and the PKCE approach was
+      chosen specifically to avoid it (see `docs/cloud-save-setup.md` in that
+      repo). An unlink button shipped 2026-08-18 too.
 
 ### iOS
 
