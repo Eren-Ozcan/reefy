@@ -10,7 +10,11 @@
  *
  * Needs a dev server on http://localhost:5173 (npm run dev).
  *
- *   node tools/capture-store-screenshots.mjs [outDir]
+ *   node tools/capture-store-screenshots.mjs [options]
+ *
+ *     --lang=en|tr   UI language to capture in (default en)
+ *     --captions     also write a captioned set beside the raw one
+ *     --out=DIR      output directory (default docs/store-assets-originals)
  *
  * Output goes to docs/store-assets-originals/ by default, which is gitignored —
  * marketing assets are mirrored to the private pictures repo, see CLAUDE.md.
@@ -18,8 +22,22 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
-const out = process.argv[2] || 'docs/store-assets-originals';
+const argv = process.argv.slice(2);
+const flag = (name, fallback) => {
+  const hit = argv.find((a) => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : fallback;
+};
+
+const lang = flag('lang', 'en');
+if (lang !== 'en' && lang !== 'tr') throw new Error(`--lang must be en or tr, got: ${lang}`);
+const wantCaptions = argv.includes('--captions');
+// The language goes in the directory name: a tr-TR listing needs its own set,
+// and one shared folder would have each run silently overwrite the last.
+const out = flag('out', `docs/store-assets-originals/screens-${lang}`);
+const captionOut = out + '/captioned';
+
 mkdirSync(out, { recursive: true });
+if (wantCaptions) mkdirSync(captionOut, { recursive: true });
 
 const TANK = 'tank-mercan-koyu';
 
@@ -97,12 +115,46 @@ function seedSave() {
     feedHintSeen: true,
     editHintSeen: true,
     adsRemoved: false,
-    lang: 'en',
-    // The listing is English, so the language has to be a CHOICE — left false
-    // it would fall back to detection and follow the runner's machine.
+    lang,
+    // The captured language has to be a CHOICE — left false it would fall back
+    // to detection and follow the runner's machine rather than --lang.
     langChosen: true,
   };
 }
+
+/**
+ * Caption text per shot. Written per language rather than translated: the
+ * Turkish lines are shorter on purpose, because the same promise takes more
+ * characters in Turkish and a wrapped third line breaks the band.
+ */
+const CAPTIONS = {
+  en: {
+    '02-welcome-back': 'Your fish earn while you sleep',
+    '03-tank-hero': 'Grow the calmest reef on your phone',
+    '04-shop-fish': 'Collect dozens of species',
+    '05-shop-eggs': 'Hatch eggs, chase the legendary',
+    '06-shop-decor': 'Decorate it until it looks like yours',
+    '07-shop-tanks': 'Unlock aquariums with their own biomes',
+    '08-quests': 'Daily quests worth coming back for',
+    '09-inventory': 'Feed, raise, and sell for profit',
+    '10-collection': 'Fill the collection, one fish at a time',
+    '11-profile': 'Streaks, stats and achievements',
+    '12-feeding': 'Better feed, better sale price',
+  },
+  tr: {
+    '02-welcome-back': 'Sen yokken de kazanmaya devam',
+    '03-tank-hero': 'Telefonundaki en huzurlu resif',
+    '04-shop-fish': 'Onlarca balık türünü topla',
+    '05-shop-eggs': 'Yumurta çatlat, efsaneyi yakala',
+    '06-shop-decor': 'Sana benzeyene kadar tasarla',
+    '07-shop-tanks': 'Kendi biyomu olan akvaryumlar aç',
+    '08-quests': 'Her gün için yeni görevler',
+    '09-inventory': 'Besle, büyüt, kârına sat',
+    '10-collection': 'Koleksiyonu tek tek doldur',
+    '11-profile': 'Seriler, istatistikler, başarımlar',
+    '12-feeding': 'İyi yem, yüksek satış fiyatı',
+  },
+};
 
 const browser = await chromium.launch();
 const page = await browser.newPage({
@@ -110,7 +162,7 @@ const page = await browser.newPage({
   deviceScaleFactor: 2,
   isMobile: true,
   hasTouch: true,
-  locale: 'en-US',
+  locale: lang === 'tr' ? 'tr-TR' : 'en-US',
 });
 
 const errors = [];
@@ -185,10 +237,15 @@ if (await feedOpt.count()) {
 }
 await page.screenshot({ path: out + '/12-feeding.png' });
 
+if (wantCaptions) {
+  const { composeCaptioned } = await import('./compose-captioned.mjs');
+  await composeCaptioned({ browser, srcDir: out, outDir: captionOut, captions: CAPTIONS[lang] });
+}
+
 await browser.close();
 
 if (errors.length) {
   console.error('Page errors during capture:\n' + errors.join('\n'));
   process.exit(1);
 }
-console.log('Captured into ' + out);
+console.log('Captured into ' + out + (wantCaptions ? ' (+ captioned/)' : ''));
