@@ -21,43 +21,6 @@ evidence for whether the numbers are right.
       points only when the active event's id differs; shipping the same id with
       new dates would hand returning players their old points.
 
-### RevenueCat has no offering — purchases are dead today
-
-Re-confirmed on the emulator (2026-08-19) while trying to verify the
-store-currency signal; the same error was already seen and noted during the
-Capacitor 8 upgrade on 2026-08-06, so this is a known gap being written down
-properly rather than a new discovery. The SDK configures fine and reaches
-`api.revenuecat.com`, so the API key and the network are not the problem.
-`getOfferings()` fails with:
-
-> ConfigurationError — You have configured the SDK with a Play Store API key,
-> but there are no Play Store products registered in the RevenueCat dashboard
-> for your offerings.
-
-This is bigger than the language signal. Three things are non-functional on
-every device right now, not just the emulator:
-
-- [ ] **Purchases cannot complete.** `findStorePackage()` looks packages up in
-      the current offering, and there is no offering.
-- [ ] **Prices are not localized.** Every player, in every country, sees the
-      hardcoded USD fallbacks from `IAP_PACKS` — the `$2.99` visible in the
-      emulator screenshot on a Turkish device, where Play itself holds ₺39,99
-      for that product.
-- [ ] **The store-currency language signal can never fire**, since it is read
-      off a package that never arrives.
-
-The fix is dashboard configuration, not code, and **only the RevenueCat half is
-missing**. The six Play Console products already exist and have been active in
-173 countries since 2026-07-26 — `pearls_s` (₺39,99), `pearls_m` (₺99,99),
-`pearls_l` (₺229,99), `pearls_xl` (₺449,99), `starter` (₺49,99), `remove_ads`
-(₺79,99). The USD figures in `IAP_PACKS` are only the offline fallback labels.
-
-What is left: import those products into RevenueCat (Android key is already
-live) and put them in the CURRENT offering, with each package identifier
-matching the product id exactly. `loadPrices()` and `findStorePackage()` both
-key off `pkg.identifier`, so a package named anything else silently matches
-nothing. iOS stays blocked behind an Apple Developer account.
-
 ### Turkish is back — one thing left to watch
 
 - [ ] **Does Google Play actually populate `currencyCode` for these products?**
@@ -68,11 +31,10 @@ nothing. iOS stays blocked behind an Apple Developer account.
       in both directions. Changing the field name breaks those tests, which is
       the point — a wrong name would otherwise look implemented and never fire.
       What a mock cannot answer is whether the real store fills the field for
-      this app's offering. Blocked behind the RevenueCat configuration above —
-      an emulator run confirmed the error path is correct (no currency recorded,
-      no crash) but could not exercise the success path. Once offerings exist,
-      check it with a live Turkish Play account: `reefy-store-currency` should
-      read `TRY` after the shop's Pearls tab has been opened once.
+      this app's offering. The RevenueCat offering now exists (see Done), so
+      this is unblocked — check it with a live Turkish Play account:
+      `reefy-store-currency` should read `TRY` after the shop's Pearls tab has
+      been opened once.
 
 ### Store listing is now stale
 
@@ -173,6 +135,40 @@ been ported to both sibling games:
       fall through to the "store not configured" path.
 
 ## Done
+
+### RevenueCat offering configured — purchases are live (2026-08-19)
+
+Root cause was deeper than the dashboard-only gap the previous write-up
+assumed: RevenueCat had no service account credentials for Play Console at
+all, so `Import` on the Products page found nothing to import, not just an
+unconfigured offering.
+
+- Created a dedicated service account (`revenuecat-play-billing@reefy-67ac5`)
+  in the `reefy-67ac5` GCP project, matching the pattern already used for
+  Çengel Bulmaca. Downloaded its JSON key and uploaded it under the app's
+  Service Account Credentials in RevenueCat.
+- Invited that service account into Play Console → Users and permissions,
+  scoped to the Reefy app only, with **View financial data** (no order
+  management — RevenueCat only needs read access to validate transactions).
+- Enabled the **Google Play Android Developer API** in the `reefy-67ac5` GCP
+  project — it had never been turned on, which is a separate prerequisite
+  from the Play Console invite and would have kept `Import` empty even with
+  correct permissions.
+- Imported all six products (`pearls_s/m/l/xl`, `starter`, `remove_ads`).
+  `starter` and the four `pearls_*` packs are **Consumable** (repeatable
+  currency purchases); `remove_ads` is **Non-consumable** — confirmed against
+  `IAP_PACKS` in `src/services.ts`, where only `remove_ads` sets
+  `removesAds: true` and grants a permanent entitlement.
+- Created the `default` offering (RevenueCat's current offering by default,
+  being the only one) with six packages, each package identifier set to
+  match its product id exactly (`pearls_s`, `pearls_m`, etc.) — `findStorePackage()`
+  and `loadPrices()` both key off `pkg.identifier`, so a mismatched name would
+  have silently matched nothing.
+- Did **not** wire up Google developer notifications (Pub/Sub) — the app page
+  still shows "Credentials need attention" for that specific optional
+  integration, but the core Purchases API access this task needed is
+  confirmed working (Import successfully read the live Play Console catalog).
+- iOS stays blocked behind an Apple Developer account, as before.
 
 ### UI redesign — Releases A and B (2026-08-18)
 
