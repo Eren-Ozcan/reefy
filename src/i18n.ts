@@ -64,6 +64,13 @@ function storedStoreCurrency(): string {
  * above exists to prevent.
  */
 export function detectLang(): Lang {
+  // The public web demo always OPENS in English, whatever the visitor's
+  // browser reports. Its audience is people following a link from the repo
+  // rather than players in a store country, and English is the language the
+  // README and the surrounding page are already in. A visitor who wants
+  // Turkish can still pick it in Settings — setLang() persists that choice and
+  // readStored() honours it on the next visit, so this only decides the guess.
+  if (import.meta.env.VITE_DEMO === '1') return 'en';
   return looksTurkish() ? 'tr' : 'en';
 }
 
