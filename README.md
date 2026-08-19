@@ -4,6 +4,26 @@ A cozy aquarium game for Android and iOS. Collect fish, decorate tanks, feed and
 
 See [`TODO.md`](TODO.md) for the current roadmap and known gaps.
 
+## Play the demo
+
+**<https://eren-ozcan.github.io/reefy/>** — the full game running in the browser,
+no install needed. It is deployed from `master` by
+[`.github/workflows/demo.yml`](.github/workflows/demo.yml) and built with
+`VITE_DEMO=1`, which is what separates it from the shipped app:
+
+- **Everything stays in your browser.** The demo reports Firebase as
+  unconfigured (`isFirebaseConfigured()` in `src/firebase-config.ts`), so it
+  never signs anyone in and never touches the production project — no cloud
+  save, no account linking, and friend codes resolve locally instead of against
+  Firestore. Progress lives in `localStorage`; clearing site data resets it.
+- **No ads and no real purchases.** Both are wired to the native Capacitor
+  plugins, so any non-native build already falls back to stubs
+  (`createServices()` in `src/services.ts`). The shop's Pearls tab still lists
+  the packs, but tapping one declines with a note pointing at quests and level
+  rewards as the way to earn pearls in the demo (`StubIAP`).
+
+To build it locally: `VITE_DEMO=1 npm run build && npm run preview`.
+
 ## Features
 
 - **Fish & species system** — collect different species, each with its own look and behavior (`src/species.ts`, `src/fish.ts`)

@@ -50,6 +50,16 @@ evidence for whether the numbers are right.
       decor, so a save with more progress would make a better hero shot than
       what's there now.
 
+### Playable web demo
+
+- [ ] **Turn Pages on for the repo.** The workflow
+      (`.github/workflows/demo.yml`) builds and deploys on every push to
+      `master`, but it fails until Settings → Pages → Source is set to
+      **GitHub Actions**. Once it runs, confirm
+      <https://eren-ozcan.github.io/reefy/> loads and that the menu carries the
+      "Web demo" note — that note is the visible proof `VITE_DEMO=1` reached the
+      deployed bundle, and with it the Firebase cut-off.
+
 ### Housekeeping
 
 - [ ] Biome marks are raster PNGs (`src/icons/`) while the UI icons are inline
@@ -112,7 +122,11 @@ been ported to both sibling games:
       chosen specifically to avoid it (see `docs/cloud-save-setup.md` in that
       repo). An unlink button shipped 2026-08-18 too.
 
-### iOS
+### iOS — parked
+
+Not being worked on. Nothing in this section is picked up until the owner
+explicitly asks for iOS; it is kept here only so the requirements are not
+rediscovered later.
 
 - [ ] Sign in with Apple — App Store guideline 4.8 requires an equivalent
       privacy-focused option once Google sign-in is offered.
