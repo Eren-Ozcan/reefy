@@ -52,13 +52,49 @@ evidence for whether the numbers are right.
 
 ### Playable web demo
 
-- [ ] **Turn Pages on for the repo.** The workflow
-      (`.github/workflows/demo.yml`) builds and deploys on every push to
-      `master`, but it fails until Settings → Pages → Source is set to
-      **GitHub Actions**. Once it runs, confirm
-      <https://eren-ozcan.github.io/reefy/> loads and that the menu carries the
-      "Web demo" note — that note is the visible proof `VITE_DEMO=1` reached the
-      deployed bundle, and with it the Firebase cut-off.
+- [x] **Live since 2026-08-19** — <https://eren-ozcan.github.io/reefy/>, built
+      with `VITE_DEMO=1` and deployed from `master` by
+      `.github/workflows/demo.yml`. The demo opens in English whatever the
+      browser reports, and makes no Firebase request at all (verified against
+      the deployed build from both a `tr-TR` and an `en-US` context).
+- [ ] **The workflow's actions are on the deprecated Node 20 runtime.** Every
+      run warns that `actions/checkout@v4`, `setup-node@v4`,
+      `configure-pages@v5` and `upload-artifact@v4` are being forced onto
+      Node 24. Harmless today, a broken deploy the day the forcing stops.
+
+### Presenting the game — store page, video, repo
+
+None of this is code; all of it is what a stranger sees first. The demo is
+live, so for the first time there is something to point a link at.
+
+- [ ] **Play Console store listing.** Still the oldest gap here: the
+      closed-testing listing shows the pre-redesign white-panel Turkish UI.
+      Needs the copy rewritten, the screenshots cropped to Play's required
+      dimensions, and the whole set uploaded. Details and the state of the raw
+      captures are in "Store listing is now stale" above.
+- [ ] **A promo video.** Wanted for both the store listing (Play takes a
+      YouTube link) and the repo. Open questions to settle when it is made:
+      whether it is a silent screen capture or narrated, and whether it is cut
+      from the web demo (easy to capture at any resolution) or from a device
+      (what players actually see, including the native store and ad paths the
+      demo stubs out).
+- [ ] **Put that video in the README.** GitHub does not play an embedded
+      YouTube iframe in a README — it strips the markup — so the practical
+      form is a thumbnail image linking to the video, or a short muted GIF/MP4
+      committed to the repo for autoplay in the page. Decide which when the
+      video exists; a GIF long enough to show the loop is easily several MB, so
+      it should be a trimmed highlight rather than the whole video. Note the
+      tension with the asset rule in CLAUDE.md: store and marketing images stay
+      out of this repo. A README clip is a deliberate exception to decide on,
+      not an oversight — the alternative is hosting it outside the repo and
+      linking to it.
+- [ ] **Refresh the README around it.** It still reads as a build-instructions
+      file: no screenshots, and the feature list is a map of source files
+      rather than a picture of the game.
+- [ ] **Explain the demo properly.** There is a "Play the demo" section now,
+      but it is written for someone reading the source. The version a visitor
+      needs is shorter and higher up — what the game is, the link, and what the
+      demo does not include — with the technical detail moved below it.
 
 ### Housekeeping
 
