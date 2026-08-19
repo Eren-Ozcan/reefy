@@ -39,10 +39,16 @@ evidence for whether the numbers are right.
 ### Store listing is now stale
 
 - [ ] **The closed-testing listing shows the old UI.** Every screenshot is the
-      old white-panel Turkish interface; the game is now a dark sheet language
-      in English. Listing text and screenshots both need redoing before any
-      wider rollout. Assets go to `docs/store-assets-originals/` and the private
-      `Eren-Ozcan/pictures` repo, never here (see CLAUDE.md).
+      old white-panel Turkish interface; the game is now a dark sheet language.
+      Four raw screenshots of the redesigned UI (tank, shop, quests, earnings
+      report) were captured from a fresh save via `npm run dev` and pushed to
+      the private `Eren-Ozcan/pictures` repo (`pictures/reefy/`) — see CLAUDE.md
+      for why they don't live in this repo. **Still needed:** the listing copy
+      itself hasn't been touched, the screenshots are raw captures (not cropped
+      to Play's required dimensions or annotated), and nothing has been
+      uploaded to Play Console yet. The fresh save also has no fish variety or
+      decor, so a save with more progress would make a better hero shot than
+      what's there now.
 
 ### Housekeeping
 
