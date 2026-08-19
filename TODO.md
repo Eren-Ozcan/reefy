@@ -50,26 +50,6 @@ evidence for whether the numbers are right.
       SVG (`src/icons.ts`). Deliberate — they are illustrations, not
       affordances — but worth revisiting if they ever need to take a tint.
 
-### Cloud save — leftovers after the end-to-end run
-
-The main flow is verified on a real account (see Done). What is left:
-
-- [ ] **Orphaned anonymous users.** The auth bug below created a new anonymous
-      user on every launch, so `saves/` has a few stray documents. Harmless,
-      but worth clearing out before launch so the collection is not misleading.
-      The emulator runs added more: a document under a first-pass test account
-      on top of the account the final run used.
-      **Blocked on tooling, not on a decision.** The Firebase CLI can delete a
-      known path but cannot LIST documents, and identifying which documents are
-      orphans needs admin credentials the CLI login does not provide (no gcloud
-      and no application-default credentials on this machine). Deleting without
-      being able to read the collection first would be guessing at live player
-      saves. Two ways forward: read the collection in the Firebase console and
-      delete by hand, or run a one-off `firebase-admin` script with a service
-      account key. Whichever comes first, the criterion is the same — a `saves/`
-      document whose uid has no matching `players/` record and whose payload is
-      an untouched starting save (`hasProgress()` false).
-
 ### Privacy policy and Data Safety
 
 - [x] `PRIVACY.md` written (2026-08-08). The game had none at all. It covers the
@@ -135,6 +115,24 @@ been ported to both sibling games:
       fall through to the "store not configured" path.
 
 ## Done
+
+### Orphaned cloud saves cleared out (2026-08-19)
+
+Was blocked on tooling, not a decision — the Firebase CLI can delete a known
+path but can't list documents, and identifying orphans needed admin
+credentials the CLI login doesn't provide. Unblocked by generating a key for
+the existing `firebase-adminsdk-fbsvc@reefy-67ac5` service account and running
+a one-off `firebase-admin` script (dry run first, then `--delete`) against the
+exact criterion the earlier write-up specified: a `saves/{uid}` document with
+no `players/` record referencing that uid, and `hasProgress()` false on the
+parsed payload. Reused `hasProgress()`/`parseSave()` from `src/save.ts`
+directly (via `tsx`) rather than reimplementing the check, so the script can't
+drift from what the app itself considers "real progress".
+
+Found 2 orphans out of 78 `saves/` documents — smaller than expected, most
+stray anonymous users apparently never made it to a second launch. Deleted
+both, then deleted the service account key and the downloaded script/JSON —
+no standing admin credential was left behind.
 
 ### RevenueCat offering configured — purchases are live (2026-08-19)
 
