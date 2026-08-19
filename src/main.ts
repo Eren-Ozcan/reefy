@@ -9,6 +9,16 @@ import { getLang, initLang, t } from './i18n';
 const menu = document.getElementById('menu')!;
 const foot = document.querySelector('.menu-foot');
 if (foot) foot.textContent = `v${APP_VERSION} • reefy.games`;
+// The public web demo runs entirely in this browser: no cloud save, no
+// account, no ads and no purchases (see isFirebaseConfigured in
+// firebase-config.ts). Saying so on the menu keeps the missing Settings rows
+// from reading as breakage.
+if (import.meta.env.VITE_DEMO === '1' && foot) {
+  const note = document.createElement('p');
+  note.className = 'menu-foot menu-demo-note';
+  note.textContent = t('Web demo — progress is saved in this browser only.');
+  foot.after(note);
+}
 document.documentElement.lang = getLang();
 const tagline = document.querySelector('.tagline');
 if (tagline) {

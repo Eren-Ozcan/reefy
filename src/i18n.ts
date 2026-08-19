@@ -605,6 +605,7 @@ const TR: Record<string, string> = {
   // ---- Main menu ----
   'Build your own reef, grow your fish,\ncomplete your collection': 'Kendi resifini kur, balıklarını büyüt,\nkoleksiyonunu tamamla',
   'Play': 'Oyna',
+  'Web demo — progress is saved in this browser only.': 'Web demosu — ilerlemen yalnızca bu tarayıcıda saklanır.',
 
   // ---- Fish growth stages (fish.ts) ----
   'Adult': 'Yetişkin', 'Young': 'Genç', 'Baby': 'Yavru',

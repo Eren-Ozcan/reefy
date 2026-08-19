@@ -153,6 +153,7 @@ html, body {
 #play-btn:hover { transform: scale(1.05); }
 #play-btn:active { transform: scale(0.97); }
 .menu-foot { margin-top: 22px; font-size: 12px; color: #3d7385; }
+.menu-demo-note { margin-top: 6px; opacity: 0.85; }
 
 .menu-bubbles { position: absolute; inset: 0; overflow: hidden; z-index: 1; }
 .menu-bubbles span {
