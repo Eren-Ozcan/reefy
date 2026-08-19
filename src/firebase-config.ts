@@ -18,6 +18,16 @@ export const FIREBASE_CONFIG = {
   appId: '1:778208134304:web:7508e0b42d534d290775c5',
 };
 
+/**
+ * The public demo build (`VITE_DEMO=1`, see .github/workflows/demo.yml) reports
+ * "not configured" even though the values above are filled in. That single
+ * switch keeps the demo entirely local: no anonymous sign-in, so no cloud save
+ * document and no `players/{code}` record is created in the production project
+ * by anyone who happens to open the page, and the social provider falls back to
+ * LocalSocial. Ads, purchases and platform sign-in are already stubbed off the
+ * native flag, so this is the only backend the web build could otherwise reach.
+ */
 export function isFirebaseConfigured(): boolean {
+  if (import.meta.env.VITE_DEMO === '1') return false;
   return !FIREBASE_CONFIG.apiKey.startsWith('REPLACE_');
 }
