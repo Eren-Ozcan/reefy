@@ -2,14 +2,12 @@
 
 ## Where to pick up
 
-Last session ended 2026-08-20 with the whole store listing produced: captioned
-screenshots and a feature graphic in both English and Turkish, plus the copy —
-all on disk under `docs/store-assets-originals/`, and mirrored to the private
-pictures repo. None of it is in Play Console yet, and uploading it is the only
-part nobody but the owner can do. After that, in the owner's stated order: a
-promo video, then getting that video and a refreshed README into this repo —
-both under "Presenting the game" below. iOS stays parked until the owner asks
-for it.
+Last session ended 2026-08-20 with the store listing finished and submitted to
+Google for review: screenshots, feature graphic and copy in both languages, and
+en-US added as a store language it did not have before. Nothing is left there
+but waiting for the review. Next, in the owner's stated order: a promo video,
+then getting that video and a refreshed README into this repo — both under
+"Presenting the game" below. iOS stays parked until the owner asks for it.
 
 ## Pending
 
@@ -69,12 +67,21 @@ evidence for whether the numbers are right.
       The feature graphic's background is the game itself run at 1024x500 with
       the chrome hidden, with the wordmark on the left where the store's play
       button will not land.
-- [ ] **Nothing is uploaded to Play Console yet.** Everything above is a draft
-      on disk; the live closed-testing listing is still the pre-redesign one.
-      This is the only remaining step and it needs a Console session.
-- [ ] **Decide whether tr-TR gets its own screenshots.** The Turkish set exists,
-      but Play also allows serving the English images to every locale — one set
-      is less to re-capture every time the UI moves.
+- [x] **Uploaded and submitted for review** (2026-08-20). The listing was
+      Turkish-only, so **en-US was added as a new store language** — without a
+      localized image set Play serves the default language's images, which would
+      have shown an English visitor Turkish screenshots. Each language got its
+      own copy, its own eight captioned plates (phone and 7-inch tablet) and its
+      own feature graphic; the app name is now `Reefy: Cozy Aquarium` in both.
+      The three stale 10-inch tablet shots were removed rather than replaced —
+      with phone screenshots present Play needs no separate 10-inch set.
+- [ ] **The 10-inch tablet set is empty in both languages.** Not a blocker, and
+      better than the pre-redesign images that were there; worth filling if a
+      tablet audience ever matters.
+- [ ] **Captioned plates are 1080x1920, raw captures are 1080x2340.** The plate
+      is 9:16 because only 16:9 or 9:16 shots at 1080 px or more are eligible
+      for Play's promotional placements. If the plate design changes, that
+      constraint is the reason for the letterboxing.
 
 ### Playable web demo
 
@@ -93,11 +100,9 @@ evidence for whether the numbers are right.
 None of this is code; all of it is what a stranger sees first. The demo is
 live, so for the first time there is something to point a link at.
 
-- [ ] **Play Console store listing.** Everything that can be produced outside
-      the Console is done as of 2026-08-20: captioned screenshots in both
-      languages, a feature graphic in both, and the copy. What is left is
-      purely a Console session — upload and paste. See "Store listing is now
-      stale" above.
+- [x] **Play Console store listing** — done 2026-08-20 and submitted for
+      review, including adding en-US as a store language. See "Store listing is
+      now stale" above for what went up and what is still open.
 - [ ] **A promo video.** Wanted for both the store listing (Play takes a
       YouTube link) and the repo. Open questions to settle when it is made:
       whether it is a silent screen capture or narrated, and whether it is cut
