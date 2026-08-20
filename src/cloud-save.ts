@@ -35,7 +35,18 @@ import { hasProgress, parseSave, progressFingerprint, SAVE_SCHEMA_VERSION, type 
 const REV_KEY = 'reefy-cloud-rev';
 const DIRTY_KEY = 'reefy-cloud-dirty';
 
-const UPLOAD_THROTTLE_MS = 60_000; // protect Firestore's daily write quota (Spark: 20K/day)
+// 5 minutes, not 1. This protects Firestore's daily write quota (Spark: 20K/day),
+// and the periodic path is the one that burns it: syncSave() is called far more
+// often than the save actually needs persisting, so the throttle interval is
+// effectively the write interval. At 60s a player with half an hour a day costs
+// ~30 writes and the free quota runs out around 600 daily players; at 300s the
+// same ceiling is roughly five times higher.
+// What is given up: if the process is killed hard WITHOUT firing
+// visibilitychange, the cloud copy can be this stale. Any ordinary background /
+// tab-hide still calls flush() (game.ts), which uploads immediately and ignores
+// this throttle, and the local save is untouched either way - so this only
+// matters if the device itself is lost.
+const UPLOAD_THROTTLE_MS = 300_000;
 // ensureUid() runs initializeApp() on cold start and waits for Auth to
 // restore the persisted session from IndexedDB (see firebase-app.ts
 // waitForRestoredUser). MEASURED on an Android 14 emulator: 2946 ms — 54 ms
