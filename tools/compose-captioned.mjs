@@ -14,7 +14,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 
-const PLATE = { width: 540, height: 1170 };
+// 1080x1920 at deviceScaleFactor 2 — exactly 9:16. Play accepts anything from
+// 1:2 to 2:1, but only screenshots at 16:9 or 9:16 and at least 1080 px wide
+// are eligible for its promotional placements, and the plate is composed
+// rather than captured, so there is no reason to give that up.
+const PLATE = { width: 540, height: 960 };
 
 /**
  * @param {object} opts
@@ -53,7 +57,7 @@ export async function composeCaptioned({ browser, srcDir, outDir, captions }) {
           <style>
             html, body { margin: 0; padding: 0; height: 100%; }
             body {
-              width: 540px; height: 1170px;
+              width: 540px; height: 960px;
               display: flex; flex-direction: column; align-items: center;
               background: linear-gradient(170deg, #123c46 0%, #0c272e 100%);
               overflow: hidden;
@@ -61,22 +65,24 @@ export async function composeCaptioned({ browser, srcDir, outDir, captions }) {
             .caption {
               font-family: 'Fredoka', system-ui, sans-serif;
               font-weight: 600;
-              font-size: 40px;
+              font-size: 34px;
               line-height: 1.18;
               color: #e8f3f1;
               text-align: center;
               /* Two lines' worth of room, reserved whether or not the text uses
                  it, so every shot in the set puts the phone at the same y. */
-              height: 100px;
+              height: 84px;
               display: flex; align-items: center; justify-content: center;
-              margin: 46px 40px 0;
+              margin: 32px 40px 0;
             }
             .rule {
               width: 74px; height: 5px; border-radius: 3px;
-              background: #35c4ac; margin: 22px 0 26px;
+              background: #35c4ac; margin: 16px 0 18px;
             }
             .phone {
-              width: 434px;
+              /* A 9:19.5 capture on a 9:16 plate: height is what binds, so the
+                 width follows from it and the plate keeps side margins. */
+              width: 355px;
               border-radius: 24px;
               box-shadow: 0 18px 46px rgba(0, 0, 0, 0.45);
               display: block;
