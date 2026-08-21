@@ -31,6 +31,21 @@ const DIRT_PENALTY_MAX = 0.35;         // production/growth is reduced by 35% in
 const DIRT_DELAY_1: [number, number] = [120_000, 150_000];
 const DIRT_DELAY_2: [number, number] = [150_000, 180_000];
 const DIRT_DELAY_3: [number, number] = [400_000, 500_000];
+/**
+ * Quiet spell after the LAST spot in a tank is scrubbed off.
+ *
+ * Without it the first new spot was due in two minutes, which is shorter than
+ * the session that produced the clean tank: the player finished the job and
+ * watched it come undone before they put the phone down, which reads as a
+ * treadmill rather than as care. Ten minutes is about four times the ordinary
+ * first-spot delay — long enough that a clean tank is something you get to
+ * keep for the rest of the visit, short enough that the tank still asks for
+ * attention across a day and the daily cleaning reward stays reachable.
+ *
+ * Earned per tank and only by CLEARING it: cleaning three of four spots grants
+ * nothing.
+ */
+const DIRT_GRACE_MS = 10 * 60_000;
 
 /** Blends two colors (a=0 -> base, a=1 -> over). For precomputing semi-transparent layers:
  *  as long as the background is a flat color, the result matches a real alpha blend. */
@@ -375,7 +390,7 @@ export class Game {
     this.save.collection = this.save.collection.filter((id) => knownSpecies.has(id));
 
     this.applyOffline();
-    this.dirtTimer = this.nextDirtDelay(this.save.dirtSpots[this.save.activeTank]?.length ?? 0);
+    this.dirtTimer = this.dirtDelayFor(this.save.activeTank);
     this.armCleanAd();
     this.applyDailyGift();
     this.ensureQuestDay();
@@ -889,7 +904,7 @@ export class Game {
     this.dirtTimer -= dt * 1000;
     if (this.dirtTimer <= 0) {
       this.maybeSpawnDirt(this.save.activeTank);
-      this.dirtTimer = this.nextDirtDelay(this.save.dirtSpots[this.save.activeTank]?.length ?? 0);
+      this.dirtTimer = this.dirtDelayFor(this.save.activeTank);
     }
     this.drawDirt(w, h);
     this.drawGrime(w, h, this.dirtLevel(this.save.activeTank));
@@ -961,9 +976,18 @@ export class Game {
 
   /** Adds dirt spots, with the same tiered delays, to every owned tank for time spent away. */
   private applyOfflineDirt(elapsed: number): void {
+    const now = Date.now();
     for (const tid of this.save.tanksOwned) {
       const spots = this.save.dirtSpots[tid] ?? (this.save.dirtSpots[tid] = []);
-      let remaining = elapsed;
+      // The quiet spell has to survive the app being closed, or cleaning a tank and
+      // leaving would hand back a dirty one — the exact moment the reward matters
+      // most. Only the part of the away-time that overlaps the grace is discounted.
+      const at = this.save.spotlessAt?.[tid] ?? 0;
+      const from = now - elapsed;
+      const overlap = at
+        ? Math.max(0, Math.min(now, at + DIRT_GRACE_MS) - Math.max(from, at))
+        : 0;
+      let remaining = Math.max(0, elapsed - overlap);
       while (spots.length < MAX_DIRT_SPOTS) {
         const delay = this.nextDirtDelay(spots.length);
         if (delay > remaining) break;
@@ -1381,6 +1405,19 @@ export class Game {
     return min + Math.random() * (max - min);
   }
 
+  /** What is left of the quiet spell a tank earned by being cleared, in ms. */
+  private dirtGraceLeft(tankId: string, now = Date.now()): number {
+    const at = this.save.spotlessAt?.[tankId] ?? 0;
+    if (!at) return 0;
+    return Math.max(0, at + DIRT_GRACE_MS - now);
+  }
+
+  /** The wait before this tank's next spot, grace included. */
+  private dirtDelayFor(tankId: string): number {
+    const spots = this.save.dirtSpots[tankId]?.length ?? 0;
+    return Math.max(this.dirtGraceLeft(tankId), this.nextDirtDelay(spots));
+  }
+
   private maybeSpawnDirt(tankId: string): void {
     const spots = this.save.dirtSpots[tankId] ?? (this.save.dirtSpots[tankId] = []);
     if (spots.length >= MAX_DIRT_SPOTS) return;
@@ -1465,6 +1502,13 @@ export class Game {
     const spots = this.save.dirtSpots[this.save.activeTank]!;
     const s = spots[idx];
     spots.splice(idx, 1);
+    // Clearing the LAST spot is what earns the quiet spell — and it restarts the
+    // countdown too, so a tank cannot drift back to dirty while the timer that
+    // was already running finishes.
+    if (spots.length === 0) {
+      this.save.spotlessAt[this.save.activeTank] = Date.now();
+      this.dirtTimer = DIRT_GRACE_MS;
+    }
     const { w, h } = this.bounds;
     const cx = s.fx * w, cy = s.fy * h;
     for (let k = 0; k < 9; k++) {
