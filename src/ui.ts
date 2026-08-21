@@ -793,8 +793,19 @@ export class UI {
         <div class="panel-body">${bodyHTML}</div>
       </div>`;
     if (!blocking) {
+      // A backdrop tap only counts when the press STARTED on the backdrop.
+      //
+      // The fish card opens on pointerdown, straight from the scene, so the
+      // release of that very press lands on a backdrop that did not exist when
+      // the press began — and the click it produced closed the card instantly.
+      // The card was reachable only by holding the button down and dragging onto
+      // the panel before letting go. Requiring both ends of the gesture also
+      // fixes the ordinary case of pressing inside the panel and releasing
+      // outside it, which used to dismiss.
+      let pressedBackdrop = false;
+      wrap.addEventListener('pointerdown', (e) => { pressedBackdrop = e.target === wrap; });
       wrap.addEventListener('click', (e) => {
-        if (e.target === wrap) { audio.click(); this.dismissPanel(); }
+        if (e.target === wrap && pressedBackdrop) { audio.click(); this.dismissPanel(); }
       });
       wrap.querySelector('.close-btn')!.addEventListener('click', () => {
         audio.click(); this.dismissPanel();
