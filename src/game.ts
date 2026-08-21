@@ -1053,7 +1053,7 @@ export class Game {
 
   /** The one goal worth surfacing on the scene: the nearest daily quest still in play,
    *  preferring one already claimable so the reward is never left sitting unnoticed. */
-  nextGoal(): { name: string; progress: number; target: number; coins: number; pearls: number } | null {
+  nextGoal(): { id: string; name: string; progress: number; target: number; coins: number; pearls: number } | null {
     const open = this.dailyQuests().filter((q) => !this.save.quests.claimed.includes(q.id));
     if (!open.length) return null;
     const withProgress = open.map((q) => ({
@@ -1066,6 +1066,7 @@ export class Game {
       (a, b) => b.p / b.q.target - a.p / a.q.target,
     )[0];
     return {
+      id: pick.q.id,
       name: pick.q.name,
       progress: pick.p,
       target: pick.q.target,
@@ -1244,6 +1245,13 @@ export class Game {
     }
   }
 
+  /** Claims a daily quest by id — what the goal strip has to hand. */
+  claimQuestById(id: string): { ok: boolean; msg: string } {
+    const q = this.dailyQuests().find((x) => x.id === id);
+    if (!q) return { ok: false, msg: t('That quest is gone.') };
+    return this.claimQuest(q);
+  }
+
   claimQuest(q: QuestDef): { ok: boolean; msg: string } {
     this.ensureQuestDay();
     const cur = this.save.quests.progress[q.id] ?? 0;
@@ -1293,8 +1301,15 @@ export class Game {
 
   private spawnFish(fs: FishSave): Fish {
     const f = new Fish(fs, speciesById(fs.sp), this.swimBounds);
-    f.root.on('pointertap', () => {
+    // pointerDOWN, not pointertap. A tap needs the press and the release to land on
+    // the same target, and a fish is never still: between the two it has swum out
+    // from under the finger, so most taps produced no event at all. Opening on the
+    // press also matches how the dirt and decor already respond.
+    f.root.on('pointerdown', (e: { stopPropagation: () => void }) => {
       if (this.inputMode !== 'normal') return; // fish card doesn't open in feed/edit mode
+      // The stage handler behind this one cleans dirt; without this the same press
+      // would open the card AND scrub a spot hidden behind the fish.
+      e.stopPropagation();
       this.ui.showFishInfo(f);
     });
     this.fishLayer.addChild(f.root);
