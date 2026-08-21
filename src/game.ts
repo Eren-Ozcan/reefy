@@ -5,7 +5,7 @@ import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fi
 import { EventDef, EventTier, activeEvent, claimableEvent, tierReached } from './events';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
 import { REWARDED_ADS_PER_DAY } from './ads';
-import { FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
+import { DirtSpot, FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
 import { Services, createServices } from './services';
 import {
@@ -165,6 +165,53 @@ export class Game {
   /** The area fish can swim in: height is capped at the sand line so they don't swim into the sand. */
   private get swimBounds(): Bounds {
     return { w: this.app.screen.width, h: this.sandTopY };
+  }
+
+  /**
+   * Rectangles, in the same 0..1 scene coordinates the dirt uses, where a DOM
+   * control stands over the water. Dirt is never spawned inside one.
+   *
+   * The rule this enforces is simple and was previously violated by every
+   * button that floated on the scene: dirt is TAPPED to clean it, so a spot
+   * underneath a button can never be tapped. It does not merely look untidy —
+   * the spot counts toward the tank's dirt percentage and toward the cap, so
+   * an unreachable one permanently soils the tank and starves the cleaning
+   * reward. Reported by the UI, which is the only side that knows where its
+   * elements ended up after layout.
+   */
+  private uiKeepOut: { x0: number; y0: number; x1: number; y1: number }[] = [];
+
+  setUiKeepOut(rects: { x0: number; y0: number; x1: number; y1: number }[]): void {
+    this.uiKeepOut = rects;
+  }
+
+  /** Is this scene-normalised point under a control? */
+  private isUnderUi(fx: number, fy: number): boolean {
+    return this.uiKeepOut.some((r) => fx >= r.x0 && fx <= r.x1 && fy >= r.y0 && fy <= r.y1);
+  }
+
+  /**
+   * A dirt position clear of the controls. Rejection sampling rather than
+   * geometry: the blocked area is small and the attempt count is bounded, and
+   * an occasional fallback to a blocked spot is far cheaper than the maths to
+   * carve rectangles out of the spawn area. The fallback is deliberate — never
+   * spawning at all would silently stop dirt if the UI ever covered everything.
+   */
+  private dirtSpot(idSalt = 0): DirtSpot {
+    let fx = 0;
+    let fy = 0;
+    for (let i = 0; i < 12; i++) {
+      fx = 0.08 + Math.random() * 0.84;
+      fy = 0.14 + Math.random() * 0.62;
+      if (!this.isUnderUi(fx, fy)) break;
+    }
+    return {
+      id: Date.now() + Math.floor(Math.random() * 1000) + idSalt,
+      fx,
+      fy,
+      r: 0.7 + Math.random() * 0.6,
+      kind: Math.random() < 0.5 ? 0 : 1,
+    };
   }
 
   /** Rebuilds the scene with the new floor line when the bottom UI height changes (mount, screen rotation). */
@@ -921,13 +968,7 @@ export class Game {
         const delay = this.nextDirtDelay(spots.length);
         if (delay > remaining) break;
         remaining -= delay;
-        spots.push({
-          id: Date.now() + Math.floor(Math.random() * 1000) + spots.length,
-          fx: 0.08 + Math.random() * 0.84,
-          fy: 0.14 + Math.random() * 0.62,
-          r: 0.7 + Math.random() * 0.6,
-          kind: Math.random() < 0.5 ? 0 : 1,
-        });
+        spots.push(this.dirtSpot(spots.length));
       }
     }
   }
@@ -1328,13 +1369,7 @@ export class Game {
   private maybeSpawnDirt(tankId: string): void {
     const spots = this.save.dirtSpots[tankId] ?? (this.save.dirtSpots[tankId] = []);
     if (spots.length >= MAX_DIRT_SPOTS) return;
-    spots.push({
-      id: Date.now() + Math.floor(Math.random() * 1000),
-      fx: 0.08 + Math.random() * 0.84,
-      fy: 0.14 + Math.random() * 0.62,
-      r: 0.7 + Math.random() * 0.6,
-      kind: Math.random() < 0.5 ? 0 : 1,
-    });
+    spots.push(this.dirtSpot());
     this.syncSave();
     this.ui.refreshHUD();
   }

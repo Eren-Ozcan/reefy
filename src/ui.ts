@@ -380,6 +380,14 @@ export class UI {
 
     this.syncBottomInset();
     window.addEventListener('resize', () => this.syncBottomInset());
+    // The dock is not a fixed slab: the goal line inside it changes text, wraps,
+    // and disappears entirely once every goal is done, and both the floor line and
+    // the collect button are positioned from its height. Watching the element is
+    // the only way to catch a resize the game itself did not trigger.
+    if (typeof ResizeObserver !== 'undefined') {
+      const bar = root.querySelector('#bottombar');
+      if (bar) new ResizeObserver(() => this.syncBottomInset()).observe(bar);
+    }
 
     this.refreshHUD();
     // Subscribe FIRST for late-arriving sync, then check: if the result lands
@@ -407,6 +415,42 @@ export class UI {
     const rect = bar.getBoundingClientRect();
     if (rect.height <= 0) return;
     this.game.setUiBottomInset(window.innerHeight - rect.top - UI.FLOOR_OVERLAP);
+    // The collect button rides just above the dock, and the dock's height changes
+    // with the goal line, so it is published rather than guessed at in CSS.
+    this.root.style.setProperty('--dock-h', `${Math.round(window.innerHeight - rect.top)}px`);
+    this.syncKeepOut();
+  }
+
+  /** Controls that stand ON the water, as opposed to the chrome above and below it. */
+  private static readonly SCENE_CONTROLS = ['#collect', '#topbar'];
+
+  /** Padding added around each control, as a fraction of the scene — dirt drawn
+   *  right up against a button's edge is still awkward to hit. */
+  private static readonly KEEP_OUT_PAD = 0.02;
+
+  /**
+   * Tells the scene where its water is covered, so dirt is never spawned somewhere
+   * it cannot be tapped. Measured from the laid-out DOM rather than declared as
+   * constants: these elements move with safe-area insets, text length and language.
+   */
+  private syncKeepOut(): void {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (w <= 0 || h <= 0) return;
+    const pad = UI.KEEP_OUT_PAD;
+    const rects = UI.SCENE_CONTROLS.flatMap((sel) => {
+      const el = this.root.querySelector<HTMLElement>(sel);
+      if (!el) return [];
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return [];
+      return [{
+        x0: r.left / w - pad,
+        y0: r.top / h - pad,
+        x1: r.right / w + pad,
+        y1: r.bottom / h + pad,
+      }];
+    });
+    this.game.setUiKeepOut(rects);
   }
 
   refreshHUD(): void {
