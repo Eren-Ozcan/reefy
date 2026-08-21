@@ -9,7 +9,7 @@ import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Speci
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { TANK_CAP_BONUS, TankDef } from './tanks';
 import { biomeIcon } from './biome-icons';
-import { AVAILABLE_LANGS, LANG_LABELS, Lang, getLang, setLang, t as tt } from './i18n';
+import { AVAILABLE_LANGS, LANG_LABELS, Lang, getLang, setLang, storedStoreCurrency, t as tt } from './i18n';
 import {
   ICON_ARRANGE, ICON_BAG, ICON_COIN, ICON_FEED, ICON_FISH, ICON_MENU, ICON_PEARL,
   ICON_QUEST, ICON_SHOP, ICON_TANK, ICON_TROPHY, ICON_YOU,
@@ -1476,6 +1476,13 @@ export class UI {
     const s = this.game.save;
     const identity = this.game.services.auth.current();
     const lang = getLang();
+    // The store's billing currency, shown as a diagnostic under the version.
+    // It is the ONE part of the language guess that no test can settle: the
+    // mocks prove the app reads `currencyCode` and lets it outrank the device
+    // language, but only a real Play account can show whether Play fills that
+    // field for this app's offering at all. Rendered even when empty, so
+    // "the store never answered" stays distinguishable from "old build".
+    const storeCurrencyDiag = `store: ${storedStoreCurrency() || '—'}`;
     // With only one language shipped there is nothing to choose, so the row is
     // omitted entirely. It comes back on its own once AVAILABLE_LANGS grows.
     const langRowHTML = AVAILABLE_LANGS.length < 2 ? '' : `
@@ -1505,7 +1512,8 @@ export class UI {
         <button class="tgl danger" id="cloud-delete">${tt('Delete')}</button></div>
       <p class="set-note-block">${tt('Removes the copy of your save in the cloud and your friend-code record. The game on this device is untouched.')}</p>
       <div class="set-row"><span>${tt('🗑️ Delete all progress')}</span><button class="tgl danger" data-t="reset">${tt('Reset')}</button></div>
-      <p class="version">${tt('Reefy v{v} — made with love 🐠', { v: APP_VERSION })}</p>
+      <p class="version">${tt('Reefy v{v} — made with love 🐠', { v: APP_VERSION })}<br/>
+        <span class="diag">${storeCurrencyDiag}</span></p>
     `);
     el.querySelector('#name-save')!.addEventListener('click', () => {
       const input = el.querySelector<HTMLInputElement>('#name-input')!;

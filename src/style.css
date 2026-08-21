@@ -868,6 +868,7 @@ html, body {
 .set-links a { color: var(--accent); font-size: 14px; text-decoration: none; font-weight: 600; }
 hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
 .version { text-align: center; font-size: 11px; color: var(--ink-faint); margin-top: 14px; }
+.version .diag { font-size: 10px; opacity: 0.55; letter-spacing: 0.04em; }
 
 /* Bulut kaydı: ayarlardaki durum etiketi ve çakışma seçim ekranı */
 .set-note { font-size: 13px; color: var(--ink-soft); font-weight: 600; }

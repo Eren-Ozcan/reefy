@@ -37,7 +37,14 @@ export function rememberStoreCurrency(code: string): void {
   try { localStorage.setItem(STORE_CURRENCY_KEY, code.toUpperCase()); } catch { /* storage may be disabled */ }
 }
 
-function storedStoreCurrency(): string {
+/**
+ * The currency recorded by a previous launch, or '' when the store has never
+ * answered. Exported because the Settings screen shows it: whether Play fills
+ * `currencyCode` for this app's offering cannot be answered by a mock, only by
+ * a real store account, and reading it off the screen beats attaching a debug
+ * console to the device.
+ */
+export function storedStoreCurrency(): string {
   try { return localStorage.getItem(STORE_CURRENCY_KEY) ?? ''; } catch { return ''; }
 }
 
