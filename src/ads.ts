@@ -105,6 +105,8 @@ export interface AdsProvider {
   maybeShowInterstitial(): void;
   /** The rewarded ad flow, deliberately started by the player. */
   showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }>;
+  /** Why ads are unavailable, if they are — empty when they work. Shown in Settings. */
+  readonly lastError?: string;
 }
 
 export class StubAds implements AdsProvider {
@@ -140,13 +142,31 @@ export class AdMobAds implements AdsProvider {
       if (info.status === AdmobConsentStatus.REQUIRED && info.isConsentFormAvailable) {
         info = await AdMob.showConsentForm();
       }
+      if (!info.canRequestAds) this.lastError = `consent: ${String(info.status)}`;
       return info.canRequestAds;
-    } catch {
+    } catch (e) {
+      // Recorded rather than swallowed. This call reaches Google's UMP servers,
+      // so it fails on a bad connection at launch as readily as on a real
+      // configuration problem, and the two are indistinguishable from the game's
+      // side — but only one of them is worth a person's afternoon.
+      this.lastError = `consent: ${e instanceof Error ? e.message : String(e)}`;
       return false;
     }
   }
 
-  private async setup(): Promise<void> {
+  /** Why ads are unavailable, if they are. Surfaced in Settings — see ui.ts. */
+  lastError = '';
+
+  /** Guards against two setups running at once when a retry lands mid-flight. */
+  private setupInFlight: Promise<void> | null = null;
+
+  private setup(): Promise<void> {
+    if (this.setupInFlight) return this.setupInFlight;
+    this.setupInFlight = this.runSetup().finally(() => { this.setupInFlight = null; });
+    return this.setupInFlight;
+  }
+
+  private async runSetup(): Promise<void> {
     try {
       if (!(await this.requestConsent())) {
         this.ready = false;
@@ -154,8 +174,10 @@ export class AdMobAds implements AdsProvider {
       }
       await AdMob.initialize(TEST_DEVICE_INIT);
       this.ready = true;
+      this.lastError = '';
       if (!this.save.adsRemoved) void this.loadInterstitial();
-    } catch {
+    } catch (e) {
+      this.lastError = `init: ${e instanceof Error ? e.message : String(e)}`;
       this.ready = false;
     }
   }
@@ -182,6 +204,11 @@ export class AdMobAds implements AdsProvider {
   }
 
   async showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }> {
+    // One retry, here, where the player has actually asked for an ad. Setup runs
+    // once at launch and reaches the network; a hiccup in that moment used to
+    // disable ads for the WHOLE session with no way back, which on a phone that
+    // was still connecting is most launches.
+    if (!this.ready) await this.setup();
     if (!this.ready) return { ok: false, msg: t("The ad system isn't ready yet, try again shortly.") };
     const now = Date.now();
     if (now - this.lastRewarded < REWARDED_COOLDOWN_MS) {

@@ -1651,7 +1651,11 @@ export class UI {
     // language, but only a real Play account can show whether Play fills that
     // field for this app's offering at all. Rendered even when empty, so
     // "the store never answered" stays distinguishable from "old build".
-    const storeCurrencyDiag = `store: ${storedStoreCurrency() || '—'}`;
+    // Two things that can only be observed on a real device, side by side: the
+    // currency the store reported, and why ads are off if they are. Both fail
+    // silently by nature, which is exactly why they get a line.
+    const adErr = this.game.services.ads.lastError;
+    const storeCurrencyDiag = `store: ${storedStoreCurrency() || '—'}${adErr ? ` · ads: ${adErr}` : ''}`;
     // With only one language shipped there is nothing to choose, so the row is
     // omitted entirely. It comes back on its own once AVAILABLE_LANGS grows.
     const langRowHTML = AVAILABLE_LANGS.length < 2 ? '' : `
