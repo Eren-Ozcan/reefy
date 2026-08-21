@@ -1341,10 +1341,16 @@ export class Game {
     // the same target, and a fish is never still: between the two it has swum out
     // from under the finger, so most taps produced no event at all. Opening on the
     // press also matches how the dirt and decor already respond.
-    f.root.on('pointerdown', (e: { stopPropagation: () => void }) => {
+    f.root.on('pointerdown', (e: { global: { x: number; y: number }; stopPropagation: () => void }) => {
       if (this.inputMode !== 'normal') return; // fish card doesn't open in feed/edit mode
-      // The stage handler behind this one cleans dirt; without this the same press
-      // would open the card AND scrub a spot hidden behind the fish.
+      // Dirt outranks the fish where the two overlap. A fish swims past a spot
+      // constantly, so whichever happened to be in front would decide what a tap
+      // did — and the spot is the thing that cannot be reached any other way,
+      // while the fish comes back around. Letting the press through to the stage
+      // handler is what scrubs it.
+      if (this.dirtAt(e.global.x, e.global.y) >= 0) return;
+      // Otherwise the card opens and the press stops here, so it does not also
+      // scrub a spot the fish was merely near.
       e.stopPropagation();
       this.nudgeToClean();
       this.ui.showFishInfo(f);
