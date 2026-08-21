@@ -2,12 +2,20 @@
 
 ## Where to pick up
 
-Last session ended 2026-08-20 with the store listing finished and submitted to
-Google for review: screenshots, feature graphic and copy in both languages, and
-en-US added as a store language it did not have before. Nothing is left there
-but waiting for the review. Next, in the owner's stated order: a promo video,
-then getting that video and a refreshed README into this repo — both under
-"Presenting the game" below. iOS stays parked until the owner asks for it.
+The store listing is finished and submitted to Google for review (2026-08-20);
+nothing is left there but waiting. On 2026-08-21 the two remaining non-code
+items were given the tooling they were blocked on — neither could be ANSWERED
+that day, because the festival had not run yet and the currency question needs
+a real store account, but both are now a short check rather than a project:
+
+- `npm run event:dump -- --key <sa.json>` prints the festival point
+  distribution and tier reach from the cloud saves. Run it once the event ends.
+- Settings shows the recorded store currency under the version line. Open the
+  shop's Pearls tab on a Turkish Play account, then read it off Settings.
+
+Next, in the owner's stated order: a promo video, then getting that video and a
+refreshed README into this repo — both under "Presenting the game" below. iOS
+stays parked until the owner asks for it.
 
 ## Pending
 
@@ -21,6 +29,15 @@ evidence for whether the numbers are right.
       900 / 1,800) were sized by estimate, not by measurement. If most players
       finish all four on day two, the event stops being a reason to come back;
       if nobody clears the third, the top tier is decoration.
+      The measurement no longer needs writing: `tools/dump-event-points.mjs`
+      (`npm run event:dump -- --key <service-account.json>`, add `--csv out.csv`
+      for per-player rows) reads every `saves/{uid}` document with the Admin
+      SDK, keeps only the saves carrying this event's id, and prints the point
+      distribution, the share of players reaching each tier, and how many
+      earned a tier without claiming it — that last number points at the claim
+      UI rather than at the numbers. A client cannot do this: the Firestore
+      rules lock each player to their own save document, which is why the
+      script needs a service-account key.
 - [ ] **Decide on a remote calendar only after that.** `EVENTS` in
       `src/events.ts` is embedded, so a new festival needs an app update. Moving
       it to Firestore is worth it once the tuning is known — and it brings an
@@ -43,7 +60,15 @@ evidence for whether the numbers are right.
       this app's offering. The RevenueCat offering now exists (see Done), so
       this is unblocked — check it with a live Turkish Play account:
       `reefy-store-currency` should read `TRY` after the shop's Pearls tab has
-      been opened once.
+      been opened once. Reading it no longer needs a debug console: Settings
+      prints `store: TRY` (or `store: —` when the store never answered) under
+      the version line. So: open the shop's Pearls tab once, then open Settings.
+      Two conditions decide whether the check means anything, and an emulator
+      meets neither by default — the build must be installed from a Play track
+      whose account is a licensed tester (RevenueCat gets nothing without real
+      Play Billing, and `store: —` would then say nothing about the field), and
+      the account's Play COUNTRY must be Turkey. A Turkish-language account
+      billed in another currency is the wrong test.
 
 ### Store listing is now stale
 
