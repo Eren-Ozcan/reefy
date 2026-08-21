@@ -297,6 +297,61 @@ export class RevenueCatIAP implements IAPProvider {
   }
 }
 
+// ---------- Play Games leaderboard ----------
+
+/**
+ * The Play Games leaderboard this game submits to.
+ *
+ * Ranking lives with Google rather than in Firestore on purpose. The score is
+ * computed on the device, so a leaderboard we host can be written to by anyone
+ * who can write as themselves — the Firestore rules can cap a number but cannot
+ * make it true, and verifying it properly needs Cloud Functions the project
+ * does not have. Play Games already owns the account, the ranking and the abuse
+ * handling, and the dependency and manifest entry were half-wired for it
+ * already.
+ *
+ * The id is minted by Play Console when the leaderboard is created there, so it
+ * comes from the environment: with it unset the game behaves exactly as before,
+ * which is also what happens on the web build and on iOS.
+ */
+const PLAY_LEADERBOARD_ID: string = (import.meta.env.VITE_PLAY_LEADERBOARD_ID ?? '').trim();
+
+/** Whether a Play Games leaderboard can be shown at all in this build. */
+export function isPlayLeaderboardAvailable(): boolean {
+  return !!PLAY_LEADERBOARD_ID && Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform();
+}
+
+/**
+ * Submits the player's total earnings to Play Games, at most once a minute and
+ * only when it changed — the same restraint the Firestore write uses, for the
+ * same reason: syncSave runs far more often than the number moves.
+ *
+ * Failures are swallowed. A player who never signed in to Play Games, or
+ * declined, must not see an error for something they did not ask for.
+ */
+let lastPlaySubmit = { at: 0, score: -1 };
+
+export function submitPlayScore(save: SaveData): void {
+  if (!isPlayLeaderboardAvailable()) return;
+  const score = Math.max(0, Math.round(save.stats.totalEarned));
+  const now = Date.now();
+  if (score === lastPlaySubmit.score || now - lastPlaySubmit.at < 60_000) return;
+  lastPlaySubmit = { at: now, score };
+  void CapacitorGameConnect.submitScore({ leaderboardID: PLAY_LEADERBOARD_ID, totalScoreAmount: score })
+    .catch(() => { /* not signed in, or offline — the next change tries again */ });
+}
+
+/** Opens the native Play Games leaderboard view. */
+export async function showPlayLeaderboard(): Promise<{ ok: boolean; msg: string }> {
+  if (!isPlayLeaderboardAvailable()) return { ok: false, msg: t('The global leaderboard is only available in the Google Play build.') };
+  try {
+    await CapacitorGameConnect.showLeaderboard({ leaderboardID: PLAY_LEADERBOARD_ID });
+    return { ok: true, msg: '' };
+  } catch {
+    return { ok: false, msg: t('Sign in to Google Play Games first, from Settings.') };
+  }
+}
+
 // ---------- Social: friends + leaderboard ----------
 
 export interface LeaderboardEntry {

@@ -7,7 +7,7 @@ import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQue
 import { REWARDED_ADS_PER_DAY } from './ads';
 import { DirtSpot, FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
-import { Services, createServices } from './services';
+import { Services, createServices, submitPlayScore } from './services';
 import {
   EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, SPEEDUP_MS_PER_PEARL,
   Species, speciesById,
@@ -2291,6 +2291,9 @@ export class Game {
     }
     persist(this.save);
     this.services.social.updateScore?.(this.save);
+    // The same number, sent to the platform that ranks it. Both calls throttle
+    // themselves, so this rides syncSave rather than needing a schedule.
+    submitPlayScore(this.save);
     // Don't write to the cloud while frozen: the data already came from the cloud,
     // needlessly advancing rev would make the other device look "behind" for no reason.
     if (this.frozen) return;

@@ -27,6 +27,7 @@ vi.mock('pixi.js', () => {
 
 vi.mock('./services', () => ({
   createServices: () => ({ auth: {}, iap: {}, ads: {}, social: { updateScore: () => undefined } }),
+  submitPlayScore: () => undefined,
 }));
 
 vi.mock('./cloud-save', () => ({

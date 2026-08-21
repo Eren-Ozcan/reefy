@@ -57,6 +57,7 @@ vi.mock('./services', () => ({
     ads: {},
     social: { updateScore: () => calls.push('updateScore') },
   }),
+  submitPlayScore: () => undefined,
 }));
 
 /** Whether the mocked cloud reports a rev left behind by another device. */

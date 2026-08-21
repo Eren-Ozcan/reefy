@@ -15,6 +15,7 @@ import {
   ICON_QUEST, ICON_SHOP, ICON_TANK, ICON_TROPHY, ICON_YOU,
 } from './icons';
 import { isAccountLinkingAvailable, isLinked, linkedLabel, linkWithGoogle } from './firebase-app';
+import { isPlayLeaderboardAvailable, showPlayLeaderboard } from './services';
 import type { FishSave } from './save';
 
 function hex(c: number): string {
@@ -1275,8 +1276,15 @@ export class UI {
 
     if (tab === 'leaderboard') {
       const rows = this.game.services.social.leaderboard(s, this.friendScoresCache);
+      // The in-app board ranks the player against visible bots and any friends
+      // whose score came back; the global ranking lives with Play Games, which
+      // owns the accounts and the abuse handling. The button appears only where
+      // that is actually reachable.
+      const playRow = isPlayLeaderboardAvailable()
+        ? `<button class="buy-btn lb-global" id="play-leaderboard">${tt('🏆 Global ranking')}</button>` : '';
       body = `
         <p class="dex-info">${tt('Ranked by total earnings.')} <i>${tt(this.game.services.social.label)}</i></p>
+        ${playRow}
         <div class="lb">${rows.map((r) => `
           <div class="lb-row ${r.isPlayer ? 'me' : ''}">
             <span class="lb-rank">${r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : '#' + r.rank}</span>
@@ -1324,6 +1332,10 @@ export class UI {
         audio.click();
         this.renderSocial(btn.dataset.tab as 'leaderboard' | 'friends');
       });
+    });
+    el.querySelector('#play-leaderboard')?.addEventListener('click', () => {
+      audio.click();
+      void showPlayLeaderboard().then((res) => { if (!res.ok) { audio.error(); this.toast(res.msg); } });
     });
     el.querySelector('#copy-code')?.addEventListener('click', () => {
       void navigator.clipboard?.writeText(s.friendCode);
