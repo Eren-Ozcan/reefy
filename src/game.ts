@@ -1334,11 +1334,32 @@ export class Game {
       // The stage handler behind this one cleans dirt; without this the same press
       // would open the card AND scrub a spot hidden behind the fish.
       e.stopPropagation();
+      this.nudgeToClean();
       this.ui.showFishInfo(f);
     });
     this.fishLayer.addChild(f.root);
     this.fishes.push(f);
     return f;
+  }
+
+  /** How long the cleaning nudge stays quiet after showing once. */
+  private static readonly CLEAN_NUDGE_QUIET_MS = 60_000;
+  private lastCleanNudge = 0;
+
+  /**
+   * Points at the dirty glass when the player reaches for a fish.
+   *
+   * A hint rather than a gate: refusing to open the card until the tank is clean
+   * would put a chore in front of the one thing the player asked for. It also
+   * stays quiet for a minute after each showing — repeated on every tap it stops
+   * being information and becomes nagging.
+   */
+  private nudgeToClean(): void {
+    if (this.dirtPct(this.save.activeTank) <= 0) return;
+    const now = Date.now();
+    if (now - this.lastCleanNudge < Game.CLEAN_NUDGE_QUIET_MS) return;
+    this.lastCleanNudge = now;
+    this.ui.toast(t('🧹 The glass is dirty — tap the spots to scrub them off.'));
   }
 
   // ---------- input modes ----------
