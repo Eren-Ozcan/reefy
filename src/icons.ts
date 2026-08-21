@@ -105,6 +105,21 @@ export const ICON_ARRANGE = svg(
    <rect x="13.4" y="13.4" width="7.6" height="7.6" rx="2.2" fill="currentColor"/>`,
 );
 
+/** A scrub brush — the care bar's cleaning chip. Bristles down, handle up, so it
+ *  reads at 22px without an outline. */
+export const ICON_CLEAN = svg(
+  `<rect x="6.4" y="3.4" width="11.2" height="7.2" rx="2.6" fill="currentColor"/>
+   <rect x="5.2" y="10.2" width="13.6" height="3.2" rx="1.4" fill="currentColor" opacity="0.85"/>
+   <path d="M7.6 13.8v4.8M10.5 13.8v5.6M13.5 13.8v5.6M16.4 13.8v4.8"
+         stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity="0.6"/>`,
+);
+
+/** An egg for the incubation chip. Same flat language as the fish icon. */
+export const ICON_EGG = svg(
+  `<path d="M12 2.6c3.6 0 6.6 5.2 6.6 9.4a6.6 6.6 0 1 1-13.2 0c0-4.2 3-9.4 6.6-9.4Z" fill="currentColor"/>
+   <ellipse cx="9.8" cy="9" rx="1.9" ry="2.6" fill="#FFFFFF" opacity="0.35" transform="rotate(-18 9.8 9)"/>`,
+);
+
 export const ICON_MENU = svg(
   `<rect x="4" y="6.2" width="16" height="2.6" rx="1.3" fill="currentColor"/>
    <rect x="4" y="10.7" width="16" height="2.6" rx="1.3" fill="currentColor"/>
