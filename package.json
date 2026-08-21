@@ -23,7 +23,8 @@
     "icons": "node tools/generate-icons.mjs",
     "smoke": "node test-reefy.mjs",
     "store:screens": "node tools/capture-store-screenshots.mjs",
-    "store:feature": "node tools/make-feature-graphic.mjs"
+    "store:feature": "node tools/make-feature-graphic.mjs",
+    "event:dump": "node tools/dump-event-points.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
+    "firebase-admin": "^14.3.0",
     "firebase-tools": "^15.24.0",
     "jsdom": "^29.1.1",
     "playwright": "^1.61.1",
