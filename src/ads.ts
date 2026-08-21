@@ -23,6 +23,25 @@ const REWARDED_AD_IDS: { android: string; ios: string } = {
  * is always controlled here in code (the ad network's own callback data is not trusted). */
 export const REWARDED_AD_PEARLS = 5;
 
+/**
+ * How many rewarded ads a player may cash in per day.
+ *
+ * Without a cap the only limit was a 30-second cooldown, which puts roughly
+ * 600 pearls an hour within reach — about ten times the smallest pearl pack,
+ * for free. That does not just undercut the pack, it removes the reason to
+ * buy one at all.
+ *
+ * Three rather than one or two: the rewarded ad is a reason to come back
+ * tomorrow as much as it is an economy tap, and it is the one ad the player
+ * chooses to watch, so cutting it too far costs both retention and ad
+ * revenue. Three a day is 15 pearls — a quarter of the smallest pack, enough
+ * to feel worth opening the app for, not enough to replace buying one.
+ *
+ * The number is an estimate, like the festival tiers were: revisit it against
+ * what players actually do rather than defend it as tuned.
+ */
+export const REWARDED_ADS_PER_DAY = 3;
+
 const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // don't show ads back-to-back on tank transitions
 const REWARDED_COOLDOWN_MS = 30 * 1000;         // prevent accidental double-clicks
 

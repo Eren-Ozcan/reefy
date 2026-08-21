@@ -836,14 +836,17 @@ export class UI {
     } else {
       const packs = this.game.services.iap.packs();
       const adsRemoved = s.adsRemoved;
+      // Shown rather than silently enforced: a Watch button that starts
+      // refusing with no explanation reads as a broken button.
+      const adsLeft = this.game.adRewardsLeftToday();
       body = `
         <p class="dex-info">${tt("💎 Pearl packs are purchased with real money. You're in <b>{store}</b> mode — purchases are enabled in the Google Play / App Store build. You can also earn pearls from quests, level-ups, and collection sets.", { store: this.game.services.iap.storeLabel })}</p>
         <div class="grid">
           <div class="card">
             <div class="egg-emoji">🎬</div>
             <div class="card-name">${tt('Watch Ad')}</div>
-            <div class="card-desc">${tt('🦪 Earn 5 pearls<br/><b>Free</b>')}</div>
-            <button class="buy-btn watch-ad">${tt('Watch')}</button>
+            <div class="card-desc">${tt('🦪 Earn 5 pearls<br/><b>{n} left today</b>', { n: adsLeft })}</div>
+            <button class="buy-btn watch-ad" ${adsLeft > 0 ? '' : 'disabled'}>${adsLeft > 0 ? tt('Watch') : tt('Back tomorrow')}</button>
           </div>
           ${packs.map((p) => p.removesAds ? `
           <div class="card">
@@ -938,11 +941,20 @@ export class UI {
             this.toast(res.msg);
           });
         } else if (btn.classList.contains('watch-ad')) {
+          // Checked again here, not just in the markup: the panel may have been
+          // open since before the day's last ad was watched.
+          if (this.game.adRewardsLeftToday() <= 0) {
+            audio.error();
+            this.toast(tt("That's all the ads for today — come back tomorrow."));
+            return;
+          }
           void this.game.services.ads.showRewarded().then((res) => {
             if (res.ok && res.grantPearls) {
               this.game.save.pearls += res.grantPearls;
+              this.game.noteAdRewardWatched();
               this.game.syncSave();
               this.refreshHUD();
+              this.renderShop('pearls', st);
             } else if (!res.ok) {
               audio.error();
             }

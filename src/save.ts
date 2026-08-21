@@ -91,6 +91,8 @@ export interface SaveData {
   incomePot: number;     // accumulated, not-yet-collected passive income
   cleanRewardDay: string;   // the first few cleanups of the day are rewarded — this field tracks the day
   cleanRewardCount: number; // number of spots cleaned with a reward today
+  adRewardDay: string;      // rewarded ads are capped per day — the day that cap is counted against
+  adRewardCount: number;    // rewarded ads already watched today
   petDay: string;           // you can pet one fish once a day — last petting day
   music: boolean;
   sfx: boolean;
@@ -170,6 +172,8 @@ export function defaultSave(): SaveData {
     incomePot: 0,
     cleanRewardDay: '',
     cleanRewardCount: 0,
+    adRewardDay: '',
+    adRewardCount: 0,
     petDay: '',
     music: true,
     sfx: true,
@@ -368,6 +372,9 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   merged.stats = { ...base.stats, ...merged.stats };
   if (merged.cleanRewardDay === undefined) merged.cleanRewardDay = '';
   if (merged.cleanRewardCount === undefined) merged.cleanRewardCount = 0;
+  // Saves written before the rewarded-ad cap carry neither field.
+  if (typeof merged.adRewardDay !== 'string') merged.adRewardDay = '';
+  if (typeof merged.adRewardCount !== 'number' || !Number.isFinite(merged.adRewardCount)) merged.adRewardCount = 0;
   if (!merged.friendVisits) merged.friendVisits = { day: '', visited: [], count: 0 };
   if (merged.petDay === undefined) merged.petDay = '';
   if (!merged.friendGifts) merged.friendGifts = { day: '', gifted: [] };

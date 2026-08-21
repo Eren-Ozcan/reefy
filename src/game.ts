@@ -4,6 +4,7 @@ import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } 
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
 import { EventDef, EventTier, activeEvent, claimableEvent, tierReached } from './events';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
+import { REWARDED_ADS_PER_DAY } from './ads';
 import { FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
 import { Services, createServices } from './services';
@@ -1080,6 +1081,34 @@ export class Game {
   /** Today's day key, in the same UTC form ensureQuestDay() uses. */
   private todayKey(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  // ---------- rewarded ad daily cap ----------
+
+  /**
+   * Rewarded ads still available today. The count is kept in the SAVE rather
+   * than beside the interstitial timer in localStorage: the interstitial's
+   * cooldown is a pacing detail that may harmlessly reset, while this one
+   * guards the pearl economy, and a counter that a relaunch clears is not a
+   * cap at all.
+   */
+  adRewardsLeftToday(): number {
+    const today = this.todayKey();
+    if (this.save.adRewardDay !== today) return REWARDED_ADS_PER_DAY;
+    return Math.max(0, REWARDED_ADS_PER_DAY - this.save.adRewardCount);
+  }
+
+  /**
+   * Records one watched ad against today's cap. Called only after the ad
+   * actually paid out — an ad the player exited early costs them nothing.
+   */
+  noteAdRewardWatched(): void {
+    const today = this.todayKey();
+    if (this.save.adRewardDay !== today) {
+      this.save.adRewardDay = today;
+      this.save.adRewardCount = 0;
+    }
+    this.save.adRewardCount++;
   }
 
   /** The event scoring right now, or null when none is running. */
