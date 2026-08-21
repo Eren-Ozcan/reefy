@@ -278,23 +278,27 @@ export class UI {
     root.innerHTML = `
       <div id="topbar">
       <div id="hud">
-        <div class="hud-ring" id="hud-ring"><b id="hud-level"></b></div>
+        <div class="hud-chip"><b id="hud-coins"></b>${ICON_COIN}</div>
+        <div class="hud-chip"><b id="hud-pearls"></b>${ICON_PEARL}</div>
+        <div class="hud-chip hud-tank" id="hud-tank" title="${tt('Switch tank')}"></div>
         <div class="hud-chip hud-streak hidden" id="hud-streak"></div>
-        <div class="hud-chip">${ICON_COIN}<b id="hud-coins"></b></div>
-        <div class="hud-chip">${ICON_PEARL}<b id="hud-pearls"></b></div>
+        <div class="hud-ring" id="hud-ring"><b id="hud-level"></b></div>
       </div>
       <div id="carebar">
         <button data-care="feed">${ICON_FEED}<span>${tt('Feed')}</span><small></small></button>
-        <button data-care="clean">${ICON_CLEAN}<span>${tt('Clean')}</span><small></small></button>
+        <button data-care="clean" class="care-round" id="clean-chip">
+          <span class="clean-ring"><span class="clean-face">${ICON_CLEAN}</span></span>
+          <span>${tt('Clean')}</span>
+        </button>
         <button data-care="arrange">${ICON_ARRANGE}<span>${tt('Arrange')}</span><small></small></button>
         <button data-care="eggs" class="hidden">${ICON_EGG}<span>${tt('Eggs')}</span><small></small></button>
-      </div>
-      <div id="hud-tanks">
-        <div class="hud-chip hud-tank" id="hud-tank" title="${tt('Switch tank')}"></div>
+        <button data-care="collect" id="collect-btn" class="care-collect">
+          <span>${tt('COLLECT')}</span><small></small>
+        </button>
       </div>
       </div>
       <div id="bottombar">
-        <div id="next-goal" class="hidden">
+        <div id="next-goal" class="hidden" role="button" tabindex="0">
           <div class="goal-main">
             <span class="goal-text"></span>
             <div class="goal-bar"><div></div></div>
@@ -308,13 +312,6 @@ export class UI {
           <button data-act="quests">${ICON_QUEST}<span>${tt('Quests')}</span><small></small></button>
           <button data-act="you">${ICON_YOU}<span>${tt('You')}</span><small></small></button>
         </div>
-      </div>
-      <div id="collect" class="empty">
-        <button id="collect-btn">
-          <span class="collect-action">${tt('COLLECT')}</span>
-          <b id="collect-amount">0</b>
-        </button>
-        <div class="collect-rate" id="collect-rate"></div>
       </div>
       <div id="feed-pop" class="hidden"></div>
       <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">${tt('Done ✓')}</button></div>
@@ -350,6 +347,7 @@ export class UI {
           case 'feed': this.toggleFeedPop(); break;
           case 'arrange': this.startEditMode(); break;
           case 'eggs': this.renderShop('eggs'); break;
+          case 'collect': this.toast(this.game.collectIncome().msg); break;
           // Cleaning has no mode of its own — the glass is scrubbed by tapping the
           // dirt itself, which is the whole point of the interaction. So the chip
           // reports the state and says where to tap rather than pretending to be
@@ -359,6 +357,20 @@ export class UI {
             : tt('The glass is spotless. ✨')); break;
         }
       });
+    });
+
+    // The strip already says "Ready" — so it has to be the thing you press. Sending
+    // the player into the Quests panel to claim a reward the main screen is
+    // announcing is a dead end dressed up as a status line.
+    root.querySelector('#next-goal')!.addEventListener('click', () => {
+      audio.click();
+      const id = this.goalQuestId;
+      const goal = this.game.nextGoal();
+      if (!id || !goal || goal.progress < goal.target) { this.setActiveTab('quests'); this.renderQuests(); return; }
+      const res = this.game.claimQuestById(id);
+      this.toast(res.msg);
+      if (!res.ok) audio.error();
+      this.refreshHUD();
     });
 
     root.querySelector('#mode-done')!.addEventListener('click', () => {
@@ -373,11 +385,6 @@ export class UI {
       audio.click();
       this.showStreak();
     });
-    root.querySelector('#collect-btn')!.addEventListener('click', () => {
-      const res = this.game.collectIncome();
-      this.toast(res.msg);
-    });
-
     this.syncBottomInset();
     window.addEventListener('resize', () => this.syncBottomInset());
     // The dock is not a fixed slab: the goal line inside it changes text, wraps,
@@ -422,7 +429,7 @@ export class UI {
   }
 
   /** Controls that stand ON the water, as opposed to the chrome above and below it. */
-  private static readonly SCENE_CONTROLS = ['#collect', '#topbar'];
+  private static readonly SCENE_CONTROLS = ['#topbar'];
 
   /** Padding added around each control, as a fraction of the scene — dirt drawn
    *  right up against a button's edge is still awkward to hit. */
@@ -487,8 +494,17 @@ export class UI {
     const placed = (s.decorPlaced[s.activeTank] ?? []).length;
 
     this.setCareChip('feed', hungry > 0 ? tt('{n} hungry', { n: hungry }) : tt('all fed'), hungry > 0);
-    this.setCareChip('clean', `%${clean}`, clean < 100);
     this.setCareChip('arrange', tt('{n} decor', { n: placed }), false);
+
+    // Cleanliness is a ring rather than a number: it is the one care value that is
+    // a proportion, and a full circle reads as "done" at a glance where "%71" has
+    // to be compared against a maximum the player has to remember.
+    const cleanBtn = this.root.querySelector<HTMLElement>('#clean-chip');
+    if (cleanBtn) {
+      cleanBtn.classList.toggle('urgent', clean < 100);
+      cleanBtn.style.setProperty('--clean', String(clean));
+      cleanBtn.title = tt('Glass {n}% clean', { n: clean });
+    }
 
     // The egg chip exists only while something is incubating: an empty countdown
     // is a fourth chip that never has anything to say, and it would squeeze the
@@ -614,14 +630,14 @@ export class UI {
   /** Updates the passive income button (called ~2 times per second from the game loop). */
   updateIncome(pot: number, ratePerHour: number): void {
     if (!this.root) return;
-    const host = this.root.querySelector<HTMLElement>('#collect');
-    if (!host) return;
-    // Always visible — shows 0 even when there are no adult fish, so the player
-    // learns where income lands before they own anything that produces it.
-    host.classList.remove('hidden');
-    host.classList.toggle('empty', pot < 1);
-    this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
-    this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}${tt('/hr')}`;
+    const btn = this.root.querySelector<HTMLElement>('#collect-btn');
+    if (!btn) return;
+    // Always present — it reads 0 even with no adult fish, so the player learns
+    // where income lands before owning anything that produces it.
+    btn.classList.toggle('empty', pot < 1);
+    // Amount and rate share the cell's one status line: the rate used to hang off
+    // the button as a tab, and a tab has nowhere to hang inside a care chip.
+    btn.querySelector('small')!.textContent = `${fmt(pot)} · ${fmt(ratePerHour)}${tt('/hr')}`;
     // The egg chip counts seconds down, so it rides this tick rather than waiting
     // for the next HUD refresh, which only happens when something is spent.
     this.refreshCareBar();
@@ -729,14 +745,18 @@ export class UI {
     this.tickHatching();
   }
 
+  /** The quest the goal strip is currently showing, so a tap can claim it. */
+  private goalQuestId: string | null = null;
+
   /** The strip above the dock. Its whole point is that the current objective and the
    *  bar filling toward it are visible without opening the Quests panel. */
   private refreshNextGoal(): void {
     const host = this.root.querySelector<HTMLElement>('#next-goal');
     if (!host) return;
     const goal = this.game.nextGoal();
-    if (!goal) { host.classList.add('hidden'); return; }
+    if (!goal) { host.classList.add('hidden'); this.goalQuestId = null; return; }
     host.classList.remove('hidden');
+    this.goalQuestId = goal.id;
     const done = goal.progress >= goal.target;
     host.classList.toggle('ready', done);
     host.querySelector('.goal-text')!.textContent =

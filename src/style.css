@@ -204,8 +204,16 @@ html, body {
 }
 #topbar > * { pointer-events: auto; }
 #hud {
-  display: flex; gap: 8px; flex-wrap: wrap;
+  display: flex; gap: 8px; align-items: center;
 }
+/* The level is the only thing on this row the player does not spend, so it sits
+   apart at the right end while the currencies and the tank read as one group
+   from the left. */
+#hud .hud-ring { margin-left: auto; }
+/* Icon after the number: the figure is what changes and what the eye returns to,
+   so it leads and the icon labels it. */
+.hud-chip .icon { order: 2; }
+.hud-tank { cursor: pointer; }
 
 /* The care bar. Sits directly under the money row rather than on a rail at the
    right edge: feeding and arranging are both done by tapping the water, so the
@@ -243,11 +251,46 @@ html, body {
    warm line read as "this one needs you" across four otherwise identical chips. */
 #carebar button.urgent small { color: var(--accent-2); }
 
-/* The tank chip keeps its own row so the care bar above it stays four equal columns. */
-#hud-tanks {
-  display: flex; gap: 8px; flex-wrap: wrap;
+/* The collect button is a care cell now, not a thing standing on the water. It is
+   the row's one warm cell, and it takes a little more width because its status
+   line carries both the pending amount and the rate — the rate used to hang off
+   the button as a tab, and a tab has nowhere to hang inside a chip. */
+#carebar button.care-collect {
+  flex: 1.5 1 0;
+  background: var(--accent-2);
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 18px rgba(255, 138, 92, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
-#ui.mode-active #hud-tanks { display: none; }
+#carebar button.care-collect span { color: #ffffff; letter-spacing: 0.3px; }
+#carebar button.care-collect small { color: rgba(255, 255, 255, 0.88); }
+/* Nothing to collect: still there, still legible, just not asking to be pressed. */
+#carebar button.care-collect.empty { background: #d98a6d; box-shadow: none; }
+
+/* Cleanliness as a gauge. A full ring is "done" at a glance, where a percentage
+   has to be compared against a maximum the player is expected to remember. */
+#carebar button.care-round {
+  flex: 0 0 auto;
+  width: 58px;
+  padding: 6px 4px;
+  justify-content: center;
+}
+.clean-ring {
+  position: relative;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  /* Opaque track, like the level ring: a translucent one lets the bright water
+     through and reads as a full circle. */
+  background: conic-gradient(var(--accent) calc(var(--clean, 100) * 1%), #23505c 0);
+  transition: background 0.4s ease;
+}
+.clean-face {
+  position: absolute; inset: 3px;
+  border-radius: 50%; background: #16383f;
+  display: grid; place-items: center;
+}
+.clean-face .icon { width: 15px; height: 15px; }
+#carebar button.care-round.urgent .clean-ring { background: conic-gradient(var(--accent-2) calc(var(--clean, 100) * 1%), #23505c 0); }
+
 
 /* Inline icons: a fixed box so chip height never depends on the glyph, which is
    exactly what emoji could not guarantee across platforms. */
@@ -403,7 +446,14 @@ html, body {
 #next-goal {
   display: flex; align-items: center; gap: 12px;
   padding: 2px 8px 0;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: transform 0.12s ease;
 }
+#next-goal:active { transform: var(--btn-press); }
+/* A finished goal is claimed from here, so it has to look pressable rather than
+   like the status line it used to be. */
+#next-goal.ready { padding: 6px 8px; background: rgba(255, 138, 92, 0.14); }
 #next-goal.hidden { display: none; }
 #ui.mode-active #next-goal { display: none; }
 
@@ -553,88 +603,6 @@ html, body {
 .buy-btn:hover { transform: scale(1.04); }
 .buy-btn:active { transform: var(--btn-press); }
 .buy-btn:disabled { background: var(--card-2); color: var(--ink-faint); box-shadow: none; cursor: default; transform: none; }
-
-/* Passive income — the scene's centrepiece: the number leads, the action sits under it.
-   The wrapper is click-through so the fish and dirt spots behind it stay tappable;
-   only the button itself takes pointer events. */
-#collect {
-  /* Off the water entirely, tucked against the dock's top-right corner. Above
-     centre was still ON the scene: fish, dirt and decor are all tapped directly,
-     and a DOM button anywhere in that area swallows those taps. Anchored to the
-     measured dock height rather than a guess, because the dock grows and shrinks
-     with the goal line. The cost is deliberate and known — it covers the right
-     end of the sand, so decor placed there sits behind it. */
-  position: absolute; right: 14px;
-  bottom: calc(var(--dock-h, 96px) + 10px);
-  /* Its own stacking context. The rate tab tucks BEHIND the button with a
-     negative z-index, and without a context here that negative index escapes
-     the whole page and the tab disappears behind the dock. */
-  z-index: 2;
-  display: flex; flex-direction: column; align-items: center; gap: 0;
-  pointer-events: none;
-  text-align: center;
-}
-#collect.hidden { display: none; }
-#collect.empty { opacity: 0.6; }
-/* Feeding and arranging are done by tapping the water, and this group sits in the
-   middle of it — the one place the player aims at most. It steps aside while a mode
-   is active, like the dock and the rail do. */
-#ui.mode-active #collect { display: none; }
-#collect.empty #collect-btn { animation: none; }
-
-/* One button, not three layers. The amount used to sit in its own bubble above the
-   button with the rate in a third pill below, which put a stack of chrome over the
-   middle of the tank — the spot fish and dirt are tapped in. The number now rides
-   inside the action it belongs to, and the rate hangs off the bottom edge as a tab. */
-#collect-btn {
-  pointer-events: auto;
-  display: flex; flex-direction: column; align-items: center; gap: 0;
-  border: none; cursor: pointer;
-  background: var(--accent-2);
-  color: #46170a; font-weight: 800; letter-spacing: 0.4px;
-  /* The one button that does NOT take --btn-radius. It is a rounded rectangle,
-     not a pill: it carries two stacked lines and a tab tucked under its bottom
-     edge, and a full pill turns that stack into a lozenge with the tab hanging
-     off a curve. Shape is the exception; size, shadow and press stay shared. */
-  padding: 10px 30px 12px; border-radius: 24px;
-  min-height: var(--btn-h);
-  box-shadow: 0 8px 22px rgba(255, 138, 92, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.3);
-  animation: collect-pulse 1.8s ease-in-out infinite;
-  transition: transform 0.12s ease;
-}
-#collect-btn:active { transform: var(--btn-press); }
-.collect-action { font-size: 16px; line-height: 1.15; color: #fff; }
-/* Held back from the label rather than given its own surface: it is what the button
-   pays out, so it should read as part of the button, not as a competing number. */
-/* Held back from the label by weight and opacity rather than by going dark: on
-   this orange a brown number reads as disabled, which is the opposite of what a
-   pending payout should look like. */
-#collect-amount {
-  font-family: var(--font-num);
-  font-size: 15px; font-weight: 800; line-height: 1.2;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-/* Sits directly on the water, whose colour changes per biome, so it carries its own
-   ground rather than relying on a panel token that only works on a dark surface. */
-/* Tucked under the button's own edge, overlapping it, so the pair reads as one
-   object instead of a button with a caption floating beneath it. */
-/* Narrower than the button and pulled up under it, so it reads as a tab the
-   button sits on rather than a second pill floating below. */
-.collect-rate {
-  font-family: var(--font-num);
-  font-size: 10.5px; font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  background: #d1552f;
-  padding: 4px 14px 4px; border-radius: 0 0 13px 13px;
-  margin-top: -8px;
-  position: relative; z-index: -1;
-}
-
-@keyframes collect-pulse {
-  0%, 100% { box-shadow: 0 8px 22px rgba(255, 138, 92, 0.4), inset 0 2px 0 rgba(255,255,255,0.3); }
-  50% { box-shadow: 0 8px 30px rgba(255, 138, 92, 0.75), inset 0 2px 0 rgba(255,255,255,0.3); }
-}
 
 /* Yem seçici */
 #feed-pop {

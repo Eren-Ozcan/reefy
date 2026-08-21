@@ -771,6 +771,8 @@ const TR: Record<string, string> = {
   'You own this ✓': 'Sahipsin ✓',
   "💎 Pearl packs are purchased with real money. You're in <b>{store}</b> mode — purchases are enabled in the Google Play / App Store build. You can also earn pearls from quests, level-ups, and collection sets.": '💎 İnci paketleri gerçek parayla satın alınır. <b>{store}</b> modundasın — satın alma, Google Play / App Store sürümünde etkinleşir. İnciyi görevlerden, seviye ve set ödüllerinden de kazanabilirsin.',
   'Watch Ad': 'Reklam İzle',
+  'Glass {n}% clean': 'Cam %{n} temiz',
+  'That quest is gone.': 'Bu görev artık yok.',
   'Clean': 'Temizle',
   'Eggs': 'Yumurta',
   '{n} hungry': '{n} aç',
