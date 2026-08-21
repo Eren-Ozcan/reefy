@@ -10,7 +10,7 @@
 //    wrong strands a player in a language they cannot read.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AVAILABLE_LANGS, STORE_CURRENCY_KEY, detectLang, getLang, initLang, rememberStoreCurrency, t } from './i18n';
+import { AVAILABLE_LANGS, STORE_CURRENCY_KEY, detectLang, getLang, initLang, rememberStoreCurrency, storedStoreCurrency, t } from './i18n';
 import { defaultSave, parseSave } from './save';
 
 // Sources are pulled in through Vite's raw glob rather than node:fs, so the
@@ -180,5 +180,23 @@ describe('language guess', () => {
     rememberStoreCurrency('');
     expect(localStorage.getItem(STORE_CURRENCY_KEY)).toBeNull();
     withLanguages(['de-DE'], () => expect(detectLang()).toBe('en'));
+  });
+});
+
+// The Settings screen prints this value so the one question the mocks cannot
+// answer — does Play fill `currencyCode` for this app's offering? — can be read
+// off a real device instead of a debug console. Empty has to stay
+// distinguishable from a recorded value, or "the store never answered" and
+// "this build is too old to show it" look the same on screen.
+describe('the store currency shown in Settings', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('reads back what loadPrices recorded', () => {
+    rememberStoreCurrency('try');
+    expect(storedStoreCurrency()).toBe('TRY');
+  });
+
+  it('is empty when the store has never answered', () => {
+    expect(storedStoreCurrency()).toBe('');
   });
 });
