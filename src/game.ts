@@ -328,6 +328,18 @@ export class Game {
     await this.app.init({ resizeTo: host, antialias: true, background: 0x2f7f96 });
     host.appendChild(this.app.canvas);
 
+    // Every layer here is paint except the fish. Left on the default event mode they
+    // are still eligible to BE the target of a press, and the topmost one wins: the
+    // grime sheet sits above the fish and is only visible when the tank is dirty, so
+    // a dirty tank quietly made every fish untappable. The press still reached the
+    // stage — dirt scrubbed fine, which is why this looked like a fish bug rather
+    // than a layering one.
+    for (const layer of [
+      this.bgG, this.rayLayer, this.decorAnimG, this.sandG, this.sandFxG, this.sandMaskG,
+      this.pelletG, this.bubbleG, this.fxG, this.dirtG, this.grimeSprite,
+    ]) {
+      layer.eventMode = 'none';
+    }
     this.world.addChild(
       this.bgG, this.rayLayer, this.decorAnimG, this.sandG, this.sandFxG, this.sandMaskG,
       this.pelletG, this.fishLayer, this.bubbleG, this.fxG, this.dirtG, this.grimeSprite,
