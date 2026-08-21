@@ -38,6 +38,8 @@ export class Fish {
   private body = new Container();
   private sad = new Graphics();
   private glow: Graphics | null = null;
+  /** The tap target at full width, before the turn animation squashes scale.x. */
+  private baseHit: Rectangle | null = null;
 
   sp: Species;
   progress: number;
@@ -287,7 +289,8 @@ export class Fish {
     // bounding box instead of exact hit-testing.
     const hb = this.root.getLocalBounds();
     const padX = L * 0.22, padY = H * 0.5;
-    this.root.hitArea = new Rectangle(hb.x - padX, hb.y - padY, hb.width + padX * 2, hb.height + padY * 2);
+    this.baseHit = new Rectangle(hb.x - padX, hb.y - padY, hb.width + padX * 2, hb.height + padY * 2);
+    this.root.hitArea = this.baseHit.clone();
 
     // Hunger indicator
     this.sad.circle(0, 0, 9).fill({ color: 0xffffff, alpha: 0.9 });
@@ -301,6 +304,29 @@ export class Fish {
     this.tx = 50 + Math.random() * Math.max(60, bounds.w - 100);
     this.ty = 80 + Math.random() * Math.max(60, bounds.h - 200);
     this.wanderTimer = 3 + Math.random() * 4;
+  }
+
+  /**
+   * Keeps the tap target the width the fish LOOKS, not the width it is scaled to.
+   *
+   * Turning is animated by sliding scale.x through zero, clamped to a twelfth, so
+   * mid-turn a fish is squashed to a sliver — and the hit area, being in local
+   * space, was squashed with it. Fish wander constantly, so they are turning much
+   * of the time: that is why tapping one worked only sometimes. Dividing the local
+   * rectangle by the same factor holds its on-screen size constant through the
+   * turn. Deliberately generous at the extreme: a fish seen edge-on is nearly
+   * invisible but still worth a full-size target, since the player aims where it
+   * appears to be.
+   */
+  private syncHitArea(dirX: number): void {
+    const base = this.baseHit;
+    if (!base) return;
+    const k = 1 / Math.max(0.12, Math.abs(dirX));
+    const r = this.root.hitArea as Rectangle;
+    r.x = base.x * k;
+    r.y = base.y;
+    r.width = base.width * k;
+    r.height = base.height;
   }
 
   /** dt: seconds. target: feed target (if any). growthMult: tank+decor bonus. Returns: whether it became an adult this frame. */
@@ -344,6 +370,7 @@ export class Fish {
     const sf = this.scaleFactor;
     const dirX = Math.abs(this.dir) < 0.12 ? 0.12 * (this.dir >= 0 ? 1 : -1) : this.dir;
     this.root.scale.set(sf * dirX, sf);
+    this.syncHitArea(dirX);
     this.root.position.set(this.x, this.y + Math.sin(time * 1.6 + this.phase) * 3);
 
     this.tail.rotation = Math.sin(time * (target ? 10 : 6) + this.phase) * 0.4;
