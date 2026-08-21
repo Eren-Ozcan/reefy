@@ -177,10 +177,61 @@ html, body {
 
 /* ---------- HUD ---------- */
 
-#hud {
+/* The three top rows stack in one flow rather than each being pinned to its own
+   offset: the care bar's height depends on its text, and hard-coded offsets put
+   the tank chip on top of it the moment a status line wrapped. */
+#topbar {
   position: absolute; top: max(10px, env(safe-area-inset-top)); left: 12px; right: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  pointer-events: none;
+}
+#topbar > * { pointer-events: auto; }
+#hud {
   display: flex; gap: 8px; flex-wrap: wrap;
 }
+
+/* The care bar. Sits directly under the money row rather than on a rail at the
+   right edge: feeding and arranging are both done by tapping the water, so the
+   controls that start them must not stand on it. Equal flex rather than fixed
+   widths, so four chips still fit a 320px phone. */
+#carebar {
+  display: flex; gap: 6px;
+}
+#ui.mode-active #carebar { display: none; }
+#carebar button {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 7px 4px; border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
+  transition: transform 0.12s ease, color 0.12s ease;
+}
+#carebar button.hidden { display: none; }
+#carebar button:active { transform: scale(0.96); }
+#carebar button .icon { width: 18px; height: 18px; }
+#carebar button span {
+  font-size: 11px; font-weight: 800; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+#carebar button small {
+  font-family: var(--font-num);
+  font-size: 9.5px; font-weight: 700; color: var(--ink-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+/* Only the status line turns: the chip itself staying calm is what lets a single
+   warm line read as "this one needs you" across four otherwise identical chips. */
+#carebar button.urgent small { color: var(--accent-2); }
+
+/* The tank chip keeps its own row so the care bar above it stays four equal columns. */
+#hud-tanks {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+#ui.mode-active #hud-tanks { display: none; }
+
 /* Inline icons: a fixed box so chip height never depends on the glyph, which is
    exactly what emoji could not guarantee across platforms. */
 .icon {
@@ -284,16 +335,20 @@ html, body {
 
 /* ---------- Alt bar ---------- */
 
+/* One block, not three. The goal line used to float as its own pill above the dock,
+   which stacked two slabs over the sand — and every pixel of bottom chrome pushes
+   the floor line up (see game.ts floorY), shortening the water the fish swim in. */
 #bottombar {
   position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: 50%;
   transform: translateX(-50%);
-  display: flex; gap: 4px;
+  display: flex; flex-direction: column; gap: 6px;
   background: var(--panel-bg);
   padding: 8px;
   border-radius: 22px;
   box-shadow: 0 10px 30px rgba(20, 60, 75, 0.25);
   width: min(96vw, 430px);
 }
+.dock-tabs { display: flex; gap: 4px; }
 #bottombar button {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   border: none; background: transparent;
@@ -329,16 +384,8 @@ html, body {
 /* The current objective, one line above the dock. Previously this lived only inside
    the Quests panel, so the bar filling was something the player never saw happen. */
 #next-goal {
-  position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 78px);
   display: flex; align-items: center; gap: 12px;
-  width: min(96vw, 430px);
-  padding: 9px 14px;
-  background: var(--panel-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
-  border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(4, 18, 24, 0.3);
+  padding: 2px 8px 0;
 }
 #next-goal.hidden { display: none; }
 #ui.mode-active #next-goal { display: none; }
@@ -368,31 +415,7 @@ html, body {
 #next-goal.ready .goal-bar > div { background: var(--accent-2); }
 #next-goal.ready .goal-reward { background: rgba(255, 138, 92, 0.2); }
 
-/* Scene actions live on the edge of the scene they act on, not in the dock, which
-   is for destinations. */
-#siderail {
-  position: absolute; right: 12px; top: 50%;
-  transform: translateY(-50%);
-  display: flex; flex-direction: column; gap: 8px;
-}
-#siderail button {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--panel-bg);
-  backdrop-filter: blur(16px);
-  color: var(--ink-soft);
-  cursor: pointer;
-  width: 56px; min-height: 56px;
-  padding: 8px 4px; border-radius: 18px;
-  box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
-  transition: transform 0.12s ease, color 0.12s ease;
-}
-#siderail button span { font-size: 9.5px; font-weight: 700; }
-#siderail button .icon { width: 22px; height: 22px; }
-#siderail button:hover { color: var(--accent); }
-#siderail button:active { transform: scale(0.94); }
-#ui.mode-active #siderail { display: none; }
-#bottombar button:hover { background: rgba(47, 158, 143, 0.12); }
+#ui.mode-active #bottombar button:hover { background: rgba(47, 158, 143, 0.12); }
 #bottombar button:active { transform: scale(0.93); }
 
 /* ---------- Paneller ---------- */
@@ -523,7 +546,7 @@ html, body {
      there would swallow exactly the taps the last two tap-tolerance fixes were about. */
   position: absolute; top: 34%; left: 50%;
   transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
   pointer-events: none;
   text-align: center;
 }
@@ -535,48 +558,44 @@ html, body {
 #ui.mode-active #collect { display: none; }
 #collect.empty #collect-btn { animation: none; }
 
-.collect-bubble {
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
-  background: rgba(10, 32, 40, 0.55);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 22px;
-  padding: 10px 26px;
-  box-shadow: 0 8px 26px rgba(4, 18, 24, 0.35);
-}
-.collect-bubble b {
-  font-family: var(--font-num);
-  font-size: 32px; font-weight: 800; line-height: 1.05;
-  color: #ffd98a;
-}
-.collect-bubble small {
-  font-size: 11px; font-weight: 600;
-  color: var(--ink-soft);
-}
-
+/* One button, not three layers. The amount used to sit in its own bubble above the
+   button with the rate in a third pill below, which put a stack of chrome over the
+   middle of the tank — the spot fish and dirt are tapped in. The number now rides
+   inside the action it belongs to, and the rate hangs off the bottom edge as a tab. */
 #collect-btn {
   pointer-events: auto;
-  display: flex; align-items: center; gap: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
   border: none; cursor: pointer;
   background: var(--accent-2);
-  color: #46170a; font-weight: 800; font-size: 15px; letter-spacing: 0.4px;
-  padding: 12px 30px; border-radius: 999px;
+  color: #46170a; font-weight: 800; letter-spacing: 0.4px;
+  padding: 12px 34px 14px; border-radius: 26px;
   min-height: 48px;
   box-shadow: 0 8px 22px rgba(255, 138, 92, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.3);
   animation: collect-pulse 1.8s ease-in-out infinite;
   transition: transform 0.12s ease;
 }
 #collect-btn:active { transform: scale(0.94); }
-#collect-btn .icon { width: 20px; height: 20px; }
+.collect-action { font-size: 17px; line-height: 1.1; color: #fff; }
+/* Held back from the label rather than given its own surface: it is what the button
+   pays out, so it should read as part of the button, not as a competing number. */
+#collect-amount {
+  font-family: var(--font-num);
+  font-size: 14px; font-weight: 800; line-height: 1.2;
+  color: rgba(70, 23, 10, 0.72);
+}
 
 /* Sits directly on the water, whose colour changes per biome, so it carries its own
    ground rather than relying on a panel token that only works on a dark surface. */
+/* Tucked under the button's own edge, overlapping it, so the pair reads as one
+   object instead of a button with a caption floating beneath it. */
 .collect-rate {
-  font-size: 11px; font-weight: 700;
-  color: var(--ink);
-  background: rgba(10, 32, 40, 0.45);
-  backdrop-filter: blur(6px);
-  padding: 3px 12px; border-radius: 999px;
+  font-family: var(--font-num);
+  font-size: 10.5px; font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  background: #d9603a;
+  padding: 3px 14px 4px; border-radius: 0 0 12px 12px;
+  margin-top: -4px;
+  box-shadow: 0 6px 14px rgba(4, 18, 24, 0.25);
 }
 
 @keyframes collect-pulse {

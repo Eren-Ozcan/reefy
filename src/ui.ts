@@ -11,7 +11,7 @@ import { TANK_CAP_BONUS, TankDef } from './tanks';
 import { biomeIcon } from './biome-icons';
 import { AVAILABLE_LANGS, LANG_LABELS, Lang, getLang, setLang, storedStoreCurrency, t as tt } from './i18n';
 import {
-  ICON_ARRANGE, ICON_BAG, ICON_COIN, ICON_FEED, ICON_FISH, ICON_MENU, ICON_PEARL,
+  ICON_ARRANGE, ICON_BAG, ICON_CLEAN, ICON_COIN, ICON_EGG, ICON_FEED, ICON_MENU, ICON_PEARL,
   ICON_QUEST, ICON_SHOP, ICON_TANK, ICON_TROPHY, ICON_YOU,
 } from './icons';
 import { isAccountLinkingAvailable, isLinked, linkedLabel, linkWithGoogle } from './firebase-app';
@@ -254,7 +254,6 @@ export class UI {
   private hudPearls!: HTMLElement;
   private hudLevel!: HTMLElement;
   private hudRing!: HTMLElement;
-  private hudCap!: HTMLElement;
   private hudTank!: HTMLElement;
   private hudStreak!: HTMLElement;
   private panelHost!: HTMLElement;
@@ -277,38 +276,44 @@ export class UI {
   mount(root: HTMLElement): void {
     this.root = root;
     root.innerHTML = `
+      <div id="topbar">
       <div id="hud">
         <div class="hud-ring" id="hud-ring"><b id="hud-level"></b></div>
+        <div class="hud-chip hud-streak hidden" id="hud-streak"></div>
         <div class="hud-chip">${ICON_COIN}<b id="hud-coins"></b></div>
         <div class="hud-chip">${ICON_PEARL}<b id="hud-pearls"></b></div>
-        <div class="hud-chip">${ICON_FISH}<span id="hud-cap"></span></div>
+      </div>
+      <div id="carebar">
+        <button data-care="feed">${ICON_FEED}<span>${tt('Feed')}</span><small></small></button>
+        <button data-care="clean">${ICON_CLEAN}<span>${tt('Clean')}</span><small></small></button>
+        <button data-care="arrange">${ICON_ARRANGE}<span>${tt('Arrange')}</span><small></small></button>
+        <button data-care="eggs" class="hidden">${ICON_EGG}<span>${tt('Eggs')}</span><small></small></button>
+      </div>
+      <div id="hud-tanks">
         <div class="hud-chip hud-tank" id="hud-tank" title="${tt('Switch tank')}"></div>
-        <div class="hud-chip hud-streak hidden" id="hud-streak"></div>
       </div>
-      <div id="siderail">
-        <button data-rail="feed" title="${tt('Feed')}">${ICON_FEED}<span>${tt('Feed')}</span></button>
-        <button data-rail="arrange" title="${tt('Arrange')}">${ICON_ARRANGE}<span>${tt('Arrange')}</span></button>
-      </div>
-      <div id="next-goal" class="hidden">
-        <div class="goal-main">
-          <span class="goal-text"></span>
-          <div class="goal-bar"><div></div></div>
-        </div>
-        <span class="goal-reward"></span>
       </div>
       <div id="bottombar">
-        <button data-act="aquarium">${ICON_TANK}<span>${tt('Aquarium')}</span><small></small></button>
-        <button data-act="shop">${ICON_SHOP}<span>${tt('Shop')}</span><small></small></button>
-        <button data-act="inventory">${ICON_BAG}<span>${tt('Inventory')}</span><small></small></button>
-        <button data-act="quests">${ICON_QUEST}<span>${tt('Quests')}</span><small></small></button>
-        <button data-act="you">${ICON_YOU}<span>${tt('You')}</span><small></small></button>
+        <div id="next-goal" class="hidden">
+          <div class="goal-main">
+            <span class="goal-text"></span>
+            <div class="goal-bar"><div></div></div>
+          </div>
+          <span class="goal-reward"></span>
+        </div>
+        <div class="dock-tabs">
+          <button data-act="aquarium">${ICON_TANK}<span>${tt('Aquarium')}</span><small></small></button>
+          <button data-act="shop">${ICON_SHOP}<span>${tt('Shop')}</span><small></small></button>
+          <button data-act="inventory">${ICON_BAG}<span>${tt('Inventory')}</span><small></small></button>
+          <button data-act="quests">${ICON_QUEST}<span>${tt('Quests')}</span><small></small></button>
+          <button data-act="you">${ICON_YOU}<span>${tt('You')}</span><small></small></button>
+        </div>
       </div>
       <div id="collect" class="empty">
-        <div class="collect-bubble">
+        <button id="collect-btn">
+          <span class="collect-action">${tt('COLLECT')}</span>
           <b id="collect-amount">0</b>
-          <small id="collect-label">${tt('waiting in the vault')}</small>
-        </div>
-        <button id="collect-btn">${ICON_COIN}<span>${tt('COLLECT')}</span></button>
+        </button>
         <div class="collect-rate" id="collect-rate"></div>
       </div>
       <div id="feed-pop" class="hidden"></div>
@@ -320,7 +325,6 @@ export class UI {
     this.hudPearls = root.querySelector('#hud-pearls')!;
     this.hudLevel = root.querySelector('#hud-level')!;
     this.hudRing = root.querySelector('#hud-ring')!;
-    this.hudCap = root.querySelector('#hud-cap')!;
     this.hudTank = root.querySelector('#hud-tank')!;
     this.hudStreak = root.querySelector('#hud-streak')!;
     this.panelHost = root.querySelector('#panel-host')!;
@@ -339,11 +343,21 @@ export class UI {
       });
     });
 
-    root.querySelectorAll<HTMLButtonElement>('#siderail button').forEach((btn) => {
+    root.querySelectorAll<HTMLButtonElement>('#carebar button').forEach((btn) => {
       btn.addEventListener('click', () => {
         audio.click();
-        if (btn.dataset.rail === 'feed') this.toggleFeedPop();
-        else this.startEditMode();
+        switch (btn.dataset.care) {
+          case 'feed': this.toggleFeedPop(); break;
+          case 'arrange': this.startEditMode(); break;
+          case 'eggs': this.renderShop('eggs'); break;
+          // Cleaning has no mode of its own — the glass is scrubbed by tapping the
+          // dirt itself, which is the whole point of the interaction. So the chip
+          // reports the state and says where to tap rather than pretending to be
+          // a button that does the cleaning.
+          case 'clean': this.toast(this.game.dirtPct(this.game.save.activeTank) > 0
+            ? tt('Tap the dirt on the glass to scrub it off.')
+            : tt('The glass is spotless. ✨')); break;
+        }
       });
     });
 
@@ -402,15 +416,64 @@ export class UI {
     this.hudLevel.textContent = String(s.level);
     this.hudRing.style.setProperty('--xp', String(Math.min(100, (100 * s.xp) / this.game.xpNeed(s.level))));
     this.hudRing.title = `${tt('Lv')} ${s.level}`;
-    this.hudCap.textContent = `${this.game.fishes.length}/${this.game.capacity}`;
     this.refreshStreakChip(s.streak);
+    this.refreshCareBar();
     this.refreshDock();
     const activeTank = this.game.activeTank;
     const boost = Math.round((this.game.growthMult - 1) * 100);
-    const dirtBadge = this.game.dirtPct(s.activeTank) > 0
-      ? ` <b class="dirt-badge" title="${tt('Dirty — tap to clean the glass')}">🧹 -${this.game.dirtPct(s.activeTank)}%</b>` : '';
+    // The dirt figure moved to the care bar's own chip, where it sits beside the
+    // action that answers it. Leaving it here as well would report one number twice.
     const boostBadge = boost !== 0 ? ` <b class="${boost > 0 ? 'boost' : 'boost-neg'}">${boost > 0 ? '+' : ''}${boost}%</b>` : '';
-    this.hudTank.innerHTML = `${biomeIcon(activeTank.biome)} ${tt(activeTank.name)}${boostBadge}${dirtBadge}`;
+    this.hudTank.innerHTML = `${biomeIcon(activeTank.biome)} ${tt(activeTank.name)}${boostBadge}`;
+  }
+
+  /**
+   * The care bar: the three things a tank asks of its owner, plus the egg that is
+   * on its own clock. Each chip carries the state that decides whether it is worth
+   * tapping, so the bar answers "does anything need me?" without opening anything.
+   *
+   * It replaced a vertical rail pinned to the right edge of the water, which put
+   * two permanent buttons over the middle of the scene — the area feeding and
+   * arranging both ask the player to tap.
+   */
+  private refreshCareBar(): void {
+    const s = this.game.save;
+    const hungry = this.game.fishes.filter((f) => f.isSad).length;
+    const clean = 100 - this.game.dirtPct(s.activeTank);
+    const placed = (s.decorPlaced[s.activeTank] ?? []).length;
+
+    this.setCareChip('feed', hungry > 0 ? tt('{n} hungry', { n: hungry }) : tt('all fed'), hungry > 0);
+    this.setCareChip('clean', `%${clean}`, clean < 100);
+    this.setCareChip('arrange', tt('{n} decor', { n: placed }), false);
+
+    // The egg chip exists only while something is incubating: an empty countdown
+    // is a fourth chip that never has anything to say, and it would squeeze the
+    // three that do on a narrow phone.
+    const eggBtn = this.root.querySelector<HTMLElement>('#carebar button[data-care="eggs"]');
+    const next = this.game.pendingEggs()[0];
+    if (!eggBtn) return;
+    eggBtn.classList.toggle('hidden', !next);
+    if (!next) return;
+    const ready = this.game.readyEggs();
+    this.setCareChip('eggs', ready > 0 ? tt('{n} ready', { n: ready }) : UI.countdown(next.readyAt - Date.now()), ready > 0);
+  }
+
+  /** Writes one care chip's status line, and flags it when it wants attention. */
+  private setCareChip(care: string, status: string, urgent: boolean): void {
+    const btn = this.root.querySelector<HTMLElement>(`#carebar button[data-care="${care}"]`);
+    if (!btn) return;
+    btn.classList.toggle('urgent', urgent);
+    const small = btn.querySelector('small');
+    if (small) small.textContent = status;
+  }
+
+  /** m:ss for anything under an hour, h:mm above it — the egg chip is one line wide. */
+  private static countdown(ms: number): string {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
   }
 
   /** The streak is already tracked and already scales the daily gift; this only makes it
@@ -515,6 +578,9 @@ export class UI {
     host.classList.toggle('empty', pot < 1);
     this.root.querySelector('#collect-amount')!.textContent = fmt(pot);
     this.root.querySelector('#collect-rate')!.textContent = `${fmt(ratePerHour)}${tt('/hr')}`;
+    // The egg chip counts seconds down, so it rides this tick rather than waiting
+    // for the next HUD refresh, which only happens when something is spent.
+    this.refreshCareBar();
     // This runs about twice a second from the game loop, which is the only tick that
     // reliably follows quest progress — questEvent() does not refresh the HUD.
     this.refreshDock();
