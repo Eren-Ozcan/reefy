@@ -42,6 +42,30 @@ export const REWARDED_AD_PEARLS = 5;
  */
 export const REWARDED_ADS_PER_DAY = 3;
 
+/**
+ * Devices that should be served TEST ads instead of live ones.
+ *
+ * Tapping your own live ad is what gets an AdMob account suspended, and testing
+ * on a real handset is exactly when that happens. Emulators are treated as test
+ * devices by the SDK automatically; a real phone has to be named, and its id is
+ * printed by the SDK itself on the first ad request ("Use
+ * RequestConfiguration.Builder().setTestDeviceIds(...)" in logcat).
+ *
+ * Read from the environment rather than written here on purpose: the id belongs
+ * to one person's handset, it is not interesting to anyone else, and a public
+ * repo is the wrong place for it. Put it in a local .env.local as
+ * VITE_ADMOB_TEST_DEVICES=<id>[,<id>] — with the variable unset, which is how
+ * every release is built, this is exactly the previous behaviour.
+ */
+const TEST_DEVICES: string[] = (import.meta.env.VITE_ADMOB_TEST_DEVICES ?? '')
+  .split(',')
+  .map((s: string) => s.trim())
+  .filter(Boolean);
+
+const TEST_DEVICE_INIT = TEST_DEVICES.length
+  ? { testingDevices: TEST_DEVICES, initializeForTesting: true }
+  : {};
+
 const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // don't show ads back-to-back on tank transitions
 const REWARDED_COOLDOWN_MS = 30 * 1000;         // prevent accidental double-clicks
 
@@ -128,7 +152,7 @@ export class AdMobAds implements AdsProvider {
         this.ready = false;
         return;
       }
-      await AdMob.initialize({});
+      await AdMob.initialize(TEST_DEVICE_INIT);
       this.ready = true;
       if (!this.save.adsRemoved) void this.loadInterstitial();
     } catch {
