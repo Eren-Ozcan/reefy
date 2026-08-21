@@ -385,6 +385,10 @@ export class UI {
       audio.click();
       this.showStreak();
     });
+    // The Aquarium IS a tab, and it is the one you start on: without this the dock
+    // opened with nothing marked, so "where am I" was answered only after the
+    // player had visited somewhere else and come back.
+    this.setActiveTab('aquarium');
     this.syncBottomInset();
     window.addEventListener('resize', () => this.syncBottomInset());
     // The dock is not a fixed slab: the goal line inside it changes text, wraps,

@@ -261,8 +261,15 @@ html, body {
   border-color: rgba(0, 0, 0, 0.12);
   box-shadow: 0 6px 18px rgba(255, 138, 92, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
-#carebar button.care-collect span { color: #ffffff; letter-spacing: 0.3px; }
-#carebar button.care-collect small { color: rgba(255, 255, 255, 0.88); }
+#carebar button.care-collect {
+  justify-content: center;
+  gap: 2px;
+}
+#carebar button.care-collect span {
+  color: #ffffff; letter-spacing: 0.5px;
+  font-size: 17px; line-height: 1.1;
+}
+#carebar button.care-collect small { color: rgba(255, 255, 255, 0.9); font-size: 11px; }
 /* Nothing to collect: still there, still legible, just not asking to be pressed. */
 #carebar button.care-collect.empty { background: #d98a6d; box-shadow: none; }
 
@@ -433,27 +440,39 @@ html, body {
 }
 #bottombar button .icon { width: 24px; height: 24px; }
 
-/* Which tab you are on had no indication at all before. */
+/* Where you are is stated by a filled mark, not by a tint. A tinted rectangle
+   behind grey text reads as "slightly different"; the filled pill reads as
+   "here", the way the goal strip's own surface reads as its own thing. */
 #bottombar button.active {
-  background: var(--card-2);
-  color: var(--accent);
+  background: var(--accent);
+  color: #06282b;
+  box-shadow: 0 4px 14px rgba(53, 196, 172, 0.3);
 }
-#bottombar button.active small { color: var(--accent); opacity: 0.8; }
+#bottombar button.active span { font-weight: 800; }
+#bottombar button.active small { color: #06282b; opacity: 0.72; }
 #bottombar button.has-badge small { color: var(--accent-2); }
 
 /* The current objective, one line above the dock. Previously this lived only inside
    the Quests panel, so the bar filling was something the player never saw happen. */
+/* Its own layer inside the dock, always — the same move the active tab makes.
+   Sharing the dock's flat background made it read as a caption; on its own
+   surface it reads as the pressable thing it is. */
 #next-goal {
   display: flex; align-items: center; gap: 12px;
-  padding: 2px 8px 0;
+  padding: 8px 12px;
   cursor: pointer;
-  border-radius: 12px;
-  transition: transform 0.12s ease;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: transform 0.12s ease, background 0.2s ease;
 }
 #next-goal:active { transform: var(--btn-press); }
-/* A finished goal is claimed from here, so it has to look pressable rather than
-   like the status line it used to be. */
-#next-goal.ready { padding: 6px 8px; background: rgba(255, 138, 92, 0.14); }
+/* Finished: the surface itself warms up, so "claim me" is legible before the
+   text is read. */
+#next-goal.ready {
+  background: rgba(255, 138, 92, 0.18);
+  border-color: rgba(255, 138, 92, 0.35);
+}
 #next-goal.hidden { display: none; }
 #ui.mode-active #next-goal { display: none; }
 
