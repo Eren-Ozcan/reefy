@@ -2,22 +2,52 @@
 
 ## Where to pick up
 
-The store listing is finished and submitted to Google for review (2026-08-20);
-nothing is left there but waiting. On 2026-08-21 the two remaining non-code
-items were given the tooling they were blocked on — neither could be ANSWERED
-that day, because the festival had not run yet and the currency question needs
-a real store account, but both are now a short check rather than a project:
+1.2.0 went out to closed testing on 2026-08-22 and is live on a real handset.
+That release carries the rebuilt aquarium screen, five scene bugs, the global
+ranking, and the ad recovery — and it closed the two questions that had been
+open for weeks, both read off the diagnostic line under the version in
+Settings: `store: TRY` (Play does fill `currencyCode` for this app) with no
+`ads:` error after it (the ad SDK now initialises).
 
-- `npm run event:dump -- --key <sa.json>` prints the festival point
-  distribution and tier reach from the cloud saves. Run it once the event ends.
-- Settings shows the recorded store currency under the version line. Open the
-  shop's Pearls tab on a Turkish Play account, then read it off Settings.
+The one that was NOT known before today: **ads were dead in production**, and
+silently. The consent step failed with "Publisher misconfiguration — no
+form(s) configured for the input app ID" because no UMP privacy message
+existed for Reefy in AdMob, and the old code treated any consent failure as
+permanent for the session. Both halves are fixed: the message is published,
+and setup now retries when the player actually asks for an ad. Do not
+re-introduce a silent `catch` there.
 
-Next, in the owner's stated order: a promo video, then getting that video and a
-refreshed README into this repo — both under "Presenting the game" below. iOS
-stays parked until the owner asks for it.
+What is left, in the owner's stated order: a promo video, then getting that
+video and a refreshed README into this repo — both under "Presenting the game"
+below. iOS stays parked until the owner asks for it.
 
 ## Pending
+
+### The global ranking has no scores in it yet
+
+The Play Games leaderboard ("Total earnings", `CgkIoInHhtMWEAIQAA`) is created
+and published, the OAuth credential is bound to the app-signing certificate,
+and the button appears in the Social panel on a real device — `showLeaderboard`
+reaches the native plugin. What it cannot do is open a leaderboard for a player
+with no Play Games profile, which is where the test stopped: the sign-in sheet
+offered to CREATE one, and creating a profile on someone's Google account is
+theirs to do.
+
+- [ ] **Sign in to Play Games once from Settings > Account**, then open Social >
+      Global ranking. That is also what starts the score reaching the board;
+      `submitPlayScore` is called from syncSave but does nothing while signed
+      out.
+
+### The test handset still sees LIVE ads
+
+`.env.local` now carries `VITE_ADMOB_TEST_DEVICES=BF390972DD2CCCC736B0C90461E6020D`,
+but 1.2.0 was built before that line existed, so the phone currently installed
+gets real ads.
+
+- [ ] **Do not tap "Watch Ad" on the phone until a build made after that line
+      ships.** Tapping your own live ad is what gets an AdMob account
+      suspended. The emulator is safe — the SDK treats emulators as test
+      devices on its own.
 
 ### Coral Festival — what the first run has to answer
 
@@ -47,28 +77,15 @@ evidence for whether the numbers are right.
       points only when the active event's id differs; shipping the same id with
       new dates would hand returning players their old points.
 
-### Turkish is back — one thing left to watch
+### Turkish is back — the currency question is answered
 
-- [ ] **Does Google Play actually populate `currencyCode` for these products?**
-      Everything on this side of the boundary is now tested against a mock
-      shaped like the SDK (`src/store-currency.test.ts`): `loadPrices()` records
-      the currency, records nothing when the store is unreachable or silent, and
-      the recorded value reaches `detectLang()` and outranks the device language
-      in both directions. Changing the field name breaks those tests, which is
-      the point — a wrong name would otherwise look implemented and never fire.
-      What a mock cannot answer is whether the real store fills the field for
-      this app's offering. The RevenueCat offering now exists (see Done), so
-      this is unblocked — check it with a live Turkish Play account:
-      `reefy-store-currency` should read `TRY` after the shop's Pearls tab has
-      been opened once. Reading it no longer needs a debug console: Settings
-      prints `store: TRY` (or `store: —` when the store never answered) under
-      the version line. So: open the shop's Pearls tab once, then open Settings.
-      Two conditions decide whether the check means anything, and an emulator
-      meets neither by default — the build must be installed from a Play track
-      whose account is a licensed tester (RevenueCat gets nothing without real
-      Play Billing, and `store: —` would then say nothing about the field), and
-      the account's Play COUNTRY must be Turkey. A Turkish-language account
-      billed in another currency is the wrong test.
+- [x] **Google Play does populate `currencyCode` for these products** (verified
+      2026-08-22). Settings reads `store: TRY` on a real Turkish Play account,
+      on a build installed from the closed-test track. The mocks in
+      `src/store-currency.test.ts` were always going to pass; what they could
+      not settle was whether the real store fills the field, and it does. The
+      language guess therefore has its strongest signal on real devices, not
+      just in tests.
 
 ### Store listing is now stale
 
