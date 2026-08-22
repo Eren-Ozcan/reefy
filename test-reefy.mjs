@@ -36,7 +36,7 @@ await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/2-aquarium.png' });
 
 // Besle: ücretli yem seç, 3 kez suya dokun, tam maliyet düşümünü HUD'dan doğrula
-await page.click('#siderail button[data-rail="feed"]');
+await page.click('#carebar button[data-care="feed"]');
 await page.waitForTimeout(300);
 await page.click('.feed-opt[data-feed="lezzet"]');
 await page.waitForTimeout(300);
@@ -96,7 +96,7 @@ await page.click('.tab[data-tab="eggs"]');
 await page.waitForTimeout(300);
 const pearlsForEgg = Number((await page.locator('#hud-pearls').textContent()).trim());
 if (pearlsForEgg < 110) errors.push(`EGG: yeterli inci yok (${pearlsForEgg})`);
-const capBefore = (await page.locator('#hud-cap').textContent()).trim();
+const capBefore = (await page.locator('#bottombar button[data-act="aquarium"] small').textContent()).trim();
 await page.click('.buy-btn[data-egg="abis"]');
 await page.waitForTimeout(400);
 if (await page.locator('[data-egg-row]').count() === 0) errors.push('EGG: kuluçka satırı görünmedi');
@@ -112,7 +112,7 @@ await page.screenshot({ path: out + '/7c-egg-collected.png' });
 // Açılış ekranı mağaza panelinin YERİNE geçer; .reveal-ok ile kapanınca panel de kapanır.
 await page.click('.reveal-ok');
 await page.waitForTimeout(400);
-const capAfter = (await page.locator('#hud-cap').textContent()).trim();
+const capAfter = (await page.locator('#bottombar button[data-act="aquarium"] small').textContent()).trim();
 if (capBefore === capAfter) errors.push(`EGG: balık sayısı artmadı (${capBefore} -> ${capAfter})`);
 
 // Envanter: dekor sekmesine geç, dekoru yerleştir
@@ -265,7 +265,7 @@ const pack = await page.evaluate(() => ({
 if (coinsBeforePack - pack.coins !== 70 || pack.stock !== 10) {
   throw new Error(`Yem paketi hatalı: ${coinsBeforePack} -> ${pack.coins}, stok ${pack.stock} (beklenen -70, 10)`);
 }
-await page.click('#siderail button[data-rail="feed"]');
+await page.click('#carebar button[data-care="feed"]');
 await page.waitForTimeout(300);
 await page.click('.feed-opt[data-feed="lezzet"]');
 await page.waitForTimeout(200);
