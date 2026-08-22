@@ -17,6 +17,16 @@ permanent for the session. Both halves are fixed: the message is published,
 and setup now retries when the player actually asks for an ad. Do not
 re-introduce a silent `catch` there.
 
+**master is ahead of the shipped 1.2.0.** Two fixes landed after the AAB was
+built and are therefore NOT on any device: the smoke run's selectors
+(`48fc01a`) and the top block's width on wide viewports (`a233076`). Neither
+needs a release of its own — fold them into the next one.
+
+The smoke run is worth a line of its own: it is not part of `npm test`, it
+needs a dev server on port 5173, and it had been silently reaching for the
+vertical rail the care bar replaced — so it failed on its first click and
+covered nothing. Run it after any HUD change; that is what it is for.
+
 What is left, in the owner's stated order: a promo video, then getting that
 video and a refreshed README into this repo — both under "Presenting the game"
 below. iOS stays parked until the owner asks for it.
