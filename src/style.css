@@ -198,7 +198,13 @@ html, body {
    offset: the care bar's height depends on its text, and hard-coded offsets put
    the tank chip on top of it the moment a status line wrapped. */
 #topbar {
-  position: absolute; top: max(10px, env(safe-area-inset-top)); left: 12px; right: 12px;
+  /* Held to the dock's width and centred like it. The game is played on a
+     phone, where this is simply the full width — but the web demo opens on
+     desktops, and left-to-right stretching turned the care row into three
+     wildly uneven cells with a fixed-width circle stranded among them. */
+  position: absolute; top: max(10px, env(safe-area-inset-top));
+  left: 50%; transform: translateX(-50%);
+  width: min(96vw, 430px);
   display: flex; flex-direction: column; gap: 6px;
   pointer-events: none;
 }
