@@ -27,6 +27,24 @@ needs a dev server on port 5173, and it had been silently reaching for the
 vertical rail the care bar replaced — so it failed on its first click and
 covered nothing. Run it after any HUD change; that is what it is for.
 
+**The handset no longer has the Play build on it** (2026-08-23). To test ads
+without being served live ones, the phone was moved to a locally built release
+APK — same version, signed with the upload key rather than Play's, which is why
+it had to be uninstalled first rather than updated in place. Consequences worth
+knowing before reading anything off that phone: it gets no Play track updates,
+Play Billing does not resolve, so Settings reads `store: —` instead of
+`store: TRY`, and Google sign-in works there but not on any build a player would
+have (see the certificate item below). `adb install -r` from Play to local, or
+back, will always fail with INSTALL_FAILED_UPDATE_INCOMPATIBLE — reinstall from
+the closed-test track to get the Play build back.
+
+The save on that phone did not survive intact. `adb backup`/`adb restore`
+carried it across the uninstall, but restored an older snapshot than the one
+taken: 986 coins, 7 pearls and a 3-day streak came back as 300 / 5 / day 1, with
+the onboarding replaying. Local saves are still the only copy — cloud save
+cannot be connected on any Play build for the same certificate reason — so treat
+that phone's progress as expendable until sign-in works.
+
 What is left, in the owner's stated order: a promo video, then getting that
 video and a refreshed README into this repo — both under "Presenting the game"
 below. iOS stays parked until the owner asks for it.
