@@ -69,16 +69,28 @@ locally built APK signed with the upload key, the same tap brings up the real
       offers to CREATE one; creating a profile on someone's Google account is
       theirs to do, so the test stops there until the owner taps it.
 
-### The test handset still sees LIVE ads
+### The test-device id in `.env.local` was the wrong device
 
-`.env.local` now carries `VITE_ADMOB_TEST_DEVICES=BF390972DD2CCCC736B0C90461E6020D`,
-but 1.2.0 was built before that line existed, so the phone currently installed
-gets real ads.
+- [x] **Corrected 2026-08-23.** The id that had been sitting in `.env.local`
+      belonged to no device the SDK recognised, so `initializeForTesting` had no
+      effect and the handset was served a real ad — confirmed the hard way, by
+      a live rewarded ad playing on it. Nothing was tapped inside it, and an
+      impression alone is not what gets an account suspended; a click is.
+      The id AdMob actually wants is printed by the SDK on every ad request:
 
-- [ ] **Do not tap "Watch Ad" on the phone until a build made after that line
-      ships.** Tapping your own live ad is what gets an AdMob account
-      suspended. The emulator is safe — the SDK treats emulators as test
-      devices on its own.
+          adb logcat -s Ads | grep setTestDeviceIds
+
+      With the right one in `.env.local` the same tap now shows the "Test
+      Reklamı" plate and logcat says `This request is sent from a test device.`
+
+- [ ] **Any build that reaches the phone must be built with that line present.**
+      A build made without it serves live ads again — that includes anything
+      installed from the Play track, which never carries `.env.local`. Treat
+      "Watch Ad" on a Play-installed build as off limits. The emulator is safe
+      on its own; the SDK treats emulators as test devices.
+- [ ] **Rewarded ads otherwise work end to end** (verified 2026-08-23): the ad
+      plays, "Ödül verildi" appears, and the five pearls are granted and
+      survive a relaunch.
 
 ### Coral Festival — what the first run has to answer
 
