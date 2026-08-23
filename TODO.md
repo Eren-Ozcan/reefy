@@ -33,20 +33,41 @@ below. iOS stays parked until the owner asks for it.
 
 ## Pending
 
-### The global ranking has no scores in it yet
+### No OAuth client carries the Play app-signing key — sign-in is dead on Play builds
 
-The Play Games leaderboard ("Total earnings", `CgkIoInHhtMWEAIQAA`) is created
-and published, the OAuth credential is bound to the app-signing certificate,
-and the button appears in the Social panel on a real device — `showLeaderboard`
-reaches the native plugin. What it cannot do is open a leaderboard for a player
-with no Play Games profile, which is where the test stopped: the sign-in sheet
-offered to CREATE one, and creating a profile on someone's Google account is
-theirs to do.
+Found on the handset 2026-08-23, and it is the reason the ranking has never had
+a score in it. Google sign-in — both the Play Games account and cloud save —
+fails **silently on every build installed from Play**, because the OAuth clients
+registered for `com.yilkgames.reefy` do not include the certificate Play signs
+the app with.
 
-- [ ] **Sign in to Play Games once from Settings > Account**, then open Social >
-      Global ranking. That is also what starts the score reaching the board;
-      `submitPlayScore` is called from syncSave but does nothing while signed
-      out.
+The three Android clients in `android/app/google-services.json` carry
+`c9690f21…`, `99e821da…` and `38374df2…`. That last one is the **upload** key
+(`android/reefy-release.keystore`), not the app-signing key — an earlier note
+had these backwards. The APK Play actually delivered to the phone
+(`adb pull` of `base.apk`, then `apksigner verify --print-certs`) is signed with
+
+    SHA-1 8A:C0:B7:C8:81:C8:F8:EC:8F:05:9A:29:7D:88:C7:07:84:ED:30:D5
+
+which appears in no client. The proof is a matched pair on one handset: on the
+Play-installed 1.2.0, tapping Settings > Hesap > "Giriş yap" opens and closes
+`GamesResolutionActivity`/`SignInActivity` with nothing shown and the button
+unchanged (logcat: `getToken() -> BAD_AUTHENTICATION … games.firstparty`); on a
+locally built APK signed with the upload key, the same tap brings up the real
+"Play Games profili oluşturun" sheet.
+
+- [ ] **Register the app-signing SHA-1 above** — as an Android OAuth client in
+      the Google Cloud project (and add it to the Firebase Android app so it
+      lands in `google-services.json`), then bind the Play Games Services
+      credential to a client that carries it. Rebuild and ship; nothing about
+      this can be tested from a sideloaded APK, because a sideloaded APK is the
+      case that already works.
+- [ ] **Then sign in once from Settings > Hesap** and open Social > Global
+      ranking. That is what starts scores reaching the board; `submitPlayScore`
+      is called from syncSave but does nothing while signed out.
+- [ ] **The handset's Google account has no Play Games profile yet.** The sheet
+      offers to CREATE one; creating a profile on someone's Google account is
+      theirs to do, so the test stops there until the owner taps it.
 
 ### The test handset still sees LIVE ads
 
