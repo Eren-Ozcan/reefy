@@ -92,6 +92,26 @@ locally built APK signed with the upload key, the same tap brings up the real
       plays, "Ödül verildi" appears, and the five pearls are granted and
       survive a relaunch.
 
+### Two layout defects the handset shows and the desktop does not
+
+Both seen on a 1080x2340 phone (Android 9, three-button navigation bar), on the
+build that already carries `a233076`.
+
+- [ ] **Every sheet's last line sits under the system navigation bar.** In
+      Settings that line is the diagnostic — `store: … · ads: …` — so the one
+      readout built for answering "is the store live, did the ad SDK start" is
+      the one thing on screen that cannot be read. The bottom tab bar loses the
+      same few pixels: "Akvaryum 2/7" and "Sv 1" run under the nav bar. Wants a
+      bottom safe-area inset on the sheet and the dock; `@capacitor-community/safe-area`
+      is already a dependency.
+- [ ] **The top block still overflows once the event pill grows.** `a233076`
+      holds it to the dock's width with a plain pill ("Mercan Koyu 🏝"), but the
+      pill gains a discount badge as the event runs, and at "-12%" the streak
+      pill is pushed off the right edge and clipped. The shipped 1.2.0, which
+      does not have `a233076` at all, clips it at "-35%" badly enough to cut the
+      words "3 gün seri" into three lines. Size the row against the pill's
+      widest state, not its narrowest.
+
 ### Coral Festival — what the first run has to answer
 
 The feature is built and shipped (see Done); what is left is not code. The
