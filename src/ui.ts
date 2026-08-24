@@ -1,4 +1,4 @@
-import { AD_TEST_DEVICES_ARMED } from './ads';
+import { AD_TEST_DEVICE_TAGS } from './ads';
 import { audio } from './audio';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
@@ -1692,10 +1692,12 @@ export class UI {
     // currency the store reported, and why ads are off if they are. Both fail
     // silently by nature, which is exactly why they get a line.
     const adErr = this.game.services.ads.lastError;
-    // Whether this build's ads are safe to tap. Live ads on a developer's own
-    // handset are the one thing here that can cost the account rather than just
-    // confuse a reader, so it is stated even when everything else is fine.
-    const adMode = AD_TEST_DEVICES_ARMED ? 'test' : 'live';
+    // Which test devices this build names — not a claim that this device is one
+    // of them, which the SDK never tells the app. Compare the prefixes against
+    // what logcat asks for (`adb logcat -s Ads | grep setTestDeviceIds`); if the
+    // SDK is still asking, the ids here are stale and Watch Ad serves a real
+    // advertiser a real impression.
+    const adMode = AD_TEST_DEVICE_TAGS.length ? `dev ${AD_TEST_DEVICE_TAGS.join(',')}` : 'live';
     // The safe-area numbers the platform actually reports, measured rather than
     // assumed. Every bottom-pinned element adds env(safe-area-inset-bottom) to
     // its own offset, and on the test handset — Android 10, WebView 150 — the

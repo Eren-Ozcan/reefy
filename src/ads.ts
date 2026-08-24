@@ -67,14 +67,25 @@ const TEST_DEVICE_INIT = TEST_DEVICES.length
   : {};
 
 /**
- * Whether this build names a test device at all. Surfaced in Settings' diagnostic
- * line because it is the difference between "tapping Watch Ad shows a test plate"
- * and "tapping Watch Ad serves a real advertiser an impression". A build from the
- * Play track never carries .env.local, so it is always the second — and that is
- * not something anyone can tell by looking at the app. An impression on its own
- * does not get an account suspended; a click on one does.
+ * The first four characters of each test-device id this build names, for the
+ * diagnostic line in Settings.
+ *
+ * It is deliberately NOT a yes/no "is this a test device". The SDK never tells
+ * the app whether it accepted the id, and an earlier version of this diagnostic
+ * printed "ads: test" whenever ANY id was configured — which read as a promise
+ * and was wrong: reinstalling the app from Play rotates the app-set id the
+ * device is identified by, so the id captured from the old install no longer
+ * matched and a real advertiser was served a real impression on the
+ * developer's own handset.
+ *
+ * Printing the prefixes makes the check a comparison instead of a promise:
+ *
+ *     adb logcat -s Ads | grep setTestDeviceIds
+ *
+ * If the SDK is still asking for an id, THAT id is the one that counts, and it
+ * will not be in this list. Re-capture it after every reinstall.
  */
-export const AD_TEST_DEVICES_ARMED = TEST_DEVICES.length > 0;
+export const AD_TEST_DEVICE_TAGS: string[] = TEST_DEVICES.map((d) => d.slice(0, 4).toUpperCase());
 
 const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // don't show ads back-to-back on tank transitions
 const REWARDED_COOLDOWN_MS = 30 * 1000;         // prevent accidental double-clicks
