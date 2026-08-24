@@ -17,15 +17,28 @@ permanent for the session. Both halves are fixed: the message is published,
 and setup now retries when the player actually asks for an ad. Do not
 re-introduce a silent `catch` there.
 
-**master is ahead of the shipped 1.2.0.** Two fixes landed after the AAB was
-built and are therefore NOT on any device: the smoke run's selectors
-(`48fc01a`) and the top block's width on wide viewports (`a233076`). Neither
-needs a release of its own — fold them into the next one.
+**master is well ahead of the shipped 1.2.0, and the gap is now worth a
+release.** Nothing below is on any device. In the order it landed: the smoke
+run's selectors (`48fc01a`), the top block's width on wide viewports
+(`a233076`), and then on 2026-08-24 the two handset-only layout defects, the
+`ads: test` / `ads: live` diagnostic, the demo workflow's action versions and
+the README. **Built and signed as 1.2.1 / versionCode 8 on 2026-08-24**,
+waiting to be uploaded to the alpha closed-test track. The certificate fix is
+NOT what makes this release necessary — that fix is entirely server-side (see
+the certificate item) — but the layout fixes only reach a phone through a
+build, and the phone has to be reinstalled from the track anyway to test
+sign-in.
 
-The smoke run is worth a line of its own: it is not part of `npm test`, it
-needs a dev server on port 5173, and it had been silently reaching for the
-vertical rail the care bar replaced — so it failed on its first click and
-covered nothing. Run it after any HUD change; that is what it is for.
+Two Playwright runs guard the parts unit tests cannot reach. Neither is part of
+`npm test` and both need a dev server on port 5173:
+
+- `npm run smoke` walks the real UI. It had been silently reaching for the
+  vertical rail the care bar replaced, so it failed on its first click and
+  covered nothing — run it after any HUD change; that is what it is for.
+- `npm run layout:check` loads the top row and the sheets in their widest state
+  at 1080x2340 and asserts nothing is clipped by the navigation bar or pushed
+  off an edge. Both defects it checks for were invisible on a desktop browser
+  and obvious on a handset.
 
 **The handset no longer has the Play build on it** (2026-08-23). To test ads
 without being served live ones, the phone was moved to a locally built release
@@ -33,10 +46,13 @@ APK — same version, signed with the upload key rather than Play's, which is wh
 it had to be uninstalled first rather than updated in place. Consequences worth
 knowing before reading anything off that phone: it gets no Play track updates,
 Play Billing does not resolve, so Settings reads `store: —` instead of
-`store: TRY`, and Google sign-in works there but not on any build a player would
-have (see the certificate item below). `adb install -r` from Play to local, or
-back, will always fail with INSTALL_FAILED_UPDATE_INCOMPATIBLE — reinstall from
-the closed-test track to get the Play build back.
+`store: TRY`, and — **since 2026-08-24 this is the other way round** — Google
+sign-in is the thing that now works on a Play build and not on that local one,
+because the single Play Games credential names the app-signing key rather than
+the upload key it used to. `adb install -r` from Play to local, or back, will
+always fail with INSTALL_FAILED_UPDATE_INCOMPATIBLE — reinstall from the
+closed-test track to get the Play build back, which is now the only way to test
+anything about accounts.
 
 The save on that phone did not survive intact. `adb backup`/`adb restore`
 carried it across the uninstall, but restored an older snapshot than the one
@@ -45,9 +61,16 @@ the onboarding replaying. Local saves are still the only copy — cloud save
 cannot be connected on any Play build for the same certificate reason — so treat
 that phone's progress as expendable until sign-in works.
 
-What is left, in the owner's stated order: a promo video, then getting that
-video and a refreshed README into this repo — both under "Presenting the game"
-below. iOS stays parked until the owner asks for it.
+What is left needs decisions or accounts rather than code. In the owner's
+stated order: a promo video (nobody but the owner can shoot it), and then the
+one question that covers both that video and the README's missing screenshots —
+whether this public repo takes an image and a clip as a deliberate exception to
+the asset rule in CLAUDE.md, or whether they are hosted outside it and linked.
+The README refresh itself is done. iOS stays parked until the owner asks for it.
+
+The Coral Festival's first run started 2026-08-24 and ends 2026-08-28, so the
+tier measurement below cannot be taken yet — `npm run event:dump` needs players
+to have played, and a service-account key.
 
 ## Pending
 
@@ -74,18 +97,57 @@ unchanged (logcat: `getToken() -> BAD_AUTHENTICATION … games.firstparty`); on 
 locally built APK signed with the upload key, the same tap brings up the real
 "Play Games profili oluşturun" sheet.
 
-- [ ] **Register the app-signing SHA-1 above** — as an Android OAuth client in
-      the Google Cloud project (and add it to the Firebase Android app so it
-      lands in `google-services.json`), then bind the Play Games Services
-      credential to a client that carries it. Rebuild and ship; nothing about
-      this can be tested from a sideloaded APK, because a sideloaded APK is the
-      case that already works.
+- [x] **Registered, bound and published (2026-08-24).** Three steps, all done:
+      the SHA-1 was added to the Firebase Android app, which made Google create
+      the Android OAuth client `778208134304-hm2mjkb4cchfb5imskcoi5f84usrb59b`
+      carrying it; `android/app/google-services.json` was regenerated from
+      `firebase apps:sdkconfig` (not a console download) so the new client is in
+      the repo; and the Play Games Services Android credential — which turned
+      out to be bound to the **upload** key client
+      (`…q3q974hifqr49e7mqv216pp6glpm5bpg`, fingerprint `38:37:4D:F2…`) — was
+      repointed at the new one and published. Play's own page confirmed the
+      fingerprint reads `8A:C0:B7:C8:81:C8:F8:EC:8F:05:9A:29:7D:88:C7:07:84:ED:30:D5`
+      before saving.
+      Two consequences to know:
+      - **All of it is server-side; none of it needs a new build.** An earlier
+        note here said the Firebase half had to ship in an AAB. It does not:
+        only the WEB client (`…33oiprsk…`, client_type 3) reaches the app, as
+        `default_web_client_id` in
+        `android/app/build/generated/res/processReleaseGoogleServices/values/values.xml`.
+        The Android client entries in `google-services.json` are never compiled
+        in — Google resolves package name plus signing certificate on its own
+        side. So the updated `google-services.json` in this repo is bookkeeping,
+        and **the already-shipped 1.2.0 on the track should now be able to sign
+        in** once the Play Games publish propagates (a few hours).
+      - **Sideloaded APKs signed with the upload key can no longer sign in.**
+        There is exactly one Android credential and it now names the app-signing
+        key. That is deliberate — the case that matters is the one players get —
+        but it means the sign-in test has to happen on a build installed from the
+        closed-test track, which is what this item always said anyway. If local
+        sign-in testing is wanted back, add a SECOND Android credential for the
+        upload key and leave it non-primary; it was not added on purpose.
 - [ ] **Then sign in once from Settings > Hesap** and open Social > Global
       ranking. That is what starts scores reaching the board; `submitPlayScore`
       is called from syncSave but does nothing while signed out.
+      Needs the phone reinstalled from the closed-test track — it is currently
+      on a local upload-key APK, which is now the case that cannot sign in. A
+      new AAB is NOT required for this test (see above); 1.2.1 is worth
+      installing anyway because it is the build that carries the layout fixes.
+- [ ] **Not verified.** Everything above is configuration; nothing has actually
+      signed in yet. Until a Play build does, "fixed" means "the certificate the
+      APK is signed with now appears in a client the credential names", not
+      "sign-in works".
 - [ ] **The handset's Google account has no Play Games profile yet.** The sheet
       offers to CREATE one; creating a profile on someone's Google account is
       theirs to do, so the test stops there until the owner taps it.
+
+### Play Games says "Firebase bağlı değil"
+
+- [ ] Noticed 2026-08-24 on the Play Games Services configuration page, beside
+      "Kaydedilmiş oyunlar etkin değil". Neither is needed for sign-in or for the
+      leaderboard, and cloud save here is Firestore's own, not Play's saved
+      games — so this is a note, not a defect. Worth revisiting only if Play's
+      saved-games or its Firebase integration ever becomes wanted.
 
 ### The test-device id in `.env.local` was the wrong device
 
@@ -106,6 +168,12 @@ locally built APK signed with the upload key, the same tap brings up the real
       installed from the Play track, which never carries `.env.local`. Treat
       "Watch Ad" on a Play-installed build as off limits. The emulator is safe
       on its own; the SDK treats emulators as test devices.
+      **The app now says which it is** (2026-08-24): Settings' diagnostic reads
+      `ads: test` when the build names a test device and `ads: live` when it
+      does not, in the slot that previously appeared only when there was an
+      error. Live ads on a developer's own handset are the one thing on that
+      line that can cost the account rather than merely confuse a reader, and it
+      was not observable from inside the app at all.
 - [ ] **Rewarded ads otherwise work end to end** (verified 2026-08-23): the ad
       plays, "Ödül verildi" appears, and the five pearls are granted and
       survive a relaunch.
@@ -113,22 +181,41 @@ locally built APK signed with the upload key, the same tap brings up the real
 ### Two layout defects the handset shows and the desktop does not
 
 Both seen on a 1080x2340 phone (Android 9, three-button navigation bar), on the
-build that already carries `a233076`.
+build that already carries `a233076`. **Both fixed on master (2026-08-24), and
+neither is on any device yet.**
 
-- [ ] **Every sheet's last line sits under the system navigation bar.** In
-      Settings that line is the diagnostic — `store: … · ads: …` — so the one
-      readout built for answering "is the store live, did the ad SDK start" is
-      the one thing on screen that cannot be read. The bottom tab bar loses the
-      same few pixels: "Akvaryum 2/7" and "Sv 1" run under the nav bar. Wants a
-      bottom safe-area inset on the sheet and the dock; `@capacitor-community/safe-area`
-      is already a dependency.
-- [ ] **The top block still overflows once the event pill grows.** `a233076`
-      holds it to the dock's width with a plain pill ("Mercan Koyu 🏝"), but the
-      pill gains a discount badge as the event runs, and at "-12%" the streak
-      pill is pushed off the right edge and clipped. The shipped 1.2.0, which
-      does not have `a233076` at all, clips it at "-35%" badly enough to cut the
-      words "3 gün seri" into three lines. Size the row against the pill's
-      widest state, not its narrowest.
+- [x] **Every sheet's last line sat under the system navigation bar.** The cause
+      was `max(12px, env(safe-area-inset-bottom))` on the dock and nothing at all
+      on the sheet. `max()` is the wrong operator here: a three-button bar is
+      48px against offsets of 12-16px, so it always won and collapsed the gap to
+      nothing. Every bottom-pinned element now ADDS `--safe-b` to its own offset,
+      and the sheet carries the inset as bottom padding — its surface continues
+      behind the bar so nothing shows through, its content stops above it.
+- [x] **The top row no longer overflows.** Three separate causes, and the first
+      two were invisible until the widths were measured:
+      - `.hud-chip { flex: none }` is declared after `.hud-tank`, so the rule
+        meant to let the tank chip give up width never applied at all. Both
+        elastic rules are id-scoped now.
+      - The streak chip's seventh-day tease was a **sentence** — 156px of a
+        430px row, more than the tank chip and the level ring together. It is a
+        pearl mark now, with the sentence kept as the chip's title; the ladder
+        the chip opens already spells it out.
+      - `.hud-chip .icon { order: 2 }` was written for the currency chips and
+        was also throwing the tank chip's biome mark to the end, after the
+        badge. The mark leads in that chip now.
+      In its widest state the row still cannot fit one line — 1.3M coins, the
+      longest tank name, a growth badge and a streak at once — so `#hud` wraps.
+      A second line reads as a full HUD; a tank name truncated to "A." reads as
+      breakage.
+- [x] **`npm run layout:check` now covers both** (`tools/check-mobile-layout.mjs`).
+      It loads that widest state — longest tank name, fully dirty tank so the
+      growth badge sits at "-32%", streak on its tease day — at 1080x2340 and
+      asserts nothing is clipped or pushed off an edge. The navigation bar is
+      simulated by overriding `--safe-b`, which is only possible because every
+      bottom offset goes through that one variable; `env(safe-area-inset-bottom)`
+      itself cannot be set from a page. `--report` prints the measured chip
+      widths, `--nav=` sets the bar height, `--shots=DIR` writes screenshots.
+      Like the smoke run it needs a dev server and is not part of `npm test`.
 
 ### Coral Festival — what the first run has to answer
 
@@ -198,6 +285,19 @@ evidence for whether the numbers are right.
       own feature graphic; the app name is now `Reefy: Cozy Aquarium` in both.
       The three stale 10-inch tablet shots were removed rather than replaced —
       with phone screenshots present Play needs no separate 10-inch set.
+- [ ] **Everything uploaded on 2026-08-20 is now stale.** Found on 2026-08-24:
+      the captures on the listing show the removed right-edge rail, because the
+      care bar landed after they were taken. Worse, the capture tools had gone
+      stale with the same rename and could not be re-run at all —
+      `capture-store-screenshots.mjs` timed out on
+      `#siderail button[data-rail="feed"]`, and `make-feature-graphic.mjs` was
+      hiding `#hud` and `#siderail` when the element to hide is now `#topbar`,
+      so the care bar would have stood in the middle of the graphic. Both are
+      fixed and both sets were regenerated for en. **Still to do: regenerate tr,
+      rebuild the captioned plates and both feature graphics, and re-upload all
+      of it to Play.** This is the same class of breakage as `48fc01a` — a HUD
+      rename silently disabling a Playwright tool — and it is why `npm run smoke`
+      and `npm run layout:check` belong in the release routine.
 - [ ] **The 10-inch tablet set is empty in both languages.** Not a blocker, and
       better than the pre-redesign images that were there; worth filling if a
       tablet audience ever matters.
@@ -213,10 +313,16 @@ evidence for whether the numbers are right.
       `.github/workflows/demo.yml`. The demo opens in English whatever the
       browser reports, and makes no Firebase request at all (verified against
       the deployed build from both a `tr-TR` and an `en-US` context).
-- [ ] **The workflow's actions are on the deprecated Node 20 runtime.** Every
-      run warns that `actions/checkout@v4`, `setup-node@v4`,
-      `configure-pages@v5` and `upload-artifact@v4` are being forced onto
-      Node 24. Harmless today, a broken deploy the day the forcing stops.
+- [x] **The workflow's actions are off the deprecated Node 20 runtime**
+      (2026-08-24): checkout v4 to v7, setup-node v4 to v7, configure-pages v5
+      to v6, upload-pages-artifact v3 to v5, deploy-pages v4 to v5. Two breaking
+      changes were checked and neither applies: checkout's safer
+      `pull_request_target` defaults (this workflow runs on `push`) and
+      upload-pages-artifact v4 dropping dotfiles from the artifact (`dist/` has
+      none — Vite writes `index.html` and `assets/`). `.nvmrc` went 20 to 22 in
+      the same pass; Node 20 is past end of life, and 22 is what the machine
+      this is developed on runs. Not yet observed green — the first run of it
+      happens on the next push.
 
 ### Presenting the game — store page, video, repo
 
@@ -242,13 +348,26 @@ live, so for the first time there is something to point a link at.
       out of this repo. A README clip is a deliberate exception to decide on,
       not an oversight — the alternative is hosting it outside the repo and
       linking to it.
-- [ ] **Refresh the README around it.** It still reads as a build-instructions
-      file: no screenshots, and the feature list is a map of source files
-      rather than a picture of the game.
-- [ ] **Explain the demo properly.** There is a "Play the demo" section now,
-      but it is written for someone reading the source. The version a visitor
-      needs is shorter and higher up — what the game is, the link, and what the
-      demo does not include — with the technical detail moved below it.
+- [x] **README refreshed** (2026-08-24). It opens with what the game is and the
+      demo link, then "What you actually do" — the loop in the player's terms,
+      where the old feature list was a map of source files. That map survives as
+      a "Where things live" table below the build instructions, which is what it
+      was always for. Also documented there: the `layout:check` run, why neither
+      Playwright run is part of `npm test`, and the UMP privacy message whose
+      absence silently killed ads in production.
+- [x] **Three images at the top** (2026-08-24). The owner took the exception:
+      `docs/readme/*.png` is committed and exempted in `.gitignore`, and CLAUDE.md
+      now carries the rule and its limits. They are 270px wide, ~35 KB each, and
+      cut from the store screenshot set by `node tools/make-readme-shots.mjs`
+      rather than captured separately — so the README cannot drift to a different
+      build than the listing. A video or GIF is the same decision and is NOT
+      covered by it; ask before committing one.
+- [x] **The demo is explained for a visitor first** (2026-08-24). The link is in
+      the third line of the file. What the demo leaves out is three plain
+      bullets now — no account, no ads or purchases, no Play Games — with the
+      `isFirebaseConfigured()` and `createServices()` detail kept but moved out
+      of the pitch. Everything below the horizontal rule is for someone
+      building it.
 
 ### Housekeeping
 
