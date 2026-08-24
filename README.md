@@ -1,70 +1,130 @@
 # Reefy 🐠
 
-A cozy aquarium game for Android and iOS. Collect fish, decorate tanks, feed and care for your reef, and complete quests — all rendered in 2D with PixiJS and shipped as a native mobile app via Capacitor.
+A cozy aquarium game. You start with a bare tank and two fish, and you end up
+with a reef you arranged yourself — species collected one egg at a time, decor
+placed where you wanted it, glass you keep clean because dirt costs you income.
+There is nothing to lose and nothing to fail; the fish keep earning while the
+app is closed, and the game's job is to be worth opening again tomorrow.
 
-See [`TODO.md`](TODO.md) for the current roadmap and known gaps.
+**▶ Play it in your browser: <https://eren-ozcan.github.io/reefy/>** — no
+install, no account, progress saved in the browser.
 
-## Play the demo
+On Android it is in closed testing. iOS is built but not submitted.
 
-**<https://eren-ozcan.github.io/reefy/>** — the full game running in the browser,
-no install needed. It is deployed from `master` by
-[`.github/workflows/demo.yml`](.github/workflows/demo.yml) and built with
-`VITE_DEMO=1`, which is what separates it from the shipped app:
+<p align="center">
+  <img src="docs/readme/tank.png" alt="A stocked reef with the care bar and the collect button" width="240"/>
+  <img src="docs/readme/eggs.png" alt="The egg shop, with rarity odds per tier" width="240"/>
+  <img src="docs/readme/collection.png" alt="The species collection, part filled" width="240"/>
+</p>
 
-- **Everything stays in your browser.** The demo reports Firebase as
-  unconfigured (`isFirebaseConfigured()` in `src/firebase-config.ts`), so it
-  never signs anyone in and never touches the production project — no cloud
-  save, no account linking, and friend codes resolve locally instead of against
-  Firestore. Progress lives in `localStorage`; clearing site data resets it.
-- **No ads and no real purchases.** Both are wired to the native Capacitor
-  plugins, so any non-native build already falls back to stubs
-  (`createServices()` in `src/services.ts`). The shop's Pearls tab still lists
-  the packs, but tapping one declines with a note pointing at quests and level
-  rewards as the way to earn pearls in the demo (`StubIAP`).
+## What you actually do
 
-To build it locally: `VITE_DEMO=1 npm run build && npm run preview`.
+- **Collect fish.** Buy them, or hatch eggs and find out what is inside — five
+  rarities, with a pity counter so a long streak of commons eventually pays out.
+- **Care for the tank.** Fish get hungry, glass gets dirty, and both show up in
+  what the tank earns per hour. The care bar tells you which one is asking.
+- **Grow and sell.** Fish mature over real time; a grown fish sells for more,
+  and better feed raises the price further.
+- **Decorate.** Decor is not only decoration — a themed set raises the tank's
+  growth and income multiplier.
+- **Unlock aquariums.** 25 tanks across seven biomes, each with its own look,
+  capacity and bonus.
+- **Come back.** Daily quests, a weekly quest, a login streak that pays pearls
+  on the seventh day, and timed festivals with reward tiers.
+- **Compare.** A global ranking through Play Games, plus friend codes for
+  visiting other people's reefs.
 
-## Features
+Coins and pearls are earned by playing. Pearls can also be bought, and a
+rewarded ad is offered for pearls — never forced, and an ad-free purchase
+removes the interstitial entirely.
 
-- **Fish & species system** — collect different species, each with its own look and behavior (`src/species.ts`, `src/fish.ts`)
-- **Multiple tanks** — unlock and switch between aquariums (`src/tanks.ts`)
-- **Feeding & care loop** — keep your fish fed and happy (`src/feeds.ts`)
-- **Decorations** — customize tanks with decor items (`src/decor.ts`)
-- **Quests** — goal-driven progression (`src/quests.ts`)
-- **Offline saves** — progress is persisted locally (`src/save.ts`)
-- **Google Play Games integration** via `capacitor-game-connect-8` (`src/services.ts`)
-- **In-app purchases** via RevenueCat (`@revenuecat/purchases-capacitor`, `src/services.ts`) — falls back to a stub in the web preview
-- **Ads** via AdMob (`@capacitor-community/admob`, `src/ads.ts`) — interstitial on tank switches (rate-limited) and an opt-in rewarded ad for free pearls; purchasable "remove ads" IAP disables the interstitial. Falls back to a stub in the web preview
-- **Sound & music** (`src/audio.ts`)
+## The demo
+
+The link above runs the same code as the shipped app with `VITE_DEMO=1`, which
+takes out everything that needs a server or a store:
+
+- **No account, no cloud.** Firebase reports itself unconfigured, so nothing is
+  signed in and nothing is written anywhere. Progress lives in `localStorage`
+  and clearing site data resets it. Friend codes resolve locally.
+- **No ads and no purchases.** Both are native plugins, so a web build already
+  falls back to stubs. The shop still lists the pearl packs; tapping one
+  declines and points at quests and level rewards instead.
+- **No Play Games.** The global ranking and achievements need the native
+  layer, so the demo's leaderboard is local.
+
+Everything else — the whole game loop, all 25 tanks, every species and every
+decor item — is the real thing.
+
+---
+
+# Building it
+
+Requires Node 22+ (see `.nvmrc`).
+
+```bash
+npm install
+npm run dev           # dev server at localhost:5173
+npm run build         # type-check + production build
+npm test              # unit tests (vitest, jsdom)
+npm run typecheck     # tsc only, no build
+npm run smoke         # Playwright walkthrough against a running dev server
+npm run layout:check  # phone-viewport layout checks against a running dev server
+npm run icons         # regenerate app icons from tools/icon-src/*.svg
+```
+
+The three images at the top are regenerated by `node tools/make-readme-shots.mjs`,
+which cuts them down from the store screenshot set (`npm run store:screens --
+--lang=en`, which needs a dev server too). They are the only marketing-type
+images in this repo and they are here deliberately — everything else of that kind
+is kept out, see `CLAUDE.md`.
+
+To build the demo locally: `VITE_DEMO=1 npm run build && npm run preview`.
 
 ## Tech stack
 
 - [PixiJS 8](https://pixijs.com/) for 2D rendering
 - TypeScript + Vite
 - [Capacitor 8](https://capacitorjs.com/) for the Android and iOS shells
-- Playwright for automated smoke testing (`test-reefy.mjs`)
+- Firebase (Firestore) for cloud save and friend codes
+- RevenueCat for in-app purchases, AdMob for ads, Play Games for the ranking
+- Vitest for unit tests, Playwright for the smoke and layout runs
 
-## Development
+## Where things live
 
-Requires Node 20+.
+| Area | Files |
+| --- | --- |
+| Species, rarities, egg odds | `src/species.ts`, `src/fish.ts` |
+| Tanks and biomes | `src/tanks.ts` |
+| Feeds and the hunger loop | `src/feeds.ts` |
+| Decor and set bonuses | `src/decor.ts` |
+| Quests, weekly quest, achievements | `src/quests.ts` |
+| Festivals and their reward tiers | `src/events.ts` |
+| Game state and rules | `src/game.ts` |
+| All UI and panels | `src/ui.ts`, `src/style.css` |
+| Save shape, migration, merge | `src/save.ts`, `src/cloud-save.ts` |
+| Platform services (IAP, ads, social) | `src/services.ts`, `src/ads.ts` |
+| Translations | `src/i18n.ts` |
 
-```bash
-npm install
-npm run dev        # run in the browser at localhost (Vite dev server)
-npm run build      # type-check + production build
-npm test           # unit tests (vitest, jsdom)
-npm run typecheck  # tsc only, no build
-npm run smoke      # Playwright screenshot walkthrough against a running dev server
-npm run icons      # regenerate app icons from tools/icon-src/*.svg
-```
+## Testing
 
-Tests cover the parts that fail silently rather than loudly: what the cloud save
-decides to keep or discard (`src/cloud-save.test.ts`), which fields count as
-player progress (`src/save.test.ts`), and the scene/cloud-restore race that
-once dropped fish mid-session (`src/game-sync.test.ts`). Firestore is faked
-there — no network, no emulator needed.
+Unit tests cover the parts that fail silently rather than loudly: what the cloud
+save decides to keep or discard (`src/cloud-save.test.ts`), which fields count as
+player progress (`src/save.test.ts`), and the scene/cloud-restore race that once
+dropped fish mid-session (`src/game-sync.test.ts`). Firestore is faked there — no
+network, no emulator needed.
 
-### Mobile builds
+Two Playwright runs are **not** part of `npm test` and each needs a dev server on
+port 5173:
+
+- `npm run smoke` plays through the real UI and reports console errors. Run it
+  after any change to the HUD or the panels — it clicks real selectors, so it is
+  what catches a rename that broke navigation.
+- `npm run layout:check` loads the top row and the sheets in their widest state
+  at phone size and asserts nothing is clipped by the system navigation bar or
+  pushed off the right edge. Both defects it checks for were invisible on a
+  desktop browser and obvious on a handset.
+
+## Mobile builds
 
 ```bash
 npx cap sync android   # copy web build into the Android project
@@ -73,6 +133,12 @@ npx cap open android   # open in Android Studio
 npx cap sync ios       # same for iOS (requires macOS + Xcode)
 npx cap open ios
 ```
+
+## Service setup
+
+The three integrations below need accounts of their own. Each degrades to a stub
+rather than crashing while it is unconfigured, so the game is playable before any
+of them is set up.
 
 ### In-app purchases (RevenueCat)
 
@@ -129,3 +195,11 @@ Before shipping:
 1. Add payment details in the AdMob dashboard (Payments) — ad units won't serve without it.
 2. Once the app is live on Play Store / App Store, link it from AdMob (Apps > Reefy > App settings) so it moves out of the "unlisted" review state.
 3. Set up the matching `remove-ads` store product (Google Play Console / App Store Connect) and RevenueCat package so the "Reklamları Kaldır" purchase works end to end.
+4. Publish a UMP privacy message for the app (AdMob > Privacy & messaging). Without
+   one the consent step fails with "Publisher misconfiguration" and no ad ever
+   serves — the failure is silent unless you read the diagnostic line in Settings.
+
+## Roadmap
+
+[`TODO.md`](TODO.md) carries the current roadmap, the known gaps and what the
+last release did and did not settle.
