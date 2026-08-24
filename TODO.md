@@ -203,6 +203,24 @@ locally built APK signed with the upload key, the same tap brings up the real
         for an id, the ones listed are stale.
       **Re-capture the id after every reinstall.** That is the rule; the old
       note assumed the id was stable and it is not.
+- [ ] **A SECOND live ad followed, and it is the more important one.** An
+      interstitial appeared while navigating the panels — no ad button was
+      pressed. It is not certain which tap reached it, and that is the finding:
+      the interstitial fires by itself when the tank's LAST dirt spot is
+      cleared (`countCleanForAd`, once per session) or on a tank switch, and a
+      tap on the water can clean dirt. On a build whose test-device id is stale,
+      **there is no such thing as a safe tap** — every ad path serves a live
+      advertiser. Both ads were closed with their own control (the rewarded
+      one's X, the interstitial with the hardware back key); nothing inside
+      either was clicked.
+      Two impressions on one device is not what gets an account actioned — a
+      click is — but it is invalid traffic on your own inventory, and it was
+      avoidable.
+      **Rule for device testing from now on: do not touch the app until the
+      build on the phone is one whose id logcat confirms.** The confirmation is
+      the SDK printing `This request is sent from a test device.` instead of
+      asking for an id. Testing with the network off is the other safe option:
+      no ad can load, and every non-network path is still exercisable.
 
 ### Two layout defects the handset shows and the desktop does not
 
