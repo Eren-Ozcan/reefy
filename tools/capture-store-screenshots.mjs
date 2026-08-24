@@ -226,7 +226,9 @@ await shot('10-collection', async () => {
 await shot('11-profile', () => page.click('#bottombar button[data-act="you"]'));
 
 // Feed mode: the one interaction a static shot can actually show off.
-await page.click('#siderail button[data-rail="feed"]');
+// The care bar replaced the right-edge rail this used to reach for; the same
+// rename broke the smoke run (48fc01a) and was missed here.
+await page.click('#carebar button[data-care="feed"]');
 await page.waitForTimeout(600);
 // Feed mode only actually arms — and only then does the Done bar appear —
 // once a feed is picked, so the shot without this is just the picker.

@@ -113,7 +113,10 @@ const welcome = scene.locator('.welcome-ok');
 if (await welcome.count()) await welcome.click();
 
 await scene.addStyleTag({
-  content: `#hud, #siderail, #bottombar, #collect, #next-goal, #mode-chip,
+  // #topbar covers the money row AND the care bar under it — both used to be
+  // separate elements (#hud and the removed #siderail), and hiding only #hud
+  // left the care bar standing in the middle of the graphic.
+  content: `#topbar, #bottombar, #next-goal, #mode-chip,
             #feed-pop, #toasts, #panel-host { display: none !important; }`,
 });
 // Let the fish scatter: they spawn clustered, and a clump reads as a bug at
