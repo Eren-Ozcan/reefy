@@ -250,7 +250,7 @@ html, body {
    is one chip narrower. */
 /* Id-scoped so it outranks the .hud-chip block below, which sets flex: none for
    every other chip in the row. */
-#hud .hud-tank { flex: 0 8 auto; overflow: hidden; min-width: 150px; }
+#hud .hud-tank { flex: 0 8 auto; overflow: hidden; min-width: 112px; }
 /* The biome mark leads inside this chip. The order: 2 above is written for the
    currency chips, where the figure changes and the icon only labels it; here the
    mark is what identifies the tank and the badge is what has to end the chip. */
@@ -413,6 +413,17 @@ html, body {
    second currency chip that has drifted into it. */
 .hud-streak .icon { width: 1em; height: 1em; opacity: 0.85; }
 .hud-streak { cursor: pointer; }
+
+/* A 1080px phone at density 3 is 360 CSS px wide, and the top row is sized for
+   the dock, so it gets 346. That is not enough for five chips at desktop
+   spacing: on a fresh save the level ring was dropping to a second line, which
+   is the wrap doing its job in a case that should never have needed it. Tighter
+   gaps and padding buy back the ~40px that costs. */
+@media (max-width: 400px) {
+  #hud { gap: 6px; }
+  #hud .hud-chip { padding: 7px 11px; }
+  #hud .hud-tank { min-width: 96px; }
+}
 
 /* Daily streak ladder */
 .streak { text-align: center; padding: 4px 2px 6px; }
