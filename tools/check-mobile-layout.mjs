@@ -32,13 +32,25 @@ const NAV = Number(flag('nav', '48'));
 const shots = flag('shots', '');
 if (shots) mkdirSync(shots, { recursive: true });
 
-// 1080x2340 at deviceScaleFactor 2 — the handset the defects were found on.
-const VIEWPORT = { width: 540, height: 1170 };
+// The handset the defects were found on is 1080x2340 at density 3.0, which is
+// 360 CSS px wide — NOT 540. Getting this wrong is not cosmetic: at 540 the row
+// has 180px of slack that no phone has, and the first version of this check
+// passed while the real device wrapped its top row on a fresh save.
+const CSS_WIDTH = Number(flag('css-width', '360'));
+const DSF = Number(flag('dsf', '3'));
+const VIEWPORT = { width: CSS_WIDTH, height: Math.round(2340 / DSF) };
 
 // The longest tank name in the game, in a tank dirty enough to carry a growth
 // badge. Both halves matter: the badge is what pushed the streak chip off the
 // right edge, and it only appears when the multiplier is not 1.
 const TANK = 'tank-aysberg';
+
+// The state an ordinary player is in most of the time: a short tank name, a
+// clean tank so there is no growth badge, three figures of coins, no streak.
+// The row MUST hold one line here — wrapping is reserved for the widest state,
+// and a fresh save dropping the level ring to a second line is the bug this
+// pass exists to catch.
+const ORDINARY_TANK = 'tank-mercan-koyu';
 
 function seedSave() {
   return {
@@ -92,13 +104,30 @@ function seedSave() {
   };
 }
 
+function seedOrdinary() {
+  const s = seedSave();
+  return {
+    ...s,
+    coins: 395,
+    pearls: 5,
+    level: 1,
+    fishes: s.fishes.map((f) => ({ ...f, tank: ORDINARY_TANK })),
+    decorPlaced: { [ORDINARY_TANK]: [] },
+    dirtSpots: {},
+    tanksOwned: [ORDINARY_TANK],
+    activeTank: ORDINARY_TANK,
+    streak: 1,
+    incomePot: 120,
+  };
+}
+
 const failures = [];
 const check = (ok, msg) => { if (!ok) failures.push(msg); return ok; };
 
 const browser = await chromium.launch();
 const page = await browser.newPage({
   viewport: VIEWPORT,
-  deviceScaleFactor: 2,
+  deviceScaleFactor: DSF,
   isMobile: true,
   hasTouch: true,
   locale: lang === 'tr' ? 'tr-TR' : 'en-US',
@@ -207,6 +236,43 @@ if (opened) {
     + ', past the navigation bar at ' + safeBottom);
   if (shots) await page.screenshot({ path: shots + '/sheet-bottom.png' });
 }
+
+// ---- 4. The ordinary state holds one line ----
+// Same viewport, a save without any of the things that make the row wide.
+const plain = await browser.newPage({
+  viewport: VIEWPORT, deviceScaleFactor: DSF, isMobile: true, hasTouch: true,
+  locale: lang === 'tr' ? 'tr-TR' : 'en-US',
+});
+await plain.addInitScript((save) => {
+  localStorage.setItem('reefy-save-v1', JSON.stringify(save));
+}, seedOrdinary());
+await plain.goto('http://localhost:5173/');
+await plain.waitForSelector('#play-btn');
+await plain.click('#play-btn');
+await plain.waitForSelector('#bottombar', { state: 'visible' });
+await plain.waitForTimeout(600);
+// Counted by height rather than by each chip's top: align-items: center gives
+// chips of different heights different tops on the SAME line, which made the
+// first version of this assertion report three lines for a row that had one.
+const plainRow = await plain.evaluate(() => {
+  const row = document.querySelector('#hud');
+  const kids = [...row.children].filter((c) => c.getBoundingClientRect().width > 0);
+  const tallest = Math.max(...kids.map((c) => c.getBoundingClientRect().height));
+  return {
+    height: Math.round(row.getBoundingClientRect().height),
+    tallest: Math.round(tallest),
+    width: row.clientWidth,
+    used: row.scrollWidth,
+  };
+});
+check(plainRow.height <= plainRow.tallest + 2,
+  'the top row wrapped in the ordinary state: ' + plainRow.height + 'px tall against a '
+  + plainRow.tallest + 'px chip, in ' + plainRow.width + 'px — wrapping is only for the widest state');
+if (argv.includes('--report')) {
+  console.log('ordinary row: ' + plainRow.height + 'px tall, tallest chip '
+    + plainRow.tallest + 'px, ' + plainRow.used + '/' + plainRow.width + 'px used');
+}
+if (shots) await plain.screenshot({ path: shots + '/hud-ordinary.png' });
 
 await browser.close();
 
