@@ -25,7 +25,8 @@
     "store:screens": "node tools/capture-store-screenshots.mjs",
     "store:feature": "node tools/make-feature-graphic.mjs",
     "event:dump": "node tools/dump-event-points.mjs",
-    "layout:check": "node tools/check-mobile-layout.mjs"
+    "layout:check": "node tools/check-mobile-layout.mjs",
+    "perf:check": "node tools/perf-check.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
