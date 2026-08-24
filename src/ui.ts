@@ -1654,6 +1654,30 @@ export class UI {
       ${groups}`);
   }
 
+  /**
+   * Reads env(safe-area-inset-top/bottom) off a throwaway element. There is no
+   * way to ask for these values directly — env() only resolves inside a CSS
+   * property — so a hidden probe takes the padding and the computed style is
+   * read back. Rounded: fractional device pixels are noise here.
+   */
+  private static measureSafeArea(): { top: number; bottom: number } {
+    const probe = document.createElement('div');
+    probe.style.cssText = [
+      'position:fixed', 'left:0', 'top:0', 'width:0',
+      'visibility:hidden', 'pointer-events:none',
+      'padding-top:env(safe-area-inset-top, 0px)',
+      'padding-bottom:env(safe-area-inset-bottom, 0px)',
+    ].join(';');
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    const out = {
+      top: Math.round(parseFloat(cs.paddingTop) || 0),
+      bottom: Math.round(parseFloat(cs.paddingBottom) || 0),
+    };
+    probe.remove();
+    return out;
+  }
+
   private renderSettings(): void {
     const s = this.game.save;
     const identity = this.game.services.auth.current();
@@ -1672,7 +1696,23 @@ export class UI {
     // handset are the one thing here that can cost the account rather than just
     // confuse a reader, so it is stated even when everything else is fine.
     const adMode = AD_TEST_DEVICES_ARMED ? 'test' : 'live';
-    const storeCurrencyDiag = `store: ${storedStoreCurrency() || '—'} · ads: ${adErr || adMode}`;
+    // The safe-area numbers the platform actually reports, measured rather than
+    // assumed. Every bottom-pinned element adds env(safe-area-inset-bottom) to
+    // its own offset, and on the test handset — Android 10, WebView 150 — the
+    // dock and the last line of every sheet still sat inside the navigation
+    // bar's band, which can only mean that value is arriving as 0. Whether it
+    // is 0 because the webview was already inset natively, or because nothing
+    // inset it at all, is the difference between "working" and "broken", and
+    // the viewport figure beside it is what separates the two: a natively
+    // padded webview is SHORTER than the screen.
+    // screen.height is already CSS pixels, so it is compared to innerHeight
+    // directly — dividing it by devicePixelRatio was wrong and made the two
+    // numbers incomparable. The ratio is printed separately because it is what
+    // turns these figures back into the device pixels a screenshot is measured
+    // in.
+    const sa = UI.measureSafeArea();
+    const saDiag = `sa ${sa.top}/${sa.bottom} · vh ${Math.round(window.innerHeight)}/${screen.height}@${window.devicePixelRatio || 1}`;
+    const storeCurrencyDiag = `store: ${storedStoreCurrency() || '—'} · ads: ${adErr || adMode} · ${saDiag}`;
     // With only one language shipped there is nothing to choose, so the row is
     // omitted entirely. It comes back on its own once AVAILABLE_LANGS grows.
     const langRowHTML = AVAILABLE_LANGS.length < 2 ? '' : `
