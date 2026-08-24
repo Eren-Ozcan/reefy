@@ -164,10 +164,17 @@ locally built APK signed with the upload key, the same tap brings up the real
       Reklamı" plate and logcat says `This request is sent from a test device.`
 
 - [ ] **Any build that reaches the phone must be built with that line present.**
-      A build made without it serves live ads again — that includes anything
-      installed from the Play track, which never carries `.env.local`. Treat
-      "Watch Ad" on a Play-installed build as off limits. The emulator is safe
-      on its own; the SDK treats emulators as test devices.
+      A build made without it serves live ads again. The emulator is safe on its
+      own; the SDK treats emulators as test devices.
+      **"Play build = live ads" is no longer a safe assumption in either
+      direction** (2026-08-24). Releases are built on the developer's machine,
+      not by CI, so 1.2.1 carries `.env.local` — which means the Play-track
+      build DOES name the test device, and "Watch Ad" on it is safe. It also
+      means the leaderboard id is only present because of the same file: with
+      `VITE_PLAY_LEADERBOARD_ID` unset the global ranking does not exist at all
+      in that build, silently. Do not build a release anywhere `.env.local` is
+      missing. Read the diagnostic line rather than reasoning about where the
+      build came from.
       **The app now says which it is** (2026-08-24): Settings' diagnostic reads
       `ads: test` when the build names a test device and `ads: live` when it
       does not, in the slot that previously appeared only when there was an
@@ -216,6 +223,16 @@ neither is on any device yet.**
       itself cannot be set from a page. `--report` prints the measured chip
       widths, `--nav=` sets the bar height, `--shots=DIR` writes screenshots.
       Like the smoke run it needs a dev server and is not part of `npm test`.
+
+### Production access — the 14-day count finishes 2026-08-25
+
+- [ ] The dashboard read "12 test users continuously enrolled for 13 days" on
+      2026-08-24, against a requirement of 12 users for 14 days. The other two
+      conditions (a published closed-test release, 12 enrolled testers) are
+      already struck through, so "Üretime başvur" should unlock on the 25th.
+      Nothing to do but notice it — and decide whether to apply before or after
+      the store listing's stale screenshots are replaced, since a production
+      listing is what a stranger would see.
 
 ### Coral Festival — what the first run has to answer
 
