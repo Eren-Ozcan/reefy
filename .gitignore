@@ -14,5 +14,10 @@ Thumbs.db
 # Private/local-only store & marketing assets (mirrored to private Eren-Ozcan/pictures repo)
 docs/store-assets-originals/
 
+# Signed build outputs. A release bundle is 11 MB and is reproducible from a
+# tag plus the keystore, so it never belongs in history.
+*.aab
+*.apk
+
 # graphify knowledge-graph output
 graphify-out/
