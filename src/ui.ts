@@ -1,3 +1,4 @@
+import { AD_TEST_DEVICES_ARMED } from './ads';
 import { audio } from './audio';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
@@ -1667,7 +1668,11 @@ export class UI {
     // currency the store reported, and why ads are off if they are. Both fail
     // silently by nature, which is exactly why they get a line.
     const adErr = this.game.services.ads.lastError;
-    const storeCurrencyDiag = `store: ${storedStoreCurrency() || '—'}${adErr ? ` · ads: ${adErr}` : ''}`;
+    // Whether this build's ads are safe to tap. Live ads on a developer's own
+    // handset are the one thing here that can cost the account rather than just
+    // confuse a reader, so it is stated even when everything else is fine.
+    const adMode = AD_TEST_DEVICES_ARMED ? 'test' : 'live';
+    const storeCurrencyDiag = `store: ${storedStoreCurrency() || '—'} · ads: ${adErr || adMode}`;
     // With only one language shipped there is nothing to choose, so the row is
     // omitted entirely. It comes back on its own once AVAILABLE_LANGS grows.
     const langRowHTML = AVAILABLE_LANGS.length < 2 ? '' : `

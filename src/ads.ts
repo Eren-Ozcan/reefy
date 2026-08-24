@@ -66,6 +66,16 @@ const TEST_DEVICE_INIT = TEST_DEVICES.length
   ? { testingDevices: TEST_DEVICES, initializeForTesting: true }
   : {};
 
+/**
+ * Whether this build names a test device at all. Surfaced in Settings' diagnostic
+ * line because it is the difference between "tapping Watch Ad shows a test plate"
+ * and "tapping Watch Ad serves a real advertiser an impression". A build from the
+ * Play track never carries .env.local, so it is always the second — and that is
+ * not something anyone can tell by looking at the app. An impression on its own
+ * does not get an account suspended; a click on one does.
+ */
+export const AD_TEST_DEVICES_ARMED = TEST_DEVICES.length > 0;
+
 const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // don't show ads back-to-back on tank transitions
 const REWARDED_COOLDOWN_MS = 30 * 1000;         // prevent accidental double-clicks
 
