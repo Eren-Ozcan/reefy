@@ -1,7 +1,7 @@
 {
   "name": "reefy",
   "private": false,
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "A cozy aquarium game for Android and iOS — collect fish, decorate tanks, and care for your reef.",
   "type": "module",
   "repository": {
