@@ -217,8 +217,21 @@ html, body {
   pointer-events: none;
 }
 #topbar > * { pointer-events: auto; }
+/* One row, and it must stay one row. Only the tank chip is allowed to give up
+   width; everything else here is a number or a badge that means nothing once it
+   is cut. Without this the row is sized by its content, so the growth badge
+   appearing on the tank chip ("-12%") pushed the streak chip off the right edge,
+   and before the row was held to the dock's width it wrapped "3 gun seri" onto
+   three lines. */
 #hud {
   display: flex; gap: 8px; align-items: center;
+  min-width: 0;
+  /* The last resort, and only ever reached by the widest state the row has: a
+     seven-figure balance, the longest tank name, a growth badge and a streak all
+     at once. Wrapping puts the streak on a second line; the alternative is
+     truncating the tank name down to a letter and a dot, which reads as breakage
+     where a second line reads as a full HUD. */
+  flex-wrap: wrap;
 }
 /* The level is the only thing on this row the player does not spend, so it sits
    apart at the right end while the currencies and the tank read as one group
@@ -227,7 +240,24 @@ html, body {
 /* Icon after the number: the figure is what changes and what the eye returns to,
    so it leads and the icon labels it. */
 .hud-chip .icon { order: 2; }
+/* The one elastic cell in the row: the tank's name is the only thing here that is
+   long, repeated elsewhere (the dock says which tank you are in) and still legible
+   cut short. The biome mark and the growth badge stay at full size inside it —
+   the badge is the reason the chip grows in the first place, so truncating it
+   would hide exactly what the extra width was for. The floor stops the chip
+   collapsing into a stub: below it the mark, a few letters and the badge no
+   longer all fit, and a chip that shows none of them is worse than a row that
+   is one chip narrower. */
+/* Id-scoped so it outranks the .hud-chip block below, which sets flex: none for
+   every other chip in the row. */
+#hud .hud-tank { flex: 0 8 auto; overflow: hidden; min-width: 150px; }
+/* The biome mark leads inside this chip. The order: 2 above is written for the
+   currency chips, where the figure changes and the icon only labels it; here the
+   mark is what identifies the tank and the badge is what has to end the chip. */
+#hud .hud-tank .biome-icon { order: -1; }
 .hud-tank { cursor: pointer; }
+.hud-tank-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hud-tank b { flex: none; }
 
 /* The care bar. Sits directly under the money row rather than on a rail at the
    right edge: feeding and arranging are both done by tapping the water, so the
@@ -324,6 +354,7 @@ html, body {
    and sit on the text baseline where they appear inside a heading. */
 .biome-icon {
   width: 1.35em; height: 1.35em;
+  flex: none;
   display: inline-block;
   vertical-align: -0.3em;
   object-fit: contain;
@@ -339,6 +370,7 @@ html, body {
   padding: 7px 14px;
   font-size: 15px;
   box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
+  flex: none; min-width: 0; white-space: nowrap;
 }
 
 /* Level ring: the XP bar becomes the ring itself, so the level reads as one
@@ -371,8 +403,15 @@ html, body {
   color: #46170a;
   font-size: 13px; font-weight: 800;
 }
+/* Second to give up width, and only long after the tank chip has: the shrink
+   factors are 8 against 1, so on a 320px phone the tank name is down to an
+   ellipsis before the streak loses a character. */
+#hud .hud-streak { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .hud-streak.hidden { display: none; }
-.hud-streak small { font-weight: 700; opacity: 0.75; }
+/* Seventh-day tease: the pearl the next daily gift pays three of instead of one.
+   Sized like the chip's own text so it reads as part of the badge, not as a
+   second currency chip that has drifted into it. */
+.hud-streak .icon { width: 1em; height: 1em; opacity: 0.85; }
 .hud-streak { cursor: pointer; }
 
 /* Daily streak ladder */

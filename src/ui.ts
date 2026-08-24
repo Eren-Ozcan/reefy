@@ -480,7 +480,11 @@ export class UI {
     // The dirt figure moved to the care bar's own chip, where it sits beside the
     // action that answers it. Leaving it here as well would report one number twice.
     const boostBadge = boost !== 0 ? ` <b class="${boost > 0 ? 'boost' : 'boost-neg'}">${boost > 0 ? '+' : ''}${boost}%</b>` : '';
-    this.hudTank.innerHTML = `${biomeIcon(activeTank.biome)} ${tt(activeTank.name)}${boostBadge}`;
+    // The name gets its own element because it is the only part of this chip that
+    // may be cut: the row is held to the dock's width, and when the badge appears
+    // the chip has to give the width back from somewhere. Cutting the badge
+    // instead would hide the thing the chip just grew to show.
+    this.hudTank.innerHTML = `${biomeIcon(activeTank.biome)}<span class="hud-tank-name">${tt(activeTank.name)}</span>${boostBadge}`;
   }
 
   /**
@@ -549,8 +553,16 @@ export class UI {
       return;
     }
     this.hudStreak.classList.remove('hidden');
+    // The tease is a pearl mark rather than the sentence it used to be. The
+    // sentence was 90px of the 430px top row — more than the tank chip and the
+    // level ring together — and it was the widest state the row had to be sized
+    // against, which is what squeezed the tank name down to an ellipsis. The
+    // pearl is what the seventh day actually pays, the chip opens the ladder
+    // that spells it out, and the sentence survives as the chip's title.
     const teaseBigGift = streak % 7 === 6;
-    const tease = teaseBigGift ? ` <small>${tt('big reward tomorrow')}</small>` : '';
+    this.hudStreak.classList.toggle('tease', teaseBigGift);
+    this.hudStreak.title = teaseBigGift ? tt('big reward tomorrow') : tt('Daily streak');
+    const tease = teaseBigGift ? ICON_PEARL : '';
     this.hudStreak.innerHTML = `${tt('{n}-day streak', { n: streak })}${tease}`;
   }
 
