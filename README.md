@@ -144,7 +144,7 @@ of them is set up.
 
 The pearl packs in `IAP_PACKS` (`src/services.ts`) are sold through RevenueCat. Before shipping a release build:
 
-1. Create the products in Google Play Console (Monetize > Products) and App Store Connect, using the same ids as `IAP_PACKS` (`pearls-s`, `pearls-m`, `pearls-l`, `pearls-xl`, `starter`).
+1. Create the products in Google Play Console (Monetize > Products) and App Store Connect, using the same ids as `IAP_PACKS` — **underscores, not hyphens**: `pearls_s`, `pearls_m`, `pearls_l`, `pearls_xl`, `starter`, `remove_ads`. RevenueCat matches by product id, so one wrong character does not error; `findStorePackage()` simply never matches and the purchase declines with "not connected". The first five are **Consumable**; `remove_ads` is **Non-consumable**.
 2. In the RevenueCat dashboard, import those store products and group them into an offering, with package identifiers matching the same ids.
 3. Replace the placeholders in `REVENUECAT_API_KEYS` (`src/services.ts`) with your project's public Google/Apple API keys from RevenueCat > Project Settings > API Keys.
 
@@ -194,7 +194,7 @@ Before shipping:
 
 1. Add payment details in the AdMob dashboard (Payments) — ad units won't serve without it.
 2. Once the app is live on Play Store / App Store, link it from AdMob (Apps > Reefy > App settings) so it moves out of the "unlisted" review state.
-3. Set up the matching `remove-ads` store product (Google Play Console / App Store Connect) and RevenueCat package so the "Reklamları Kaldır" purchase works end to end.
+3. Set up the matching `remove_ads` store product (Google Play Console / App Store Connect) and RevenueCat package so the "Reklamları Kaldır" purchase works end to end.
 4. Publish a UMP privacy message for the app (AdMob > Privacy & messaging). Without
    one the consent step fails with "Publisher misconfiguration" and no ad ever
    serves — the failure is silent unless you read the diagnostic line in Settings.
