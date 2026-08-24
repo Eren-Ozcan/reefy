@@ -804,7 +804,15 @@ export class Game {
     // Passive income accumulation (adult fish, capped at INCOME_CAP_HOURS of production)
     const rate = this.incomePerHour;
     if (rate > 0) {
-      this.save.incomePot = Math.min(rate * INCOME_CAP_HOURS, this.save.incomePot + (rate / 3600) * dt);
+      // The cap limits what is ADDED; it never takes back what is already
+      // banked. The rate falls as the glass gets dirty, and a plain Math.min
+      // against the new, lower cap would delete coins the player had already
+      // earned at the old one — money vanishing from the collect button with
+      // nothing on screen to explain it.
+      this.save.incomePot = Math.max(
+        this.save.incomePot,
+        Math.min(rate * INCOME_CAP_HOURS, this.save.incomePot + (rate / 3600) * dt),
+      );
     }
     this.incomeUiTimer += dt;
     if (this.incomeUiTimer > 0.5) {
@@ -968,7 +976,11 @@ export class Game {
     if (rate > 0) {
       const gained = (rate / 3600_000) * elapsed * OFFLINE_SPEED;
       const before = this.save.incomePot;
-      this.save.incomePot = Math.min(rate * INCOME_CAP_HOURS, this.save.incomePot + gained);
+      // Same rule as update(): the cap bounds the gain, it does not confiscate.
+      // Offline is where this bites hardest — the tank gets dirty while nobody
+      // is watching, so the rate (and with it the cap) is always LOWER when the
+      // player comes back than it was when they left.
+      this.save.incomePot = Math.max(before, Math.min(rate * INCOME_CAP_HOURS, before + gained));
       this.offline.income = Math.floor(this.save.incomePot - before);
     }
     for (const fs of this.save.fishes) {
