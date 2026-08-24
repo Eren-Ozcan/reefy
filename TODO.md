@@ -181,9 +181,28 @@ locally built APK signed with the upload key, the same tap brings up the real
       error. Live ads on a developer's own handset are the one thing on that
       line that can cost the account rather than merely confuse a reader, and it
       was not observable from inside the app at all.
-- [ ] **Rewarded ads otherwise work end to end** (verified 2026-08-23): the ad
-      plays, "Ödül verildi" appears, and the five pearls are granted and
-      survive a relaunch.
+- [x] **Rewarded ads work end to end on a PLAY build** (verified 2026-08-24, on
+      1.2.1 installed from the track): the consent step passes, the ad plays,
+      the five pearls are granted (5 to 10) and the daily cap ticks down (3 to
+      2). This is the first time the UMP fix has been proven anywhere other than
+      a sideloaded APK, and it is the thing that was dead in production.
+- [ ] **A live ad was served during that test, and the diagnostic said it was
+      safe.** The id in `.env.local` was captured on the sideloaded build.
+      Reinstalling from Play rotated the app-set id the SDK identifies the
+      device by, so the stored id matched nothing and a real advertiser got a
+      real impression on the developer's own handset. Nothing was tapped inside
+      the ad; it was closed with its own X.
+      Two things changed because of it:
+      - The correct id for the Play install, `BF39…`, is appended in
+        `.env.local` (the variable takes a comma-separated list, so both are
+        kept).
+      - **The diagnostic no longer claims `ads: test`.** It prints `ads: dev
+        1B1D,BF39` — the prefixes this build NAMES — because the SDK never tells
+        the app whether it accepted any of them. Compare against
+        `adb logcat -s Ads | grep setTestDeviceIds`: if the SDK is still asking
+        for an id, the ones listed are stale.
+      **Re-capture the id after every reinstall.** That is the rule; the old
+      note assumed the id was stable and it is not.
 
 ### Two layout defects the handset shows and the desktop does not
 
@@ -223,6 +242,30 @@ neither is on any device yet.**
       itself cannot be set from a page. `--report` prints the measured chip
       widths, `--nav=` sets the bar height, `--shots=DIR` writes screenshots.
       Like the smoke run it needs a dev server and is not part of `npm test`.
+
+### Before production — what 2026-08-24's device pass found
+
+Everything below was checked on 1.2.1 installed from the closed-test track.
+
+- [x] Play Games sign-in, cloud save linking and the global leaderboard all
+      work. A score reached the board for the first time (95, first place).
+- [x] Play Billing resolves: the pearl packs show `₺47,99` and the rest in TRY.
+      Settings reads `store: —` until the Pearls tab has been opened once,
+      because prices are fetched lazily — the dash is not a failure.
+- [x] The Coral Festival is running and scoring (58 points, ends 2026-08-28).
+- [ ] **The store listing's screenshots are the launch blocker.** Every plate on
+      the live listing shows the removed right-edge rail. Fresh sets for en and
+      tr, captioned, plus both feature graphics, are regenerated and sitting in
+      `docs/store-assets-originals/` and mirrored to the pictures repo —
+      they have NOT been uploaded. A production listing is the first thing a
+      stranger sees, and right now it advertises a UI the game no longer has.
+- [ ] **The bottom safe area is still wrong on a real phone**, and 1.2.2 only
+      instruments it. Cosmetic rather than broken — the handset's navigation bar
+      is translucent, so the last line of a sheet is readable underneath it —
+      but the shop's buy buttons do sit under the bar.
+- [ ] **In-app purchase has never been completed end to end.** Prices load,
+      which proves the billing connection, but nothing has been bought. Only the
+      owner can test that, and it costs real money.
 
 ### Production access — the 14-day count finishes 2026-08-25
 
