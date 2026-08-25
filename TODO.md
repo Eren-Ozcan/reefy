@@ -322,9 +322,89 @@ Everything below was checked on 1.2.1 installed from the closed-test track.
       cosmetic on this handset because the navigation bar is translucent — the
       last line of a sheet is readable under it — and the only thing genuinely
       awkward is the shop's buy buttons sitting in the bar's band.
-- [ ] **In-app purchase has never been completed end to end.** Prices load,
-      which proves the billing connection, but nothing has been bought. Only the
-      owner can test that, and it costs real money.
+      **2026-08-25 adds one case that is not ours and not cosmetic**: the
+      Google sign-in sheet raised by "Link cloud save" is a system sheet, and
+      it inherits this window's layout — its confirm button lands in the
+      navigation bar's band. The first tap at the button's centre hit the Home
+      key and dropped the app to the launcher instead of signing in. So the
+      band swallows a step in account linking, not just a shop button.
+- [x] **In-app purchase now runs end to end (2026-08-25) — and it cost
+      nothing.** The device's account is on the license-testing list, so the
+      Play sheet came up as "Test kartı, her zaman onaylanır · Bu bir test
+      siparişidir, sizden ödeme alınmayacaktır". Avuç İnci (₺47,99, 60 pearls)
+      was bought twice: 11 → 71 → 131. The second sheet opening is the proof
+      that matters — an unconsumed consumable would have been refused with
+      "you already own this item", so the consume step works. A cold restart
+      afterwards left the balance at 131, not 191: the purchase is not
+      re-granted on relaunch. Prices for the whole ladder resolve in TRY
+      (₺47,99 / ₺59,99 / ₺119,99 / ₺274,99 / ₺539,99).
+- [ ] **The one product still untested is `Reklamları Kaldır` (₺95,99)**, the
+      only non-consumable. Buying it even as a test order marks this account as
+      owning it permanently, which switches interstitials off on the one handset
+      that can test them — undoing it means cancelling the order in Play
+      Console. Worth doing deliberately, not in passing.
+- [x] **Remove Ads can only be bought once — and now it can be got back
+      (2026-08-25).** Two separate things were true: the shop already refuses a
+      second purchase (`ui.ts` renders "You own this ✓" disabled once
+      `adsRemoved` is set) and Play refuses one anyway, so a double charge was
+      never possible. But the entitlement lived ONLY in the local save, and it
+      is stripped from every cloud write on purpose, so a reinstall or a new
+      phone left a paying player with ads back on, a buyable-looking button,
+      and a raw "Purchase failed: …" toast when they pressed it — Play answers
+      PRODUCT_ALREADY_PURCHASED and nothing handled that code.
+      The store is now the source of truth for it, in three places:
+      `IAPProvider.ownsRemoveAds()` runs at startup and grants (never revokes —
+      a false answer means "offline" just as easily as "never bought"),
+      Settings gained a "Restore purchases" row calling
+      `Purchases.restorePurchases()`, and PRODUCT_ALREADY_PURCHASED on the
+      remove-ads pack is now a silent restore rather than an error. Ownership
+      is read from BOTH the entitlement map and
+      `allPurchasedProductIdentifiers`, so a dashboard with no entitlement
+      configured still restores. 18 new tests (280 total).
+      Still to verify on the handset: it needs a build newer than the 1.2.2
+      that is installed there.
+
+### 1.2.2 device pass — 2026-08-25
+
+Same handset (Huawei POT-LX1, Android 10, WebView 150), 1.2.2 (versionCode 9)
+from the alpha track. Ads are in test mode on this build, so the paths that
+were unsafe to touch on 1.2.1 could finally be exercised.
+
+- [x] **The test device is recognised.** `I/Ads: This request is sent from a
+      test device.` — on 1.2.1 the SDK was still asking for the id, and two
+      live impressions came from that.
+- [x] **Interstitial fires at the intended break** (last dirt spot cleaned) and
+      arrives with the "Test Ad" plate.
+- [x] **The income-cap fix holds in the field.** After 8 hours away the tank was
+      fully dirty (-35%) and the welcome screen still read `+40`, positive —
+      exactly the setup that used to report a negative gain.
+- [x] **Cloud restore, end to end, from a wiped install.** The device save
+      (786 coins / 11 pearls / Mercan the neon tetra / 2-day streak) was pushed
+      to the cloud first — verified in `localStorage` through an `adb backup`:
+      `reefy-cloud-dirty` flips to `0` with `rev` 192 then 193, which is the
+      only proof the write was acknowledged rather than queued. Then
+      `pm clear`, relaunch, tutorial, and Settings → Link cloud save.
+      Because the tutorial counts as progress the CONFLICT screen came up (not
+      the silent fast path) with two genuinely different columns — cloud 786 /
+      this device 300 — and picking the cloud restored every field: coins,
+      pearls, streak, player name, friend code, the fish and its hunger.
+      Worth keeping: a `flush()` triggered by backgrounding did NOT land while
+      the app was in the background (rev advanced, dirty stayed 1 — the write
+      timed out under Android's throttling); the next foreground sync uploaded
+      it. Cloud freshness cannot be assumed from a tab-hide alone.
+- [x] **Back button.** In the aquarium it asks once ("Press back again to
+      exit"); inside a sheet it closes the sheet and nothing else.
+- [x] **Language switch** en ⇄ tr reloads and comes back with the save intact.
+- [x] **Egg hatching, decor placement, quest tracking.** Bronze egg → Fantail
+      Goldfish (new species, added to the collection); a decor bought, placed,
+      and counted by `Arrange`. Daily quests moved with the actions: hatch 1/2,
+      decorate 1/2, feed 4/20 — feed only counts when a fish actually eats a
+      pellet, not when one is dropped, which is why three taps at a sated tank
+      moved nothing.
+- [x] **A 4.5-hour background stretch** (the phone slept from 04:40 to 09:03)
+      returned with the session intact.
+- [x] **Friend code:** a code that does not exist is refused by the Firestore
+      lookup. Adding a real friend still needs a second account.
 
 ### Production access — the 14-day count finishes 2026-08-25
 
