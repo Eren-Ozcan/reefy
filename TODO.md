@@ -181,6 +181,14 @@ locally built APK signed with the upload key, the same tap brings up the real
       error. Live ads on a developer's own handset are the one thing on that
       line that can cost the account rather than merely confuse a reader, and it
       was not observable from inside the app at all.
+- [x] **The test device is recognised again on 1.2.2** (2026-08-25). logcat
+      prints `This request is sent from a test device.` instead of asking for an
+      id, and Settings reads `ads: dev 1B1D,BF39`. Ad paths are safe to exercise
+      on this build; they were not on 1.2.1.
+- [x] **The income cap fix is visible in the wild.** After eight hours away with
+      the tank gone fully dirty (-35%), the welcome-back sheet reported
+      "Balıkların üretti 40" — a positive number. That is the exact shape that
+      used to go negative.
 - [x] **Rewarded ads work end to end on a PLAY build** (verified 2026-08-24, on
       1.2.1 installed from the track): the consent step passes, the ad plays,
       the five pearls are granted (5 to 10) and the daily cap ticks down (3 to
@@ -277,10 +285,43 @@ Everything below was checked on 1.2.1 installed from the closed-test track.
       `docs/store-assets-originals/` and mirrored to the pictures repo —
       they have NOT been uploaded. A production listing is the first thing a
       stranger sees, and right now it advertises a UI the game no longer has.
-- [ ] **The bottom safe area is still wrong on a real phone**, and 1.2.2 only
-      instruments it. Cosmetic rather than broken — the handset's navigation bar
-      is translucent, so the last line of a sheet is readable underneath it —
-      but the shop's buy buttons do sit under the bar.
+- [x] **Measured on 1.2.2 (2026-08-25), and the answer is unambiguous.** The
+      diagnostic reads:
+
+          store: TRY · ads: dev 1B1D,BF39 · sa 27/0 · vh 780/780@3
+
+      `sa 27/0` — the TOP inset arrives (27px, the status bar) and the bottom
+      arrives as zero. `vh 780/780` — the webview is the full height of the
+      screen, so nothing padded it natively either. Both halves of the same
+      mechanism, one working and one not: this is not "insets are missing", it
+      is Chromium 150 in this WebView mapping the status bar into
+      `safe-area-inset-top` and NOT mapping the navigation bar into
+      `safe-area-inset-bottom`.
+      `@capacitor-community/safe-area` cannot help: its padding fallback only
+      runs for Chromium below 140, and this device is on 150, so it correctly
+      stands down and hands the job to a Chromium that does not do it.
+- [ ] **The fix is a choice between two plugins, and it is not a five-minute
+      change.** Capacitor 8 ships its own `SystemBars`, which injects
+      `--safe-area-inset-top/right/bottom/left` onto `documentElement`
+      (`node_modules/@capacitor/android/.../plugin/SystemBars.java`) — exactly
+      the number that is missing. It is switched OFF here by
+      `SystemBars: { insetsHandling: 'disable' }` in `capacitor.config.ts`,
+      which the community plugin's own README tells you to set so the two do
+      not fight.
+      Turning it on is a one-line config change plus
+
+          --safe-b: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+
+      and it would fix this device. The catch is the OTHER case: on a webview
+      below 140 the community plugin pads the webview natively AND Capacitor
+      would inject a non-zero variable, so the inset lands twice. CSS cannot
+      tell those apart — though the `vh` figure in this same diagnostic can,
+      because a natively padded webview is shorter than the screen.
+      So the real decision is which plugin owns insets, not which line to
+      write. **Not worth taking blind before a release**: the defect is
+      cosmetic on this handset because the navigation bar is translucent — the
+      last line of a sheet is readable under it — and the only thing genuinely
+      awkward is the shop's buy buttons sitting in the bar's band.
 - [ ] **In-app purchase has never been completed end to end.** Prices load,
       which proves the billing connection, but nothing has been bought. Only the
       owner can test that, and it costs real money.
