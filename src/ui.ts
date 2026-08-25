@@ -1734,6 +1734,9 @@ export class UI {
       <div class="set-row"><span>${tt('🎵 Music')}</span><button class="tgl ${s.music ? 'on' : ''}" data-t="music">${s.music ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('🔊 Sound Effects')}</span><button class="tgl ${s.sfx ? 'on' : ''}" data-t="sfx">${s.sfx ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('📤 Tell your friends')}</span><button class="tgl" data-t="share">${tt('Share')}</button></div>
+      <div class="set-row"><span>${tt('🧾 Restore purchases')}</span>
+        <button class="tgl" id="restore-iap">${tt('Restore')}</button></div>
+      <p class="set-note-block">${tt('Brings back Remove Ads if you bought it on this store account — after a reinstall or on a new phone.')}</p>
       <hr/>
       <div class="set-links">
         <a href="https://reefy.games" target="_blank" rel="noopener">🌐 reefy.games</a>
@@ -1756,6 +1759,18 @@ export class UI {
       this.game.syncSave();
       audio.click();
       this.toast(tt('Name updated: {name}', { name }));
+    });
+    el.querySelector('#restore-iap')!.addEventListener('click', () => {
+      const btn = el.querySelector<HTMLButtonElement>('#restore-iap')!;
+      // Disabled for the round trip: the store call is not instant and a
+      // second press would start a second restore against the same account.
+      btn.disabled = true;
+      audio.click();
+      this.toast(tt('Checking your purchases…'));
+      void this.game.restorePurchases().then((msg) => {
+        btn.disabled = false;
+        this.toast(msg);
+      });
     });
     el.querySelector('#auth-btn')!.addEventListener('click', () => {
       void this.game.services.auth.signIn().then((res) => this.toast(res.msg));

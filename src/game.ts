@@ -435,6 +435,12 @@ export class Game {
 
     this.app.ticker.add((t) => this.update(t.deltaMS / 1000));
 
+    // Ask the store what this account already paid for. Not awaited: it is a
+    // network round trip and nothing on screen depends on it — the only thing
+    // it can do is switch interstitials off, which matters at the next natural
+    // break, not on this frame.
+    void this.restoreEntitlements();
+
     window.setInterval(() => this.syncSave(), 6000);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
@@ -2290,6 +2296,42 @@ export class Game {
     } finally {
       this.recoveringStale = false;
     }
+  }
+
+  /**
+   * Re-grants the remove-ads entitlement from the STORE on startup.
+   *
+   * `adsRemoved` is stripped from every cloud write on purpose (cloud-save.ts
+   * ENTITLEMENT_KEYS): a paid entitlement that rides along in a save file is
+   * one a tampered document could hand out for free. The cost of that choice
+   * is that a reinstall — or a new phone — starts with the flag false, and
+   * the player who paid sees ads again. Play will not sell them the
+   * non-consumable a second time either, so without this call there is no way
+   * back at all.
+   *
+   * Only ever GRANTS. A false answer can mean "offline" just as easily as
+   * "never bought", and turning ads back on for a paying player because their
+   * train went through a tunnel is the worse mistake by far.
+   */
+  private async restoreEntitlements(): Promise<void> {
+    if (this.save.adsRemoved) return;
+    if (!(await this.services.iap.ownsRemoveAds())) return;
+    this.save.adsRemoved = true;
+    this.syncSave();
+  }
+
+  /**
+   * The player-facing "Restore purchases". Google requires a visible path back
+   * to a non-consumable, and it is also the manual fallback for the startup
+   * check above when that one ran while the device was offline.
+   */
+  async restorePurchases(): Promise<string> {
+    const res = await this.services.iap.restore();
+    if (res.ownsRemoveAds && !this.save.adsRemoved) {
+      this.save.adsRemoved = true;
+      this.syncSave();
+    }
+    return res.msg;
   }
 
   async resyncCloudForNewAccount(): Promise<CloudSyncResult> {
