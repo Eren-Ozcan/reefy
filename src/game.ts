@@ -24,6 +24,11 @@ const OFFLINE_CAP_MS = 8 * 3600_000;
 const OFFLINE_SPEED = 0.5;
 const HUNGER_RATE_MS = HUNGER_RATE / 1000; // same rule as fish.ts, in ms
 
+/** Marks that startup has already spent its one silent restore on this install.
+ *  Local on purpose: it tracks what this installation has asked the store, and a
+ *  reinstall — the exact case the restore is for — has to ask again. */
+const SILENT_RESTORE_KEY = 'reefy.iap.silentRestore';
+
 const MAX_DIRT_SPOTS = 6;              // max unclean dirt spots per tank
 const DIRT_PENALTY_MAX = 0.35;         // production/growth is reduced by 35% in a fully dirty tank
 // Delay ranges (ms) for the first spot / second spot / later spots: dirtying slows down
@@ -2315,7 +2320,26 @@ export class Game {
    */
   private async restoreEntitlements(): Promise<void> {
     if (this.save.adsRemoved) return;
-    if (!(await this.services.iap.ownsRemoveAds())) return;
+    if (await this.services.iap.ownsRemoveAds()) {
+      this.save.adsRemoved = true;
+      this.syncSave();
+      return;
+    }
+    // The store's "no" is not final on a fresh install, and this is the case
+    // the whole method exists for. ownsRemoveAds reads the customer record for
+    // THIS install's app user id; a reinstall gets a new one, so the record is
+    // empty however many non-consumables the Play account owns. Only a restore
+    // goes out to the store, reads the purchase history and attaches it — the
+    // same call the Settings button makes, which is why that button worked on a
+    // wiped device while startup did not.
+    if (localStorage.getItem(SILENT_RESTORE_KEY)) return;
+    const res = await this.services.iap.restore();
+    // Marked only on a store answer, so an offline launch tries again next time
+    // instead of spending the one attempt on a tunnel.
+    if (res.ok) {
+      try { localStorage.setItem(SILENT_RESTORE_KEY, '1'); } catch { /* private mode */ }
+    }
+    if (!res.ownsRemoveAds) return;
     this.save.adsRemoved = true;
     this.syncSave();
   }

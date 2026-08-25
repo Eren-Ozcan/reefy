@@ -101,6 +101,64 @@ describe('the startup entitlement check', () => {
     expect(game.save.adsRemoved).toBeFalsy();
   });
 
+  it('falls back to a restore when the customer record comes back empty', async () => {
+    // The reinstall case, and the one this whole path exists for. A wiped
+    // device gets a new app user id, so the customer record is empty no matter
+    // what the Play account owns; only a restore reaches the purchase history.
+    // Found on a handset: the Settings button brought remove-ads back on a
+    // freshly cleared install where startup had just failed to.
+    ownsRemoveAds = false;
+    restoreResult = { ok: true, ownsRemoveAds: true, msg: 'Purchases restored. ✓' };
+    const game = new Game();
+
+    await startupCheck(game);
+
+    expect(calls).toEqual(['ownsRemoveAds', 'restore']);
+    expect(game.save.adsRemoved).toBe(true);
+    expect(loadSave().adsRemoved).toBe(true);
+  });
+
+  it('does not restore when the record already answered yes', async () => {
+    // The common launch. Going out to the store when the answer is already in
+    // hand would spend a network round trip on every cold start.
+    ownsRemoveAds = true;
+    const game = new Game();
+
+    await startupCheck(game);
+
+    expect(calls).toEqual(['ownsRemoveAds']);
+  });
+
+  it('spends the silent restore once per install, not once per launch', async () => {
+    ownsRemoveAds = false;
+    restoreResult = { ok: true, ownsRemoveAds: false, msg: 'No purchases found on this account.' };
+    await startupCheck(new Game());
+    calls.length = 0;
+
+    await startupCheck(new Game());
+
+    // The account owns nothing; asking the store again on every launch would be
+    // a request per cold start for an answer that will not change on its own.
+    // The Settings button is still there for a purchase made elsewhere later.
+    expect(calls).toEqual(['ownsRemoveAds']);
+  });
+
+  it('keeps the attempt for next launch when the restore never reached the store', async () => {
+    // Offline. Burning the one attempt on a tunnel would leave a paying player
+    // with ads until they found the button themselves.
+    ownsRemoveAds = false;
+    restoreResult = { ok: false, ownsRemoveAds: false, msg: "Couldn't restore: offline" };
+    await startupCheck(new Game());
+    calls.length = 0;
+
+    restoreResult = { ok: true, ownsRemoveAds: true, msg: 'Purchases restored. ✓' };
+    const game = new Game();
+    await startupCheck(game);
+
+    expect(calls).toEqual(['ownsRemoveAds', 'restore']);
+    expect(game.save.adsRemoved).toBe(true);
+  });
+
   it('never revokes an entitlement this device already knows about', async () => {
     // The offline case. A false answer here is indistinguishable from "the
     // store could not be reached", and taking ads-free away from someone who
