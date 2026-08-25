@@ -406,31 +406,71 @@ were unsafe to touch on 1.2.1 could finally be exercised.
 - [x] **Friend code:** a code that does not exist is refused by the Firestore
       lookup. Adding a real friend still needs a second account.
 
-### 1.2.3 is in review — START HERE next session
+### 1.2.3 cleared review and is on the handset — one check left
 
 Submitted to the alpha track on 2026-08-25: versionCode 10, release name
 `10 (1.2.3)`, release notes in tr-TR and en-US, full rollout. The only warning
 was the missing deobfuscation file, which R8 being off explains and 1.2.2 had
 too. The AAB is at
-`android/app/build/outputs/bundle/release/reefy-1.2.3-vc10.aab`.
+`android/app/build/outputs/bundle/release/reefy-1.2.3-vc10.aab`. The review
+cleared overnight and the phone was updated from the track on 2026-08-26; the
+save survived the update intact, unlike the 1.2.2 reinstall.
 
-Everything it carries is the remove-ads restore path, and **none of it has run
-on a handset yet** — the phone still holds 1.2.2, which predates the change.
-Once the review clears, update the phone and check these three, in this order:
+Two of the three checks are done, on the device, on the Play build:
 
-- [ ] **Settings → "Satın alımları geri yükle" on an account that owns
-      nothing.** Must answer "Bu hesapta satın alım bulunamadı." — a button
-      that goes quiet is the failure mode this row exists to avoid.
-- [ ] **Buy Reklamları Kaldır (₺95,99) and confirm interstitials actually stop.**
-      It is a test order on this license-tested account, so it costs nothing,
-      but it marks the account as owning it permanently: undoing it means
-      cancelling the order in Play Console, and until then this handset can no
-      longer test interstitials. Do it deliberately, and expect to give up ad
-      testing on this device for a while.
+- [x] **Settings → "Satın alımları geri yükle" on an account that owns
+      nothing** answers "Bu hesapta satın alım bulunamadı." Both toasts fire in
+      order and the whole exchange is over in under six seconds — the first
+      attempt looked like a dead button only because the screenshot came too
+      late. The one log line is RevenueCat's expected
+      `allowSharingPlayStoreAccount is set to false` warning.
+- [x] **Reklamları Kaldır (₺95,99) bought, and interstitials stopped.** The Play
+      sheet confirmed it as a test order ("Bu bir test siparişidir") before the
+      tap, so it cost nothing; the shop button now reads "Sahipsin ✓". Both
+      triggers were then exercised on the device: cleaning the tank to spotless
+      (`src/game.ts:1532`) and, after buying Altın Kumsal with in-game coins,
+      switching tanks (`src/game.ts:2019`). Neither showed an ad, and logcat
+      carries zero AdMob lines — with `adsRemoved` set, `src/ads.ts:199` never
+      even preloads one. **This handset can no longer test interstitials**
+      until the order is cancelled in Play Console.
 - [ ] **`pm clear` and relaunch.** The startup check must bring the entitlement
       back on its own, with no button pressed — that is the whole point of the
       change. While there, confirm the cloud save still does NOT carry it: the
       restore must come from the store, not from the save file.
+      Not run yet, because it wipes the handset's local save. The cloud copy is
+      connected (crazything5341@gmail.com), but this same phone once came back
+      from `adb backup`/`restore` holding an older snapshot than the one taken,
+      so treat the progress as expendable before starting rather than after.
+
+Which trigger fires is not left to the device alone any more:
+`src/interstitial-guard.test.ts` pins the guard itself (shown, then refused once
+`adsRemoved` is set, refused on every later trigger, and not burning the
+ten-minute cooldown while refusing) and `src/tank-switch-ad.test.ts` pins the
+switch actually asking the provider. They were written because a second tank
+costs 2,500 coins and level 3, which put the switch out of reach on a fresh
+account — the device pass has since confirmed both, but the pair is what keeps
+either from rotting.
+
+### The HUD rework is on master and on no device
+
+Landed 2026-08-26, after 1.2.3 shipped, so **the phone does not have it**: the
+level ring is gone from the top row, the streak moved down beside the goal
+strip as a `🔥n` chip, and both currency chips grew a `+` that opens the pearl
+shelf. The row is `nowrap` now — it used to wrap to a second line, and with the
+plus marks added, a dirty tank's `-35%` badge was enough to trigger it. The tank
+name truncates instead.
+
+Both orientations are locked to portrait as well (`android:screenOrientation`
+and the iOS plist), which is the one change here that cannot be seen without a
+build.
+
+To look at the HUD on the handset without touching the installed Play build:
+`adb reverse tcp:5173 tcp:5173` with `npm run dev` running, then open
+`http://localhost:5173/` in the phone's Chrome. To seed a save from the desktop,
+`adb forward tcp:9222 localabstract:chrome_devtools_remote` and drive that
+Chrome with Playwright's `chromium.connectOverCDP` — `page.addInitScript` is the
+part that matters, since a plain evaluate-then-reload loses to the running
+game's own save write.
 
 ### Production access — unlocked on 2026-08-25
 
