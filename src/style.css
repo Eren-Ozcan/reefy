@@ -72,7 +72,7 @@ body { font-variant-numeric: tabular-nums; }
 
 /* Anything whose digits change under the reader — HUD totals, the collect amount,
    scores, prices, progress counters — stays on the uniform-width face. */
-.hud-chip, .hud-ring b, .hud-streak, #collect-btn,
+.hud-chip, .hud-streak, #collect-btn,
 .inv-right, .inv-sub, .feed-cost,
 .lb-rank, .lb-score, .friend-code-box b,
 .q-done, .q-meta, .dex-count,
@@ -226,17 +226,14 @@ html, body {
 #hud {
   display: flex; gap: 8px; align-items: center;
   min-width: 0;
-  /* The last resort, and only ever reached by the widest state the row has: a
-     seven-figure balance, the longest tank name, a growth badge and a streak all
-     at once. Wrapping puts the streak on a second line; the alternative is
-     truncating the tank name down to a letter and a dot, which reads as breakage
-     where a second line reads as a full HUD. */
-  flex-wrap: wrap;
+  /* One line, no fallback. Wrapping used to be the escape hatch here, and with a
+     streak chip and a level ring in the row it was the better of two bad options.
+     Both have left, and the row that remains — two balances and the tank — has a
+     cell built to give width back: the tank name truncates. Wrapping now costs a
+     whole second line to save a few characters of a name that the dock repeats
+     anyway, and it fired on something as ordinary as a dirty tank's -35% badge. */
+  flex-wrap: nowrap;
 }
-/* The level is the only thing on this row the player does not spend, so it sits
-   apart at the right end while the currencies and the tank read as one group
-   from the left. */
-#hud .hud-ring { margin-left: auto; }
 /* Icon after the number: the figure is what changes and what the eye returns to,
    so it leads and the icon labels it. */
 .hud-chip .icon { order: 2; }
@@ -250,7 +247,10 @@ html, body {
    is one chip narrower. */
 /* Id-scoped so it outranks the .hud-chip block below, which sets flex: none for
    every other chip in the row. */
-#hud .hud-tank { flex: 0 8 auto; overflow: hidden; min-width: 112px; }
+/* The floor is what the chip can still say something with: the biome mark, a few
+   letters of the name and the badge. It came down when the row lost its wrap —
+   truncating to this is the behaviour that replaced the second line. */
+#hud .hud-tank { flex: 0 8 auto; overflow: hidden; min-width: 96px; }
 /* The biome mark leads inside this chip. The order: 2 above is written for the
    currency chips, where the figure changes and the icon only labels it; here the
    mark is what identifies the tank and the badge is what has to end the chip. */
@@ -360,6 +360,25 @@ html, body {
   object-fit: contain;
 }
 
+/* The plus on a currency chip: the shortest path from "I am short" to the shelf
+   that sells it. Sized as a tap target rather than a glyph — it sits inside a
+   chip the player also reads as a number, so it has to look pressable to not
+   read as punctuation. */
+.hud-plus {
+  flex: none;
+  width: 22px; height: 22px; margin: -3px -6px -3px 0;
+  border: 0; border-radius: 50%;
+  background: var(--accent); color: #062a30;
+  font: inherit; font-size: 15px; font-weight: 800; line-height: 1;
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.2s ease;
+}
+.hud-plus:active { transform: var(--btn-press); }
+/* Icon last, then the plus: the figure leads, the icon labels it, and the
+   action closes the chip. */
+.hud-money .hud-plus { order: 3; }
+
 .hud-chip {
   display: flex; align-items: center; gap: 6px;
   background: var(--panel-bg);
@@ -373,27 +392,9 @@ html, body {
   flex: none; min-width: 0; white-space: nowrap;
 }
 
-/* Level ring: the XP bar becomes the ring itself, so the level reads as one
-   glanceable mark instead of a number plus a separate bar. --xp is set from JS. */
-.hud-ring {
-  position: relative; flex: none;
-  width: 44px; height: 44px; border-radius: 50%;
-  display: grid; place-items: center;
-  /* The unfilled part of the track must be opaque: a translucent white would let the
-     bright water show through and read as a full ring. */
-  background: conic-gradient(var(--accent) calc(var(--xp, 0) * 1%), #23505c 0);
-  box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
-  transition: background 0.4s ease;
-}
-.hud-ring::before {
-  content: ''; position: absolute; inset: 4px;
-  border-radius: 50%; background: var(--panel-bg);
-}
-.hud-ring b {
-  position: relative;
-  font-size: 15px; font-weight: 800; color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
+/* The level ring used to close this row. It is gone: the dock already prints
+   the level under "You", so the ring repeated it while taking the widest fixed
+   cell in a row that had to wrap to fit. */
 
 /* Streak chip: the one warm mark in the HUD, so the retention loop is the thing
    that stands out. Hidden below 2 days — a one-day streak isn't worth a badge. */
@@ -403,10 +404,12 @@ html, body {
   color: #46170a;
   font-size: 13px; font-weight: 800;
 }
-/* Second to give up width, and only long after the tank chip has: the shrink
-   factors are 8 against 1, so on a 320px phone the tank name is down to an
-   ellipsis before the streak loses a character. */
-#hud .hud-streak { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+/* It no longer competes for the top row's width — it sits in the goal row, where
+   the strip beside it is the elastic cell. Fixed here so the flame and the figure
+   never truncate: two glyphs that mean nothing cut short. */
+#goal-row .hud-streak { flex: none; padding: 7px 10px; gap: 4px; }
+.hud-streak .streak-flame { font-size: 14px; line-height: 1; }
+.hud-streak b { font-variant-numeric: tabular-nums; }
 .hud-streak.hidden { display: none; }
 /* Seventh-day tease: the pearl the next daily gift pays three of instead of one.
    Sized like the chip's own text so it reads as part of the badge, not as a
@@ -415,14 +418,17 @@ html, body {
 .hud-streak { cursor: pointer; }
 
 /* A 1080px phone at density 3 is 360 CSS px wide, and the top row is sized for
-   the dock, so it gets 346. That is not enough for five chips at desktop
-   spacing: on a fresh save the level ring was dropping to a second line, which
-   is the wrap doing its job in a case that should never have needed it. Tighter
-   gaps and padding buy back the ~40px that costs. */
+   the dock, so it gets 346. The row is down to three chips now that the level
+   ring and the streak have left it, but the tank name is still the cell that
+   pays for anything the currencies gain — and each currency grew a plus mark.
+   Tighter gaps and padding keep that off the name. */
 @media (max-width: 400px) {
   #hud { gap: 6px; }
   #hud .hud-chip { padding: 7px 11px; }
-  #hud .hud-tank { min-width: 96px; }
+  /* The plus rides in the chip's own right padding here rather than after it. */
+  #hud .hud-money { padding-right: 5px; gap: 5px; }
+  #hud .hud-money .hud-plus { margin-right: 0; }
+  #hud .hud-tank { min-width: 88px; }
 }
 
 /* Daily streak ladder */
@@ -521,7 +527,16 @@ html, body {
 /* Its own layer inside the dock, always — the same move the active tab makes.
    Sharing the dock's flat background made it read as a caption; on its own
    surface it reads as the pressable thing it is. */
+/* The streak chip and the goal strip share a line. The strip is the elastic
+   half: its text is the long thing here, and the chip beside it is two glyphs
+   wide. Kept as a row of its own rather than putting the chip inside the strip,
+   because the strip hides itself when every goal is done and the streak has to
+   outlive that. */
+#goal-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#ui.mode-active #goal-row { display: none; }
+
 #next-goal {
+  flex: 1 1 auto; min-width: 0;
   display: flex; align-items: center; gap: 12px;
   padding: 8px 12px;
   cursor: pointer;

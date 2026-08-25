@@ -729,6 +729,7 @@ const TR: Record<string, string> = {
   // ---- ui.ts: interface ----
   'Feed': 'Besle', 'Shop': 'Mağaza', 'Inventory': 'Envanter', 'Social': 'Sosyal', 'More': 'Daha',
   'Switch tank': 'Akvaryum değiştir', 'Done ✓': 'Bitti ✓',
+  'Get more': 'Daha fazla al',
   'Lv': 'Sv',
   'Dirty — tap to clean the glass': 'Kirli — camı temizlemek için dokun',
   'Press back again to exit': 'Çıkmak için tekrar geri tuşuna bas',

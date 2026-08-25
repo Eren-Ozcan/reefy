@@ -254,8 +254,6 @@ export class UI {
   private root!: HTMLElement;
   private hudCoins!: HTMLElement;
   private hudPearls!: HTMLElement;
-  private hudLevel!: HTMLElement;
-  private hudRing!: HTMLElement;
   private hudTank!: HTMLElement;
   private hudStreak!: HTMLElement;
   private panelHost!: HTMLElement;
@@ -280,11 +278,9 @@ export class UI {
     root.innerHTML = `
       <div id="topbar">
       <div id="hud">
-        <div class="hud-chip"><b id="hud-coins"></b>${ICON_COIN}</div>
-        <div class="hud-chip"><b id="hud-pearls"></b>${ICON_PEARL}</div>
+        <div class="hud-chip hud-money"><b id="hud-coins"></b>${ICON_COIN}<button class="hud-plus" id="hud-coins-plus" title="${tt('Get more')}">+</button></div>
+        <div class="hud-chip hud-money"><b id="hud-pearls"></b>${ICON_PEARL}<button class="hud-plus" id="hud-pearls-plus" title="${tt('Get more')}">+</button></div>
         <div class="hud-chip hud-tank" id="hud-tank" title="${tt('Switch tank')}"></div>
-        <div class="hud-chip hud-streak hidden" id="hud-streak"></div>
-        <div class="hud-ring" id="hud-ring"><b id="hud-level"></b></div>
       </div>
       <div id="carebar">
         <button data-care="feed">${ICON_FEED}<span>${tt('Feed')}</span><small></small></button>
@@ -300,12 +296,15 @@ export class UI {
       </div>
       </div>
       <div id="bottombar">
-        <div id="next-goal" class="hidden" role="button" tabindex="0">
-          <div class="goal-main">
-            <span class="goal-text"></span>
-            <div class="goal-bar"><div></div></div>
+        <div id="goal-row">
+          <div class="hud-chip hud-streak hidden" id="hud-streak"></div>
+          <div id="next-goal" class="hidden" role="button" tabindex="0">
+            <div class="goal-main">
+              <span class="goal-text"></span>
+              <div class="goal-bar"><div></div></div>
+            </div>
+            <span class="goal-reward"></span>
           </div>
-          <span class="goal-reward"></span>
         </div>
         <div class="dock-tabs">
           <button data-act="aquarium">${ICON_TANK}<span>${tt('Aquarium')}</span><small></small></button>
@@ -322,8 +321,6 @@ export class UI {
     `;
     this.hudCoins = root.querySelector('#hud-coins')!;
     this.hudPearls = root.querySelector('#hud-pearls')!;
-    this.hudLevel = root.querySelector('#hud-level')!;
-    this.hudRing = root.querySelector('#hud-ring')!;
     this.hudTank = root.querySelector('#hud-tank')!;
     this.hudStreak = root.querySelector('#hud-streak')!;
     this.panelHost = root.querySelector('#panel-host')!;
@@ -383,6 +380,17 @@ export class UI {
       audio.click();
       this.renderInventory('tanks');
     });
+    // Both plus marks land on the same shelf, because it is the only one that
+    // sells either currency for money: pearls come as packs and coins ride
+    // along in the starter bundle. Sending the coin's plus to the fish shelf
+    // instead would answer "where do coins come from" with a list of things to
+    // spend them on.
+    for (const id of ['#hud-coins-plus', '#hud-pearls-plus']) {
+      root.querySelector(id)!.addEventListener('click', () => {
+        audio.click();
+        this.renderShop('pearls');
+      });
+    }
     this.hudStreak.addEventListener('click', () => {
       audio.click();
       this.showStreak();
@@ -470,9 +478,6 @@ export class UI {
     const s = this.game.save;
     this.hudCoins.textContent = fmt(s.coins);
     this.hudPearls.textContent = fmt(s.pearls);
-    this.hudLevel.textContent = String(s.level);
-    this.hudRing.style.setProperty('--xp', String(Math.min(100, (100 * s.xp) / this.game.xpNeed(s.level))));
-    this.hudRing.title = `${tt('Lv')} ${s.level}`;
     this.refreshStreakChip(s.streak);
     this.refreshCareBar();
     this.refreshDock();
@@ -554,17 +559,18 @@ export class UI {
       return;
     }
     this.hudStreak.classList.remove('hidden');
-    // The tease is a pearl mark rather than the sentence it used to be. The
-    // sentence was 90px of the 430px top row — more than the tank chip and the
-    // level ring together — and it was the widest state the row had to be sized
-    // against, which is what squeezed the tank name down to an ellipsis. The
-    // pearl is what the seventh day actually pays, the chip opens the ladder
-    // that spells it out, and the sentence survives as the chip's title.
+    // A flame and a figure, not a sentence. The chip now rides beside the goal
+    // strip, where the objective's own text is the long thing and needs the
+    // room; the sentence survives as the title, and the ladder the chip opens
+    // spells it out in full. The pearl tease stays because it is what the
+    // seventh day actually pays.
     const teaseBigGift = streak % 7 === 6;
     this.hudStreak.classList.toggle('tease', teaseBigGift);
-    this.hudStreak.title = teaseBigGift ? tt('big reward tomorrow') : tt('Daily streak');
+    this.hudStreak.title = teaseBigGift
+      ? `${tt('{n}-day streak', { n: streak })} · ${tt('big reward tomorrow')}`
+      : tt('{n}-day streak', { n: streak });
     const tease = teaseBigGift ? ICON_PEARL : '';
-    this.hudStreak.innerHTML = `${tt('{n}-day streak', { n: streak })}${tease}`;
+    this.hudStreak.innerHTML = `<span class="streak-flame">🔥</span><b>${streak}</b>${tease}`;
   }
 
   private toggleFeedPop(): void {
