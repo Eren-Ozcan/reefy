@@ -406,15 +406,39 @@ were unsafe to touch on 1.2.1 could finally be exercised.
 - [x] **Friend code:** a code that does not exist is refused by the Firestore
       lookup. Adding a real friend still needs a second account.
 
-### Production access — the 14-day count finishes 2026-08-25
+### 1.2.3 is in review — START HERE next session
 
-- [ ] The dashboard read "12 test users continuously enrolled for 13 days" on
-      2026-08-24, against a requirement of 12 users for 14 days. The other two
-      conditions (a published closed-test release, 12 enrolled testers) are
-      already struck through, so "Üretime başvur" should unlock on the 25th.
-      Nothing to do but notice it — and decide whether to apply before or after
-      the store listing's stale screenshots are replaced, since a production
-      listing is what a stranger would see.
+Submitted to the alpha track on 2026-08-25: versionCode 10, release name
+`10 (1.2.3)`, release notes in tr-TR and en-US, full rollout. The only warning
+was the missing deobfuscation file, which R8 being off explains and 1.2.2 had
+too. The AAB is at
+`android/app/build/outputs/bundle/release/reefy-1.2.3-vc10.aab`.
+
+Everything it carries is the remove-ads restore path, and **none of it has run
+on a handset yet** — the phone still holds 1.2.2, which predates the change.
+Once the review clears, update the phone and check these three, in this order:
+
+- [ ] **Settings → "Satın alımları geri yükle" on an account that owns
+      nothing.** Must answer "Bu hesapta satın alım bulunamadı." — a button
+      that goes quiet is the failure mode this row exists to avoid.
+- [ ] **Buy Reklamları Kaldır (₺95,99) and confirm interstitials actually stop.**
+      It is a test order on this license-tested account, so it costs nothing,
+      but it marks the account as owning it permanently: undoing it means
+      cancelling the order in Play Console, and until then this handset can no
+      longer test interstitials. Do it deliberately, and expect to give up ad
+      testing on this device for a while.
+- [ ] **`pm clear` and relaunch.** The startup check must bring the entitlement
+      back on its own, with no button pressed — that is the whole point of the
+      change. While there, confirm the cloud save still does NOT carry it: the
+      restore must come from the store, not from the save file.
+
+### Production access — unlocked on 2026-08-25
+
+- [x] The three closed-test conditions are struck through and "Üretime başvur"
+      is live on the dashboard (seen 2026-08-25).
+- [ ] Do not apply yet. A production listing is the first thing a stranger
+      sees, and the live listing still shows the removed right-edge rail — the
+      screenshots below have to be uploaded first.
 
 ### Coral Festival — what the first run has to answer
 
