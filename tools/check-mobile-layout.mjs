@@ -7,8 +7,9 @@
  * overriding --safe-b, the variable every bottom-pinned element adds to its own
  * offset; env(safe-area-inset-bottom) itself cannot be set from a page. The top
  * row is loaded with its widest realistic content instead of its narrowest: the
- * longest tank name, a fully dirty tank so the growth badge is present, and a
- * streak sitting on its seventh-day tease.
+ * longest tank name, a fully dirty tank so the growth badge is present, and
+ * seven-figure balances carrying their plus marks. The streak moved down to the
+ * goal row, so it is measured there instead.
  *
  * Needs a dev server on http://localhost:5173 (npm run dev).
  *
@@ -41,15 +42,15 @@ const DSF = Number(flag('dsf', '3'));
 const VIEWPORT = { width: CSS_WIDTH, height: Math.round(2340 / DSF) };
 
 // The longest tank name in the game, in a tank dirty enough to carry a growth
-// badge. Both halves matter: the badge is what pushed the streak chip off the
-// right edge, and it only appears when the multiplier is not 1.
+// badge. Both halves matter: the badge is what used to push the row over its
+// width, and it only appears when the multiplier is not 1.
 const TANK = 'tank-aysberg';
 
 // The state an ordinary player is in most of the time: a short tank name, a
 // clean tank so there is no growth badge, three figures of coins, no streak.
 // The row MUST hold one line here — wrapping is reserved for the widest state,
-// and a fresh save dropping the level ring to a second line is the bug this
-// pass exists to catch.
+// and a fresh save dropping a chip to a second line is the bug this pass
+// exists to catch.
 const ORDINARY_TANK = 'tank-mercan-koyu';
 
 function seedSave() {
@@ -186,13 +187,40 @@ for (const c of hud.chips.filter((c) => c.w > 0 && c.h > 0)) {
   check(c.left >= hud.bar.left - 0.5, '"' + c.text + '" (' + c.id + ') runs past the left edge');
   check(c.h <= 56, '"' + c.text + '" (' + c.id + ') is ' + Math.round(c.h) + 'px tall — it has wrapped onto another line');
 }
-// Both variable-width chips have to be on screen, or the row was measured in a
-// state narrower than the one that broke.
-check(hud.chips.some((c) => c.id === 'hud-streak' && c.w > 0), 'the streak chip is hidden — the widest row was not the one measured');
+// The plus marks are part of what the currency chips now cost in width, so a
+// run without them measured a narrower row than any player sees.
+const plusCount = await page.locator('#hud .hud-plus:visible').count();
+check(plusCount === 2, 'expected both currency chips to carry a plus mark, found ' + plusCount);
 // The badge is the whole reason the chip grew; it has to survive the truncation.
 const badge = await page.locator('#hud-tank b').first().textContent().catch(() => null);
 check(badge != null && badge.indexOf('%') >= 0,
   'the growth badge is missing from the tank chip (got ' + JSON.stringify(badge) + ')');
+
+// ---- 2b. The goal row holds the streak chip and the strip on one line ----
+// The chip is fixed-width and the strip is elastic, so the failure mode here is
+// the strip's text pushing the row taller rather than the chip falling off it.
+const goalRow = await page.evaluate(() => {
+  const row = document.querySelector('#goal-row');
+  const chip = document.querySelector('#hud-streak');
+  const strip = document.querySelector('#next-goal');
+  const box = (el) => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { left: r.left, right: r.right, w: r.width, h: r.height };
+  };
+  return { row: box(row), chip: box(chip), strip: box(strip), scrollW: row?.scrollWidth, clientW: row?.clientWidth };
+});
+check(goalRow.row != null, 'the goal row is missing');
+check(goalRow.chip != null && goalRow.chip.w > 0,
+  'the streak chip is hidden — the seeded streak should be showing it');
+if (goalRow.chip && goalRow.strip && goalRow.strip.w > 0) {
+  check(goalRow.scrollW <= goalRow.clientW + 0.5,
+    'goal row overflows: ' + goalRow.scrollW + 'px of content in a ' + goalRow.clientW + 'px row');
+  check(goalRow.chip.right <= goalRow.strip.left + 0.5,
+    'the streak chip overlaps the goal strip');
+  check(Math.abs(goalRow.chip.h - goalRow.row.h) <= 24,
+    'the streak chip is ' + Math.round(goalRow.chip.h) + 'px in a ' + Math.round(goalRow.row.h) + 'px row — one of them has wrapped');
+}
 
 if (argv.includes('--report')) {
   console.log('top row: ' + hud.clientW + 'px available, ' + hud.scrollW + 'px used');
