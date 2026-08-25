@@ -433,14 +433,23 @@ Two of the three checks are done, on the device, on the Play build:
       carries zero AdMob lines — with `adsRemoved` set, `src/ads.ts:199` never
       even preloads one. **This handset can no longer test interstitials**
       until the order is cancelled in Play Console.
-- [ ] **`pm clear` and relaunch.** The startup check must bring the entitlement
-      back on its own, with no button pressed — that is the whole point of the
-      change. While there, confirm the cloud save still does NOT carry it: the
-      restore must come from the store, not from the save file.
-      Not run yet, because it wipes the handset's local save. The cloud copy is
-      connected (crazything5341@gmail.com), but this same phone once came back
-      from `adb backup`/`restore` holding an older snapshot than the one taken,
-      so treat the progress as expendable before starting rather than after.
+- [x] **`pm clear` and relaunch — and it FAILED, which is why 1.2.4 exists.**
+      On the wiped install the shop still asked ₺95,99; the Settings button,
+      one screen later, restored it. The two paths were asking different
+      questions: `ownsRemoveAds` reads `getCustomerInfo`, which describes the
+      customer record for this install's RevenueCat app user id, and a reinstall
+      gets a new one — empty however many non-consumables the Play account owns.
+      `restorePurchases` is what reaches the store, and the log says it plainly:
+      nothing at launch, then `Purchase history retrieved productIds:
+      [remove_ads], orderId: GPA.3312-4767-0274-32974` on the button. Fixed in
+      `src/game.ts` (`restoreEntitlements`), covered by four new cases in
+      `src/entitlement-grant.test.ts`. Not re-tested on a device yet — the fix
+      is in 1.2.4, which is in review.
+      Worth knowing for the retest: the first launch after `pm clear` also hit
+      `Scheduling restart of crashed service ... InAppBillingService`, so the
+      first reading was thrown away and the check repeated on a healthy launch.
+      The cloud half of the row did pass: the save was wiped, no sign-in
+      happened, and the entitlement still came back from the store.
 
 Which trigger fires is not left to the device alone any more:
 `src/interstitial-guard.test.ts` pins the guard itself (shown, then refused once
@@ -450,6 +459,21 @@ switch actually asking the provider. They were written because a second tank
 costs 2,500 coins and level 3, which put the switch out of reach on a fresh
 account — the device pass has since confirmed both, but the pair is what keeps
 either from rotting.
+
+### 1.2.4 is in review
+
+Submitted to the alpha track on 2026-08-26: versionCode 11, release name
+`11 (1.2.4)`, notes in tr-TR and en-US, full rollout. AAB at
+`android/app/build/outputs/bundle/release/reefy-1.2.4-vc11.aab`.
+
+It carries the startup-restore fix above, the HUD rework and the portrait lock.
+Two warnings, both understood: the missing deobfuscation file (R8 is off, every
+release has had it) and **26 devices dropped** — which is the portrait lock
+doing exactly what it was asked to. No phones were lost (12,281 either side);
+the losses are TV 6 → 3, Android Auto 25 → 8, tablet 6,633 → 6,627.
+
+When it lands, the retest is the `pm clear` row above, and the HUD is finally
+on a device.
 
 ### The HUD rework is on master and on no device
 
