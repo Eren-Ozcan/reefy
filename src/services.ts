@@ -139,6 +139,28 @@ export interface IAPProvider {
   loadPrices(): Promise<void>;
   /** Purchase flow. Returns an info message on web; connects to the store in native builds. */
   purchase(packId: string): Promise<{ ok: boolean; msg: string; grantPearls?: number; grantCoins?: number; grantRemovesAds?: boolean }>;
+  /**
+   * Asks the STORE whether this account already owns the remove-ads product.
+   *
+   * `adsRemoved` lives in the local save and is deliberately never copied
+   * through the cloud (see cloud-save.ts ENTITLEMENT_KEYS) — an entitlement
+   * that travels in a save file is an entitlement anyone can hand themselves
+   * by editing one. That leaves exactly one honest source for it: the store.
+   * Without this call a player who reinstalls loses what they paid for, and
+   * cannot buy it back either, because Play refuses to sell a non-consumable
+   * twice.
+   *
+   * Answers false on any failure (offline, store not ready). The caller must
+   * therefore only ever GRANT on true, never revoke on false.
+   */
+  ownsRemoveAds(): Promise<boolean>;
+  /**
+   * The explicit "Restore purchases" the player can press. Same question as
+   * ownsRemoveAds(), but it forces the store to re-read the account rather
+   * than accepting a cached answer, and it reports back in words because a
+   * button that silently does nothing reads as broken.
+   */
+  restore(): Promise<{ ok: boolean; ownsRemoveAds: boolean; msg: string }>;
   readonly storeLabel: string;
 }
 
@@ -149,6 +171,14 @@ export class StubIAP implements IAPProvider {
   purchase(): Promise<{ ok: boolean; msg: string }> {
     return Promise.resolve({
       ok: false,
+      msg: t('Real purchases are enabled in the Google Play / App Store build. In this preview, use quests and level rewards to earn pearls.'),
+    });
+  }
+  ownsRemoveAds(): Promise<boolean> { return Promise.resolve(false); }
+  restore(): Promise<{ ok: boolean; ownsRemoveAds: boolean; msg: string }> {
+    return Promise.resolve({
+      ok: false,
+      ownsRemoveAds: false,
       msg: t('Real purchases are enabled in the Google Play / App Store build. In this preview, use quests and level rewards to earn pearls.'),
     });
   }
@@ -292,7 +322,91 @@ export class RevenueCatIAP implements IAPProvider {
       if (rcError.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
         return { ok: false, msg: t('Purchase canceled.') };
       }
+      // "You already own this" is the store's answer to the ONE product that
+      // can only be bought once, and it is not a failure — it means the
+      // player paid before and this device simply did not know. Reporting it
+      // as an error would leave them staring at a raw store message with no
+      // way forward, which is the exact dead end a reinstall creates. Grant
+      // instead: the store just confirmed the purchase exists.
+      if (rcError.code === PURCHASES_ERROR_CODE.PRODUCT_ALREADY_PURCHASED_ERROR) {
+        return pack.removesAds
+          ? { ok: true, msg: t('You already own this — restored. ✓'), grantRemovesAds: true }
+          : { ok: false, msg: t('Purchase failed: {err}', { err: rcError.message ?? t('unknown error') }) };
+      }
       return { ok: false, msg: t('Purchase failed: {err}', { err: rcError.message ?? t('unknown error') }) };
+    }
+  }
+
+  /**
+   * The remove-ads product's STORE id. It is read from the offering rather
+   * than assumed, because the package identifier (what IAP_PACKS uses) and
+   * the Play/App Store product id are two different strings that only happen
+   * to match today; hard-coding the assumption would fail silently the first
+   * time they diverge. Falls back to the pack id when the offering cannot be
+   * read, which is better than giving up on the check entirely.
+   */
+  private async removeAdsProductId(): Promise<string> {
+    const pack = IAP_PACKS.find((p) => p.removesAds);
+    const fallback = pack?.id ?? 'remove_ads';
+    try {
+      const storePackage = pack ? await this.findStorePackage(pack.id) : null;
+      return storePackage?.product?.identifier ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  /**
+   * Both halves of the same question, because RevenueCat can answer it two
+   * ways and only one of them is guaranteed to be configured: an ENTITLEMENT
+   * exists only if someone mapped the product to one in the dashboard, while
+   * the purchased-product list is filled in by the SDK itself. Checking both
+   * means a dashboard that was never given an entitlement still restores.
+   */
+  private async ownsRemoveAdsFrom(info: {
+    entitlements?: { active?: Record<string, unknown> };
+    allPurchasedProductIdentifiers?: string[];
+  }): Promise<boolean> {
+    if (Object.keys(info.entitlements?.active ?? {}).length > 0) return true;
+    const productId = await this.removeAdsProductId();
+    return (info.allPurchasedProductIdentifiers ?? []).includes(productId);
+  }
+
+  async ownsRemoveAds(): Promise<boolean> {
+    if (!this.configured) await this.ensureConfigured();
+    if (!this.configured) return false;
+    try {
+      const { customerInfo } = await Purchases.getCustomerInfo();
+      return await this.ownsRemoveAdsFrom(customerInfo);
+    } catch {
+      return false; // offline or store not ready — never revoke on a failed read
+    }
+  }
+
+  async restore(): Promise<{ ok: boolean; ownsRemoveAds: boolean; msg: string }> {
+    if (!this.configured) await this.ensureConfigured();
+    if (!this.configured) {
+      return {
+        ok: false,
+        ownsRemoveAds: false,
+        msg: t("{store} connection isn't set up yet. Please try again later.", { store: this.storeLabel }),
+      };
+    }
+    try {
+      const { customerInfo } = await Purchases.restorePurchases();
+      const owns = await this.ownsRemoveAdsFrom(customerInfo);
+      return {
+        ok: true,
+        ownsRemoveAds: owns,
+        msg: owns ? t('Purchases restored. ✓') : t('No purchases found on this account.'),
+      };
+    } catch (err) {
+      const rcError = err as { message?: string };
+      return {
+        ok: false,
+        ownsRemoveAds: false,
+        msg: t("Couldn't restore: {err}", { err: rcError.message ?? t('unknown error') }),
+      };
     }
   }
 }
