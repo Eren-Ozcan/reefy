@@ -17,17 +17,15 @@ permanent for the session. Both halves are fixed: the message is published,
 and setup now retries when the player actually asks for an ad. Do not
 re-introduce a silent `catch` there.
 
-**master is well ahead of the shipped 1.2.0, and the gap is now worth a
-release.** Nothing below is on any device. In the order it landed: the smoke
-run's selectors (`48fc01a`), the top block's width on wide viewports
-(`a233076`), and then on 2026-08-24 the two handset-only layout defects, the
-`ads: test` / `ads: live` diagnostic, the demo workflow's action versions and
-the README. **Built and signed as 1.2.1 / versionCode 8 on 2026-08-24**,
-waiting to be uploaded to the alpha closed-test track. The certificate fix is
-NOT what makes this release necessary — that fix is entirely server-side (see
-the certificate item) — but the layout fixes only reach a phone through a
-build, and the phone has to be reinstalled from the track anyway to test
-sign-in.
+**The launch blocker is gone (2026-08-26).** 1.2.4 / versionCode 11 cleared
+review, the handset updated to it from the alpha track, and the three things
+that had never worked on a Play build all work on it: Google sign-in
+("Play Games'a giriş yapıldı: CrazyThing1111"), the global ranking (Play's own
+board lists this player at 5.062 points), and cloud save (the conflict screen
+came up and restored level 4 / 2,437 coins / 4 species). The `pm clear`
+entitlement retest that 1.2.3 failed now passes at launch, without the restore
+button. Nothing on the certificate or the ad-free product is waiting on code
+any more.
 
 Two Playwright runs guard the parts unit tests cannot reach. Neither is part of
 `npm test` and both need a dev server on port 5173:
@@ -40,33 +38,23 @@ Two Playwright runs guard the parts unit tests cannot reach. Neither is part of
   off an edge. Both defects it checks for were invisible on a desktop browser
   and obvious on a handset.
 
-**The handset no longer has the Play build on it** (2026-08-23). To test ads
-without being served live ones, the phone was moved to a locally built release
-APK — same version, signed with the upload key rather than Play's, which is why
-it had to be uninstalled first rather than updated in place. Consequences worth
-knowing before reading anything off that phone: it gets no Play track updates,
-Play Billing does not resolve, so Settings reads `store: —` instead of
-`store: TRY`, and — **since 2026-08-24 this is the other way round** — Google
-sign-in is the thing that now works on a Play build and not on that local one,
-because the single Play Games credential names the app-signing key rather than
-the upload key it used to. `adb install -r` from Play to local, or back, will
-always fail with INSTALL_FAILED_UPDATE_INCOMPATIBLE — reinstall from the
-closed-test track to get the Play build back, which is now the only way to test
-anything about accounts.
+**The handset carries the Play build and is signed in** (2026-08-26): 1.2.4
+from the alpha track, Play Games account CrazyThing1111, cloud save linked to
+that account. Its progress is no longer expendable — the cloud copy is real and
+a `pm clear` is recoverable through Settings > Bulut kaydı > Bağla, which is how
+this session put it back after the wipe test. Two things still hold: a local
+upload-key APK cannot sign in (one Android credential, and it names the
+app-signing key on purpose), and `adb install -r` across the two signatures
+always fails with INSTALL_FAILED_UPDATE_INCOMPATIBLE.
 
-The save on that phone did not survive intact. `adb backup`/`adb restore`
-carried it across the uninstall, but restored an older snapshot than the one
-taken: 986 coins, 7 pearls and a 3-day streak came back as 300 / 5 / day 1, with
-the onboarding replaying. Local saves are still the only copy — cloud save
-cannot be connected on any Play build for the same certificate reason — so treat
-that phone's progress as expendable until sign-in works.
-
-What is left needs decisions or accounts rather than code. In the owner's
-stated order: a promo video (nobody but the owner can shoot it), and then the
-one question that covers both that video and the README's missing screenshots —
-whether this public repo takes an image and a clip as a deliberate exception to
-the asset rule in CLAUDE.md, or whether they are hosted outside it and linked.
-The README refresh itself is done. iOS stays parked until the owner asks for it.
+What is left needs decisions or accounts rather than code. The promo video is
+the only unstarted deliverable: no clip exists anywhere in the repo or in
+`docs/store-assets-originals/`, Play takes a YouTube link rather than a file, so
+uploading it needs the owner's account either way, and the open question is
+still whether it is cut from the web demo or from the device — plus whether a
+short GIF goes in the README as a second deliberate exception to the asset rule
+(the three still images already took the first). iOS stays parked until the
+owner asks for it.
 
 The Coral Festival's first run started 2026-08-24 and ends 2026-08-28, so the
 tier measurement below cannot be taken yet — `npm run event:dump` needs players
@@ -79,13 +67,13 @@ language carries and what is still empty.
 
 ## Pending
 
-### No OAuth client carries the Play app-signing key — sign-in is dead on Play builds
+### No OAuth client carried the Play app-signing key — FIXED AND VERIFIED 2026-08-26
 
-Found on the handset 2026-08-23, and it is the reason the ranking has never had
-a score in it. Google sign-in — both the Play Games account and cloud save —
-fails **silently on every build installed from Play**, because the OAuth clients
-registered for `com.yilkgames.reefy` do not include the certificate Play signs
-the app with.
+Found on the handset 2026-08-23, and it was the reason the ranking never had a
+score in it. Google sign-in — both the Play Games account and cloud save —
+failed **silently on every build installed from Play**, because the OAuth
+clients registered for `com.yilkgames.reefy` did not include the certificate
+Play signs the app with. Registered 2026-08-24, proven on a device 2026-08-26.
 
 The three Android clients in `android/app/google-services.json` carry
 `c9690f21…`, `99e821da…` and `38374df2…`. That last one is the **upload** key
@@ -131,20 +119,32 @@ locally built APK signed with the upload key, the same tap brings up the real
         closed-test track, which is what this item always said anyway. If local
         sign-in testing is wanted back, add a SECOND Android credential for the
         upload key and leave it non-primary; it was not added on purpose.
-- [ ] **Then sign in once from Settings > Hesap** and open Social > Global
-      ranking. That is what starts scores reaching the board; `submitPlayScore`
-      is called from syncSave but does nothing while signed out.
-      Needs the phone reinstalled from the closed-test track — it is currently
-      on a local upload-key APK, which is now the case that cannot sign in. A
-      new AAB is NOT required for this test (see above); 1.2.1 is worth
-      installing anyway because it is the build that carries the layout fixes.
-- [ ] **Not verified.** Everything above is configuration; nothing has actually
-      signed in yet. Until a Play build does, "fixed" means "the certificate the
-      APK is signed with now appears in a client the credential names", not
-      "sign-in works".
-- [ ] **The handset's Google account has no Play Games profile yet.** The sheet
-      offers to CREATE one; creating a profile on someone's Google account is
-      theirs to do, so the test stops there until the owner taps it.
+- [x] **Signed in, on a Play build, on the handset (2026-08-26).** On 1.2.4
+      installed from the alpha track, Settings > Hesap > "Giriş yap" answers
+      with the toast "Play Games'a giriş yapıldı: CrazyThing1111 🎮". The plugin
+      logs `CapacitorGameConnect: SignIn method called` then `User is already
+      authenticated` — no resolution activity flashes past any more, and the
+      account already had a Play Games profile, so nothing had to be created.
+      This is the end of the launch blocker: the same tap opened and closed a
+      dead activity on 1.2.0.
+- [x] **Scores reach the global board.** Social > Küresel sıralama opens Play's
+      own "Total earnings" board and it lists `CrazyThing1111 (Siz)` at 5.062
+      points, 2. Sıra. `submitPlayScore` from syncSave is landing; the board was
+      empty for weeks because nothing could sign in.
+- [x] **Cloud save also works on a Play build** — the other half that the
+      certificate was blocking. Settings > Bulut kaydı > Bağla brings up the
+      real Google One Tap sheet, the account signs in, and the CONFLICT screen
+      compares cloud against device with genuinely different columns. Restoring
+      the cloud column brought back level 4, 2,437 coins, 4 species, the 3-day
+      streak and the second tank. Ignore the `AuthPII … BAD_AUTHENTICATION /
+      Long live credential not available` lines in logcat during this: they
+      belong to one of the four Google accounts on the handset whose stored
+      credential is stale, and the sign-in still completes on the chosen one.
+- [ ] **The open settings sheet does not repaint after signing in.** The Hesap
+      row still reads "Giriş yap" and the name field still reads the old
+      `Misafir-…` until the sheet is closed and reopened, at which point it
+      reads "Play Games" and the Play name. Cosmetic, but it looks exactly like
+      a failed sign-in — which is how the fix nearly got recorded as broken.
 
 ### Play Games says "Firebase bağlı değil"
 
@@ -465,7 +465,7 @@ costs 2,500 coins and level 3, which put the switch out of reach on a fresh
 account — the device pass has since confirmed both, but the pair is what keeps
 either from rotting.
 
-### 1.2.4 is in review
+### 1.2.4 cleared review and passed its device pass — 2026-08-26
 
 Submitted to the alpha track on 2026-08-26: versionCode 11, release name
 `11 (1.2.4)`, notes in tr-TR and en-US, full rollout. AAB at
@@ -477,8 +477,27 @@ release has had it) and **26 devices dropped** — which is the portrait lock
 doing exactly what it was asked to. No phones were lost (12,281 either side);
 the losses are TV 6 → 3, Android Auto 25 → 8, tablet 6,633 → 6,627.
 
-When it lands, the retest is the `pm clear` row above, and the HUD is finally
-on a device.
+It landed the same day and the handset took it as an in-place update from the
+track (versionCode 10 → 11), with the save intact. What the pass found:
+
+- [x] **The `pm clear` retest PASSES.** On a wiped install, before touching
+      Settings at all, the shop's Reklamları Kaldır card already reads
+      "Sahipsin ✓". The startup log is the proof:
+      `[Purchases] INFO: 😻💰 Purchase history retrieved productIds:
+      [remove_ads], orderId: GPA.3312-4767-0274-32974` — at launch, not on a
+      button. This is the exact case 1.2.3 failed, and it is the last
+      untested path in the ad-free product.
+- [x] **The entitlement also survives a cloud restore**, which reloads the app:
+      the card still read "Sahipsin ✓" afterwards, with the restored save.
+- [x] **The HUD rework is on a device.** One row, no wrap, no level ring; both
+      currency chips carry a `+`; the tank name truncates ("Mercan Ko… -35%")
+      instead of pushing the row to two lines; the streak sits beside the goal
+      strip as `🔥3`. Portrait lock holds.
+- [x] **The test device is still recognised after `pm clear`.**
+      `I/Ads: This request is sent from a test device.` at first launch, before
+      any tap — so the app-set id did not rotate this time and the pair of
+      prefixes in `.env.local` still covers this install. Checked before
+      touching anything, which is the rule.
 
 ### The HUD rework is on master and on no device
 
@@ -509,6 +528,12 @@ game's own save write.
       longer shows the removed right-edge rail. Applying is now a decision, not
       a dependency; the one thing worth waiting for is the en-US review coming
       back, so a reviewer does not land on a half-updated listing.
+- [ ] **Sign-in is no longer a reason to hold production back either**
+      (2026-08-26). It was the one defect a reviewer could have hit on a real
+      install — accounts, cloud save and the leaderboard all dead — and 1.2.4
+      proves it working from the track. What remains before applying is the
+      en-US listing review and the promo video decision, both of them
+      presentation rather than function.
 
 ### Coral Festival — what the first run has to answer
 
@@ -717,22 +742,29 @@ live, so for the first time there is something to point a link at.
 - [x] **Play Console store listing** — done 2026-08-20 and submitted for
       review, including adding en-US as a store language. See "Store listing is
       now stale" above for what went up and what is still open.
-- [ ] **A promo video.** Wanted for both the store listing (Play takes a
-      YouTube link) and the repo. Open questions to settle when it is made:
-      whether it is a silent screen capture or narrated, and whether it is cut
-      from the web demo (easy to capture at any resolution) or from a device
-      (what players actually see, including the native store and ad paths the
-      demo stubs out).
-- [ ] **Put that video in the README.** GitHub does not play an embedded
-      YouTube iframe in a README — it strips the markup — so the practical
-      form is a thumbnail image linking to the video, or a short muted GIF/MP4
-      committed to the repo for autoplay in the page. Decide which when the
-      video exists; a GIF long enough to show the loop is easily several MB, so
-      it should be a trimmed highlight rather than the whole video. Note the
-      tension with the asset rule in CLAUDE.md: store and marketing images stay
-      out of this repo. A README clip is a deliberate exception to decide on,
-      not an oversight — the alternative is hosting it outside the repo and
-      linking to it.
+- [x] **A promo video exists** (2026-08-26). `npm run store:promo` records it:
+      53 seconds, 1080x1920, silent, no captions, cut from the web build against
+      the same seeded save the store screenshots use — so the film and the
+      plates can never advertise two different games. It runs title card →
+      welcome-back summary ("you were away 9m, your fish produced 218") → the
+      stocked reef → feeding → shop, decor and tanks → the collection → quests →
+      back to the reef. Output is
+      `docs/store-assets-originals/promo/reefy-promo-en.mp4` (gitignored,
+      mirrored to the private pictures repo).
+      Two things it deliberately does not show, both because the web build stubs
+      them: the native purchase sheet and the ad paths. If either ever needs to
+      be in the film, that part has to be shot on a device.
+- [ ] **Upload it to YouTube and paste the link into the listing.** Play takes a
+      YouTube URL rather than a file, so this needs the studio account and is
+      the owner's to do — `yilkgamesstudio@gmail.com`, unlisted is enough. The
+      tr-TR and en-US listings each take their own link; a Turkish cut is
+      `npm run store:promo -- --lang=tr` and has not been recorded yet.
+- [x] **The README has the clip** (2026-08-26). GitHub strips a YouTube iframe,
+      so it is a muted GIF that autoplays in the page: `docs/readme/promo.gif`,
+      480px wide, 11 seconds of the reef and the feeding, ~2 MB, cut by the same
+      run with `--gif`. That is the second deliberate exception to the asset
+      rule in CLAUDE.md, which now carries it and its limits. The full video
+      stays out of the repo.
 - [x] **README refreshed** (2026-08-24). It opens with what the game is and the
       demo link, then "What you actually do" — the loop in the player's terms,
       where the old feature list was a map of source files. That map survives as
