@@ -743,7 +743,7 @@ live, so for the first time there is something to point a link at.
       review, including adding en-US as a store language. See "Store listing is
       now stale" above for what went up and what is still open.
 - [x] **A promo video exists** (2026-08-26). `npm run store:promo` records it:
-      53 seconds, 1080x1920, silent, no captions, cut from the web build against
+      49 seconds, 1080x1920, silent, no captions, cut from the web build against
       the same seeded save the store screenshots use — so the film and the
       plates can never advertise two different games. It runs title card →
       welcome-back summary ("you were away 9m, your fish produced 218") → the
@@ -760,19 +760,96 @@ live, so for the first time there is something to point a link at.
       game in the top-left quarter and grey around it. Screencast frames are
       device pixels, which at deviceScaleFactor 2 is a true 1080x1920.
 - [x] **The Turkish cut is recorded too** —
-      `docs/store-assets-originals/promo/reefy-promo-tr.mp4`, 58 seconds, the
+      `docs/store-assets-originals/promo/reefy-promo-tr.mp4`, 55 seconds, the
       same film with the game's own UI in Turkish ("Tekrar hoş geldin — yokken
       geçen süre 9 dk, balıkların üretti 222").
+- [x] **There is a 16:9 cut now, which is what the listing field wants**
+      (2026-08-26). `npm run store:promo:wide` builds
+      `reefy-promo-<lang>-landscape.mp4`, 1920x1080: the portrait film placed at
+      576x1024 on the left, the game's own water blurred behind it, and a line
+      of the store copy on the right that changes with the film.
+      It composes the master rather than re-shooting in landscape, because the
+      game hands a 1920-wide viewport its wide layout (see VIEWPORT in
+      `tools/record-promo.mjs`) — a landscape shoot would advertise a layout
+      almost nobody installs. Padding the portrait file to 16:9 was the other
+      option and is worse: it bakes the black bars into the file.
+      Height is the binding constraint. A 9:16 master inside a 1080-tall frame
+      is 608 px wide at most, so the game is about a third of the width whatever
+      else happens; the text carries the message and the game carries the mood.
+      The text is not new copy — it is the captioned-plate voice
+      (`CAPTIONS` in `tools/capture-store-screenshots.mjs`) carried into the
+      film, so the video and the screenshots make the same promises.
+      Timing comes from a beat table the recorder now writes beside the mp4
+      (`reefy-promo-<lang>.beats.json`), not from hand-counted seconds. The GIF
+      trim reads it too, so it can no longer slide onto the wrong scene when a
+      hold changes — which it would have, because the title card's hold went
+      from 600ms to 1800ms in the same pass.
+      Three things cost a round each and are worth not rediscovering: the cards
+      are rendered on the dev server's origin so they can use the game's own
+      Fredoka, which also means the game's stylesheet is loaded and a wrapper
+      called `.card` silently inherits a shop tile's opaque background; ffmpeg's
+      `-shortest` does not end an encode whose only infinite inputs are looped
+      stills, so the length is stated with `-t`; and blurring the backdrop at
+      full size took longer than the encode, while blurring it at 64x114 and
+      scaling up looks the same.
+- [x] **The trailer has music, and it is the game's own** (2026-08-26).
+      `npm run store:music` renders it and `store:promo:wide` mixes it into the
+      landscape cut at -16 LUFS with a fade at each end; the portrait master
+      stays silent, because it is the source the GIF and the wide cut are built
+      from. The film is captured with CDP's screencast, which is frames and
+      nothing else, so there was never any sound to keep.
+      It is the game's own ambient loop rather than a library track:
+      `src/audio.ts` synthesizes the whole thing in WebAudio, so there is no
+      licence to clear and nothing for Content ID to match, and the trailer
+      sounds like the thing it is advertising. The renderer loads the real
+      module and records what it plays instead of rebuilding the graph in a
+      tools file — a second copy of the synth would go out of tune quietly. The
+      one trick is a shim over `AudioContext` that swaps `destination` for a
+      `MediaStreamDestination`, which `audio.ts` connects to without knowing.
+      It runs in real time (60 seconds of track takes 60 seconds) because the
+      module paces its chord loop with `setInterval` against `ctx.currentTime`;
+      an OfflineAudioContext would be faster and would mean changing shipping
+      game code for a marketing asset. It is also mixed for a phone speaker
+      under sound effects — about -36 dB mean — so `loudnorm` is not optional.
+      The biome is read from the seeded save's tank, so the trailer is in the
+      key of the tank it was filmed in.
+- [x] **The thumbnail is cut from the video** (2026-08-27).
+      `reefy-promo-<lang>-thumb.jpg`, 1280x720, written by the same
+      `store:promo:wide` run from halfway through the reef beat. Nothing in the
+      store set is that shape — the plates are 1080x1920 and the feature graphic
+      is 1024x500 — and a thumbnail that is literally a frame of the video
+      cannot advertise a different game than the video does.
+- [ ] **Google's Play badge on the closing card.** The composer will draw it and
+      the closing card has a slot for it; the file is deliberately absent.
+      `docs/store-assets-originals/promo/badges/README.md` has the whole rule
+      set. Two reasons it is not in already: it is Google's mark and has to be
+      the asset from their brand page in the right localisation rather than
+      anything redrawn here, and a badge tells a viewer they can install the app
+      today — which is false for anyone off the tester list while Reefy is in
+      closed testing. At the production rollout, drop `google-play-en.png` and
+      `google-play-tr.png` in and re-run `npm run store:promo:wide` twice.
 - [ ] **Upload both to YouTube and paste the links into the listings.** Play
       takes a YouTube URL rather than a file, so this needs the studio account
       and is the owner's to do — `yilkgamesstudio@gmail.com`, unlisted is
-      enough. tr-TR and en-US each take their own link.
+      enough. tr-TR and en-US each take their own link. Title, description,
+      tags and the upload settings for both cuts are written and ready to paste:
+      `docs/store-assets-originals/promo/youtube-metadata.md` (gitignored,
+      mirrored to the private pictures repo). The file to upload is the
+      landscape cut; the portrait master is worth a second upload as a Short,
+      not as the listing video. Two fields stay open until after upload — each
+      description links to the other language's video, and the Play link goes in
+      only once the app is in production.
+      Not checked from here and worth confirming on Play's own help page before
+      uploading: that the listing video may not be monetised or age-restricted.
 - [x] **The README has the clip** (2026-08-26). GitHub strips a YouTube iframe,
       so it is a muted GIF that autoplays in the page: `docs/readme/promo.gif`,
-      480px wide, 11 seconds of the reef and the feeding, ~2 MB, cut by the same
-      run with `--gif`. That is the second deliberate exception to the asset
-      rule in CLAUDE.md, which now carries it and its limits. The full video
-      stays out of the repo.
+      360px wide, 10 seconds of the reef and the feeding, 2.2 MB, cut by the
+      same run with `--gif`. That is the second deliberate exception to the
+      asset rule in CLAUDE.md, which now carries it and its limits. The full
+      video stays out of the repo.
+      Its window is taken from the beat table rather than a fixed offset, so
+      when the film's timings moved it followed instead of drifting onto the
+      welcome sheet.
 - [x] **README refreshed** (2026-08-24). It opens with what the game is and the
       demo link, then "What you actually do" — the loop in the player's terms,
       where the old feature list was a map of source files. That map survives as

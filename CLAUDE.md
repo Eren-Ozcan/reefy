@@ -27,11 +27,13 @@ Rules for that folder:
   README can never drift to a different build than the store listing.
 - **Plus one GIF**, `docs/readme/promo.gif`, agreed on 2026-08-26 the same way
   the images were. Same reasoning and the same limits: keep it around 2 MB,
-  480px wide, and a trimmed highlight rather than the whole film. It is cut by
+  360px wide, and a trimmed highlight rather than the whole film. It is cut by
   `npm run store:promo -- --gif` from the same recording the store video comes
   from, so it cannot drift either. One GIF, not a folder of them.
-- The full promo video (`docs/store-assets-originals/promo/*.mp4`) stays out,
-  like every other store asset — Play takes a YouTube link, not a file.
+- The full promo video stays out, like every other store asset — Play takes a
+  YouTube link, not a file. That covers everything in
+  `docs/store-assets-originals/promo/`: both portrait masters, both 16:9 cuts,
+  the beat tables beside them and the YouTube metadata.
 
 Everything else — feature graphics, store plates, the icon, captioned sets —
 stays out, exactly as above.

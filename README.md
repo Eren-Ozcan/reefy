@@ -81,8 +81,14 @@ which cuts them down from the store screenshot set (`npm run store:screens --
 --lang=en`, which needs a dev server too). The GIF above them comes from
 `npm run store:promo -- --gif`, which records the store video against the same
 seeded save (`tools/store-save-seed.mjs`) and needs ffmpeg as well as a dev
-server. Those four files are the only marketing-type assets in this repo and
-they are here deliberately — everything else of that kind, the full video
+server. That same run also writes a beat table beside the video, which
+`npm run store:promo:wide` uses to build the 16:9 cut a store listing wants:
+the phone frame on the left and a line of text on the right, changing with the
+film. `npm run store:music` scores it with the game's own ambient loop, by
+loading `src/audio.ts` in a browser and recording what it plays — the trailer's
+music is the same WebAudio synth the game runs, so there is no third-party
+track in it. Those four files are the only marketing-type assets in this repo
+and they are here deliberately — everything else of that kind, the full video
 included, is kept out; see `CLAUDE.md`.
 
 To build the demo locally: `VITE_DEMO=1 npm run build && npm run preview`.
