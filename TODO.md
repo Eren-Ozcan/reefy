@@ -669,6 +669,18 @@ evidence for whether the numbers are right.
 - [ ] **The 10-inch tablet set is empty in both languages.** Not a blocker, and
       better than the pre-redesign images that were there; worth filling if a
       tablet audience ever matters.
+- [x] **The six in-app products now carry en-US** (2026-08-26). They were
+      authored in tr-TR because the app's default store language is tr-TR and
+      every product inherits it at creation, which is what blocked switching
+      the default to en-US: Play requires the new default on every product
+      first. Names match `IAP_PACKS` in `src/services.ts` exactly, and the
+      descriptions mirror the Turkish phrasing rather than inventing new lines.
+      The Turkish text survives as a tr-TR translation.
+- [ ] **The default store language is still tr-TR.** Nothing forces the switch
+      now that the products are translated, but the default is what Play serves
+      to every locale with no localized set — today that means an English
+      speaker outside Turkey gets the Turkish listing. Switching is the owner's
+      call, not a code change.
 - [ ] **Nothing here has been A/B tested.** Play's Store Listing Experiments
       need production traffic and the app is in closed testing, so the whole
       rebuild is a considered guess. First experiment once live: screenshot 1,
