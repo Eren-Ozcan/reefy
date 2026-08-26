@@ -754,11 +754,19 @@ live, so for the first time there is something to point a link at.
       Two things it deliberately does not show, both because the web build stubs
       them: the native purchase sheet and the ad paths. If either ever needs to
       be in the film, that part has to be shot on a device.
-- [ ] **Upload it to YouTube and paste the link into the listing.** Play takes a
-      YouTube URL rather than a file, so this needs the studio account and is
-      the owner's to do — `yilkgamesstudio@gmail.com`, unlisted is enough. The
-      tr-TR and en-US listings each take their own link; a Turkish cut is
-      `npm run store:promo -- --lang=tr` and has not been recorded yet.
+      Recorded through CDP's screencast rather than Playwright's own recorder:
+      `recordVideo` captures the page at CSS size and then places that image
+      inside `recordVideo.size`, so the first cut was a 1080x1920 file with the
+      game in the top-left quarter and grey around it. Screencast frames are
+      device pixels, which at deviceScaleFactor 2 is a true 1080x1920.
+- [x] **The Turkish cut is recorded too** —
+      `docs/store-assets-originals/promo/reefy-promo-tr.mp4`, 58 seconds, the
+      same film with the game's own UI in Turkish ("Tekrar hoş geldin — yokken
+      geçen süre 9 dk, balıkların üretti 222").
+- [ ] **Upload both to YouTube and paste the links into the listings.** Play
+      takes a YouTube URL rather than a file, so this needs the studio account
+      and is the owner's to do — `yilkgamesstudio@gmail.com`, unlisted is
+      enough. tr-TR and en-US each take their own link.
 - [x] **The README has the clip** (2026-08-26). GitHub strips a YouTube iframe,
       so it is a muted GIF that autoplays in the page: `docs/readme/promo.gif`,
       480px wide, 11 seconds of the reef and the feeding, ~2 MB, cut by the same
