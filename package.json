@@ -25,6 +25,8 @@
     "store:screens": "node tools/capture-store-screenshots.mjs",
     "store:feature": "node tools/make-feature-graphic.mjs",
     "store:promo": "node tools/record-promo.mjs",
+    "store:music": "node tools/render-promo-music.mjs",
+    "store:promo:wide": "node tools/compose-landscape.mjs",
     "event:dump": "node tools/dump-event-points.mjs",
     "layout:check": "node tools/check-mobile-layout.mjs",
     "perf:check": "node tools/perf-check.mjs"
