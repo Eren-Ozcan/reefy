@@ -10,6 +10,12 @@
  *
  * Needs a dev server (npm run dev) and ffmpeg on PATH.
  *
+ * Writes two files per language: the mp4, and a `.beats.json` naming the second
+ * each section of the film starts at. Nothing here reads that back, but the
+ * landscape cut (tools/compose-landscape.mjs) puts a line of text beside the
+ * game and needs to know when to change it. Hand-timing that against a
+ * re-recorded film is exactly the drift the seeded save exists to prevent.
+ *
  * Why the web build and not the device: the same seeded save the store
  * screenshots use (tools/store-save-seed.mjs) gives a reef that is already
  * worth filming, at any resolution, reproducibly. A device capture would show
@@ -110,6 +116,16 @@ const startCapture = () => cdp.send('Page.startScreencast', {
   everyNthFrame: 1,
 });
 
+/**
+ * Section marks. `mark()` records wall-clock at the moment the step is issued,
+ * which is a beat or two before the screen finishes changing — the landscape
+ * cut fades its text in over a third of a second, so it lands with the picture
+ * rather than ahead of it. Screencast frame timestamps are also seconds since
+ * epoch, so the two are subtractable.
+ */
+const beats = [];
+const mark = (id) => beats.push({ id, at: Date.now() / 1000 });
+
 const errors = [];
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
@@ -171,11 +187,15 @@ await page.waitForTimeout(400);
 await startCapture();
 
 // ---- 1. the title card ----------------------------------------------------
-await page.waitForTimeout(600);
+// Held long enough to be a shot rather than a flash: in the landscape cut this
+// is where the tagline sits, and 600ms of it was a subliminal frame.
+mark('title');
+await page.waitForTimeout(1800);
 
 // ---- 2. coming back to a reef that kept earning ---------------------------
 await page.click('#play-btn');
 await page.waitForSelector('#menu.hidden', { timeout: 20000 });
+mark('welcome');
 // The summary is the pitch — "it earned while you were gone" — so it is the
 // one sheet that gets a hold long enough to read.
 await page.waitForTimeout(3400);
@@ -183,9 +203,11 @@ const welcome = page.locator('.welcome-ok');
 if (await welcome.count()) await welcome.click();
 
 // ---- 3. the tank itself, which is the whole pitch -------------------------
+mark('reef');
 await page.waitForTimeout(3200);
 
 // ---- 4. feeding, the one interaction worth filming ------------------------
+mark('feed');
 await page.click('#carebar button[data-care="feed"]');
 await page.waitForTimeout(900);
 const feedOpt = page.locator('.feed-opt').first();
@@ -208,13 +230,16 @@ if (await doneBtn.count()) await doneBtn.click();
 await page.waitForTimeout(900);
 
 // ---- 5. what there is to spend it on --------------------------------------
+mark('shop-fish');
 await openSheet('shop');
 await scrollPanel(1500, 1900);
 await page.waitForTimeout(500);
+mark('shop-decor');
 await page.click('.tab[data-tab="decor"]');
 await page.waitForTimeout(700);
 await scrollPanel(1400, 1700);
 await page.waitForTimeout(500);
+mark('shop-tanks');
 await page.click('.tab[data-tab="tanks"]');
 await page.waitForTimeout(700);
 await scrollPanel(1100, 1600);
@@ -222,6 +247,7 @@ await page.waitForTimeout(600);
 await closeSheet();
 
 // ---- 6. the roster, which is the reason to keep going ---------------------
+mark('collection');
 await page.click('#bottombar button[data-act="you"]');
 await page.waitForTimeout(700);
 await page.click('.more-btn[data-go="collection"]');
@@ -231,11 +257,13 @@ await page.waitForTimeout(500);
 await closeSheet();
 
 // ---- 7. a reason to come back tomorrow ------------------------------------
+mark('quests');
 await openSheet('quests');
 await page.waitForTimeout(1700);
 await closeSheet();
 
 // ---- 8. end on the reef ---------------------------------------------------
+mark('outro');
 await page.waitForTimeout(2600);
 
 await cdp.send('Page.stopScreencast');
@@ -248,6 +276,26 @@ if (errors.length) {
   console.error('Page errors during recording:\n' + errors.join('\n'));
   process.exit(1);
 }
+
+// ---- the beat table -------------------------------------------------------
+/**
+ * Frame timestamps ARE the film's timeline (see the concat list below), so a
+ * beat's position in the finished mp4 is its wall-clock minus the first frame's.
+ */
+const t0 = frames[0].t;
+const filmEnd = frames[frames.length - 1].t - t0 + 1 / FPS;
+const beatTable = beats.map((b) => ({ id: b.id, t: Math.max(0, Number((b.at - t0).toFixed(3))) }));
+const beatAt = (id) => beatTable.find((b) => b.id === id)?.t;
+
+const beatsFile = join(out, `reefy-promo-${lang}.beats.json`);
+writeFileSync(beatsFile, JSON.stringify({
+  lang,
+  fps: FPS,
+  width: VIDEO_SIZE.width,
+  height: VIDEO_SIZE.height,
+  duration: Number(filmEnd.toFixed(3)),
+  beats: beatTable,
+}, null, 2) + '\n');
 
 // ---- encode ---------------------------------------------------------------
 /**
@@ -291,8 +339,11 @@ if (wantGif) {
   const gif = join(out, `reefy-promo-${lang}.gif`);
   const palette = join(raw, 'palette.png');
   // The window is the reef and the feeding — the two seconds either side of it
-  // are a title card and a shop list, neither of which reads at GIF size.
-  const trim = ['-ss', '8', '-t', '10'];
+  // are a title card and a shop list, neither of which reads at GIF size. Taken
+  // from the beat table rather than a hardcoded second: the title card's hold
+  // changed once already, and a fixed offset would have quietly slid the GIF
+  // onto the welcome sheet without anything failing.
+  const trim = ['-ss', String(beatAt('reef') ?? 8), '-t', '10'];
   const scale = 'fps=10,scale=360:-1:flags=lanczos';
   execFileSync('ffmpeg', ['-y', ...trim, '-i', mp4, '-vf', `${scale},palettegen=max_colors=96`, palette], { stdio: 'inherit' });
   execFileSync('ffmpeg', ['-y', ...trim, '-i', mp4, '-i', palette,
@@ -302,3 +353,4 @@ if (wantGif) {
 
 rmSync(raw, { recursive: true, force: true });
 console.log('Wrote ' + mp4);
+console.log('Wrote ' + beatsFile);
