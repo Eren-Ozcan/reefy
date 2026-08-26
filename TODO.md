@@ -72,6 +72,11 @@ The Coral Festival's first run started 2026-08-24 and ends 2026-08-28, so the
 tier measurement below cannot be taken yet — `npm run event:dump` needs players
 to have played, and a service-account key.
 
+**The store listing was rebuilt on 2026-08-26 and is sitting on disk, uploaded
+nowhere.** New plates, new feature graphics and new copy for both languages;
+the live listing is still the 2026-08-20 set. The upload stalled on a browser
+permission, not on a decision — see "Store listing is now stale" below.
+
 ## Pending
 
 ### No OAuth client carries the Play app-signing key — sign-in is dead on Play builds
@@ -559,11 +564,12 @@ evidence for whether the numbers are right.
       `npm run store:screens -- --lang=en|tr --captions` writes a raw set per
       language and a captioned variant beside it; `npm run store:feature --
       --lang=en|tr` writes the 1024x500 graphic Play will not publish without.
-      The caption goes ABOVE the phone, not over it — the game fills the frame
-      edge to edge, so an overlay band buries either the HUD or the bottom bar.
-      The feature graphic's background is the game itself run at 1024x500 with
-      the chrome hidden, with the wordmark on the left where the store's play
-      button will not land.
+      The caption goes ABOVE the capture, never over it — the game fills the
+      frame edge to edge, so an overlay band buries either the HUD or the
+      bottom bar. (The device frame this version drew around the capture is
+      gone as of 2026-08-26.) The feature graphic's background is the game
+      itself run at 1024x500 with the chrome hidden, with the wordmark on the
+      left where the store's play button will not land.
 - [x] **Uploaded and submitted for review** (2026-08-20). The listing was
       Turkish-only, so **en-US was added as a new store language** — without a
       localized image set Play serves the default language's images, which would
@@ -572,26 +578,94 @@ evidence for whether the numbers are right.
       own feature graphic; the app name is now `Reefy: Cozy Aquarium` in both.
       The three stale 10-inch tablet shots were removed rather than replaced —
       with phone screenshots present Play needs no separate 10-inch set.
-- [ ] **Everything uploaded on 2026-08-20 is now stale.** Found on 2026-08-24:
-      the captures on the listing show the removed right-edge rail, because the
-      care bar landed after they were taken. Worse, the capture tools had gone
-      stale with the same rename and could not be re-run at all —
-      `capture-store-screenshots.mjs` timed out on
-      `#siderail button[data-rail="feed"]`, and `make-feature-graphic.mjs` was
-      hiding `#hud` and `#siderail` when the element to hide is now `#topbar`,
-      so the care bar would have stood in the middle of the graphic. Both are
-      fixed and both sets were regenerated for en. **Still to do: regenerate tr,
-      rebuild the captioned plates and both feature graphics, and re-upload all
-      of it to Play.** This is the same class of breakage as `48fc01a` — a HUD
-      rename silently disabling a Playwright tool — and it is why `npm run smoke`
-      and `npm run layout:check` belong in the release routine.
+- [x] **The stale-capture breakage is fixed** (2026-08-24). The captures on the
+      listing showed the removed right-edge rail because the care bar landed
+      after they were taken, and the capture tools had gone stale with the same
+      rename and could not be re-run at all — `capture-store-screenshots.mjs`
+      timed out on `#siderail button[data-rail="feed"]`, and
+      `make-feature-graphic.mjs` was hiding `#hud` and `#siderail` when the
+      element to hide is now `#topbar`. Same class of breakage as `48fc01a` — a
+      HUD rename silently disabling a Playwright tool — and it is why
+      `npm run smoke` and `npm run layout:check` belong in the release routine.
+
+- [x] **The whole set was rebuilt on 2026-08-26**, and not for staleness this
+      time. The 2026-08-20 plates were selling the wrong thing. The hero shot
+      was a tank at 7 fish of 18 with seven short decor pieces spread at even
+      intervals, and its HUD printed `7 hungry`, `7/18` and a red `-21%` dirt
+      penalty across the most important frame in the set. At the ~120px a Play
+      search result actually gives a card, that reads as an empty blue
+      rectangle with complaints on it. Five commits: `cd0d006`, `374ff66`,
+      `14f5769`, `de57489`, `4632a08`.
+
+      What changed, and the reasoning is in
+      `docs/store-assets-originals/listing-copy.md` rather than repeated here:
+
+      - The seeded save fills the tank — 18 fish (capacity at level 12), all
+        fed, 10 decor (`MAX_PLACED`), clean glass, 66/100 collected. The same
+        chips now read `all fed`, `18/18` and a green `+35%`.
+      - **Fish placement is solved, not scattered.** `Fish`'s constructor
+        derives its spawn point from the save's `seed`, so the seeds in `CAST`
+        ARE the layout. `tools/fish-layout-seeds.mjs` brute-forces them from a
+        target composition and carries both the screenshot's and the feature
+        graphic's. Two traps documented in that file: its bounds are
+        `swimBounds` (`sandTopY`), not the capture viewport, because the UI has
+        not reported its inset when the fish are built; and the hero fires 2.2s
+        in, because at 26 * speedMul px/s ten seconds of wandering is a school
+        clumped in the middle of the frame.
+      - No device frame. The capture is taken at 540x820 — the game area of a
+        9:16 plate rather than a phone's aspect ratio — so it runs full-bleed
+        under the caption. The game went from ~53% of the plate to ~85%.
+      - The caption zone is water, not a band: Coral Cove's own gradient, a
+        light ray, a few bubbles, and a last stop that matches the tank's
+        surface colour so the join has no seam. The gradient lives on the zone
+        rather than the body — on the body its stops spread over the whole
+        960px plate and drew a hard line across the join.
+      - Real counts in the copy: **100 fish, 80 decor, 25 aquariums.** The old
+        text said "dozens of species" and "eighty-odd pieces of decor".
+      - The feature graphic hides the chrome BEFORE the game mounts.
+        `syncBottomInset` bails on a zero-height bottom bar, so the inset stays
+        0 and the sand keeps its natural 96px; hiding it after mount baked in a
+        ~120px inset that pushed the sand up to fill half the graphic.
+      - Two capture passes in one run, because the set wants two incompatible
+        things: pass A is an hour away for the welcome-back summary, pass B is
+        nine minutes and `spotless` for clean glass everywhere else. Dirt is
+        cleaned by tapping canvas spots, which a script cannot aim at.
+
+- [ ] **None of it is uploaded.** The live listing is still the 2026-08-20 set.
+      Attempted on 2026-08-26 and stopped by the browser, not by a decision:
+      the Claude in Chrome extension lost host permission for
+      `play.google.com` mid-session (`Cannot access contents of the page`) and
+      would not recover. **The extension needs play.google.com enabled before
+      this can be retried.**
+
+      Two things learned in the attempt that will save the next one time:
+
+      - A bare console URL opens on Chrome's default account
+        (`crazything5341@gmail.com`) and lands on the *create developer
+        account* signup form. Do not fill it in. Append
+        `?authuser=yilkgamesstudio@gmail.com` to the console URL instead.
+      - "Öğe ekle" in the graphics section is a `<button>`, not an
+        `<input type=file>`, so `file_upload` refuses it. The real input has to
+        be located first.
+
+      To upload: eight captioned plates per language on phone AND 7-inch
+      tablet, both feature graphics, and four text fields (short and full
+      description per language). Files are in
+      `docs/store-assets-originals/` and mirrored to the private
+      `Eren-Ozcan/pictures` repo at `15fe376`.
+
 - [ ] **The 10-inch tablet set is empty in both languages.** Not a blocker, and
       better than the pre-redesign images that were there; worth filling if a
       tablet audience ever matters.
-- [ ] **Captioned plates are 1080x1920, raw captures are 1080x2340.** The plate
-      is 9:16 because only 16:9 or 9:16 shots at 1080 px or more are eligible
-      for Play's promotional placements. If the plate design changes, that
-      constraint is the reason for the letterboxing.
+- [ ] **Nothing here has been A/B tested.** Play's Store Listing Experiments
+      need production traffic and the app is in closed testing, so the whole
+      rebuild is a considered guess. First experiment once live: screenshot 1,
+      one variable, 7+ days.
+- [ ] **Captioned plates are 1080x1920 and raw captures are 1080x1640.** The
+      plate is 9:16 because only 16:9 or 9:16 shots at 1080 px or more are
+      eligible for Play's promotional placements; 1640 is that height minus the
+      280px caption zone, which is what lets the capture run edge to edge with
+      no letterboxing. Change one and the other has to follow.
 
 ### Playable web demo
 
