@@ -33,43 +33,64 @@ if (lang !== 'en' && lang !== 'tr') throw new Error(`--lang must be en or tr, go
 const out = flag('out', 'docs/store-assets-originals');
 mkdirSync(out, { recursive: true });
 
+// The one place in the listing with room for the numbers AND the difference.
+// Broken by hand rather than left to wrap: the natural break is after the
+// counts, and letting the column decide put "No timers." alone on line two
+// split across the sentence instead of between the two claims.
 const TAGLINE = {
-  en: 'Grow the calmest reef on your phone',
-  tr: 'Telefonundaki en huzurlu resif',
+  en: ['100 fish. 25 aquariums.', 'No timers, nothing to lose.'],
+  tr: ['100 balık. 25 akvaryum.', 'Sayaç yok, kaybetmek yok.'],
 };
 
 const TANK = 'tank-mercan-koyu';
 
 /**
- * A wide, busy tank. This seed is deliberately fuller than the screenshot
- * seed's: the frame is a third as tall, so the same fish count would leave the
- * water looking empty at feature-graphic size.
+ * A wide, packed tank. Fuller than the screenshot seed on purpose: the frame is
+ * a third as tall, so ten fish left most of the water bare — at store-card size
+ * the old graphic read as an empty gradient with a wordmark on it.
+ *
+ * The second column is the layout, not a nonce. Spawn points are derived from
+ * the save seed, so these are solved for by
+ *   node tools/fish-layout-seeds.mjs --target=feature
+ * which carries the composition and the reasoning with it. They hold only for
+ * this 1024x500 frame.
  */
 function seedSave() {
   const picks = [
-    ['koi', 7], ['aslan', 19], ['palyaco', 23], ['melek', 31],
-    ['beta', 44], ['mandarin', 66], ['diskus', 81], ['kral-gramma', 95],
-    ['zebra-ciklit', 102], ['altin-arowana', 117],
+    ['altin-arowana', 86567],  ['inci', 55605],           ['koi', 40152],
+    ['gen-epic-68', 112515],   ['gen-epic-71', 16107],    ['gen-epic-67', 201514],
+    ['aslan', 205302],         ['beta', 120047],          ['gen-rare-62', 38814],
+    ['kral-gramma', 150957],   ['palyaco', 225927],       ['melek', 8162],
+    ['gen-uncommon-42', 136177], ['gen-uncommon-46', 39881], ['neon-tetra', 388871],
+    ['lepistes', 334689],      ['gen-common-3', 85851],   ['gen-common-5', 369667],
+    ['diskus', 369451],        ['mandarin', 42108],       ['zebra-ciklit', 99241],
+    ['moli', 371070],
   ];
   return {
     v: 2,
     coins: 24000, pearls: 60, xp: 500, level: 18,
     playerName: 'Reef Keeper', friendCode: 'REEF-K7M2P',
     fishes: picks.map(([sp, seed], i) => ({
-      sp, seed, progress: 1, hunger: 0.9, name: 'Fish' + i, tank: TANK,
+      // Fully fed: below SAD_THRESHOLD a fish grows a speech bubble, and the
+      // one thing the graphic cannot afford is a tank of sulking fish.
+      sp, seed, progress: 1, hunger: 1, name: 'Fish' + i, tank: TANK,
     })),
     collection: picks.map(([sp]) => sp),
     feedOwned: {}, decorOwned: {},
+    // Ten — MAX_PLACED — and weighted right, where the wordmark is not. Heights
+    // alternate so the sand line is a skyline rather than a row of pegs.
     decorPlaced: {
       [TANK]: [
-        { def: 'dec-coral-mound-19', fx: 0.08 },
-        { def: 'dec-kelp-6', fx: 0.18 },
-        { def: 'dec-anemone-29', fx: 0.28 },
-        { def: 'dec-wreck-57', fx: 0.44 },
-        { def: 'dec-castle-64', fx: 0.6 },
-        { def: 'dec-rock-34', fx: 0.72 },
-        { def: 'dec-chest-53', fx: 0.82 },
-        { def: 'dec-kelp-1', fx: 0.93 },
+        { def: 'dec-kelp-4', fx: 0.05 },
+        { def: 'dec-coral-mound-19', fx: 0.15 },
+        { def: 'dec-anemone-33', fx: 0.3 },
+        { def: 'dec-kelp-7', fx: 0.4 },
+        { def: 'dec-wreck-57', fx: 0.52 },
+        { def: 'dec-starfish-52', fx: 0.62 },
+        { def: 'dec-castle-65', fx: 0.71 },
+        { def: 'dec-chest-55', fx: 0.8 },
+        { def: 'dec-lamp-74', fx: 0.88 },
+        { def: 'dec-kelp-6', fx: 0.96 },
       ],
     },
     dirtSpots: {},
@@ -80,7 +101,7 @@ function seedSave() {
     weeklyQuest: { day: '', progress: {}, claimed: [] },
     event: { id: '', points: 0, claimed: [] },
     achievementsClaimed: [], pendingEggs: [],
-    stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 8, totalCleaned: 0 },
+    stats: { totalSold: 0, totalEarned: 0, totalFed: 0, eggsHatched: 0, decorPlacedCount: 10, totalCleaned: 0 },
     pityCounter: 0, streak: 0, bestStreak: 0,
     // Zero: the collect bubble is hidden along with the rest of the chrome, and
     // a pot the graphic never shows is just noise in the save.
@@ -105,6 +126,21 @@ await scene.addInitScript((save) => {
   localStorage.setItem('reefy-save-v1', JSON.stringify(save));
 }, seedSave());
 await scene.goto('http://localhost:5173/');
+await scene.addStyleTag({
+  // #topbar covers the money row AND the care bar under it — both used to be
+  // separate elements (#hud and the removed #siderail), and hiding only #hud
+  // left the care bar standing in the middle of the graphic.
+  //
+  // Injected BEFORE the game mounts, which is load-bearing rather than tidy.
+  // The scene's floor line is placed above whatever the bottom bar measures,
+  // and syncBottomInset bails on a zero-height bar — so hiding the chrome first
+  // leaves the inset at 0 and the sand takes its natural 96px. Hiding it after
+  // mount left an inset of ~120px already baked in, which pushed the sand up to
+  // fill nearly half the graphic and squashed every fish into a band across the
+  // top.
+  content: `#topbar, #bottombar, #next-goal, #mode-chip,
+            #feed-pop, #toasts, #panel-host { display: none !important; }`,
+});
 await scene.waitForTimeout(1200);
 await scene.click('#play-btn');
 await scene.waitForSelector('#menu.hidden', { timeout: 20000 });
@@ -112,16 +148,9 @@ await scene.waitForTimeout(800);
 const welcome = scene.locator('.welcome-ok');
 if (await welcome.count()) await welcome.click();
 
-await scene.addStyleTag({
-  // #topbar covers the money row AND the care bar under it — both used to be
-  // separate elements (#hud and the removed #siderail), and hiding only #hud
-  // left the care bar standing in the middle of the graphic.
-  content: `#topbar, #bottombar, #next-goal, #mode-chip,
-            #feed-pop, #toasts, #panel-host { display: none !important; }`,
-});
-// Let the fish scatter: they spawn clustered, and a clump reads as a bug at
-// this size.
-await scene.waitForTimeout(6000);
+// The seeds ARE the layout, so this is only long enough to let the fish drift
+// off their exact spawn points. Six seconds of wandering scrambled it.
+await scene.waitForTimeout(1800);
 const scenePath = join(out, `.feature-scene-${lang}.png`);
 await scene.screenshot({ path: scenePath });
 await scene.close();
@@ -165,8 +194,8 @@ await plate.evaluate(
         }
         .rule { width: 96px; height: 7px; border-radius: 4px; background: #35c4ac; margin: 22px 0 20px; }
         .tagline {
-          font-size: 33px; font-weight: 500; line-height: 1.24;
-          color: #cfe7e4; max-width: 420px;
+          font-size: 30px; font-weight: 500; line-height: 1.3;
+          color: #cfe7e4; max-width: 460px;
           text-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
         }
       </style>`;
@@ -179,7 +208,7 @@ await plate.evaluate(
         <div class="tagline">${tagline}</div>
       </div>`;
   },
-  { sceneUri, tagline: TAGLINE[lang] },
+  { sceneUri, tagline: TAGLINE[lang].join('<br>') },
 );
 await plate.evaluate(() => document.fonts.ready);
 await plate.waitForTimeout(150);
