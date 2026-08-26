@@ -20,9 +20,9 @@
  * file, and a listing video autoplays muted anyway.
  */
 import { chromium } from 'playwright';
-import { mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { makeSave } from './store-save-seed.mjs';
 
 const argv = process.argv.slice(2);
@@ -47,11 +47,13 @@ mkdirSync(raw, { recursive: true });
  * The screenshot set uses 540x820 because it is filling the game area of a
  * captioned plate; a video has no caption band, so it gets the full frame.
  *
- * Recorded at 1080x1920 against deviceScaleFactor 2, so the frames come off the
- * page at their real pixel size rather than being upscaled afterwards.
+ * The layout is driven at 540x960 CSS pixels — the game lays out for a phone,
+ * and a 1080-wide viewport would hand it the wide layout instead — while
+ * deviceScaleFactor 2 makes the real frame 1080x1920.
  */
 const VIEWPORT = { width: 540, height: 960 };
-const VIDEO_SIZE = { width: 1080, height: 1920 };
+const VIDEO_SIZE = { width: 540 * 2, height: 960 * 2 };
+const FPS = 30;
 
 /**
  * Nine minutes away, spotless. Long enough that the welcome-back sheet has
@@ -77,12 +79,36 @@ const context = await browser.newContext({
   isMobile: true,
   hasTouch: true,
   locale: lang === 'tr' ? 'tr-TR' : 'en-US',
-  recordVideo: { dir: raw, size: VIDEO_SIZE },
 });
-// Recording starts with the context, so everything before the take has to be
-// cut back off at encode time — see TAKE_AT below.
-const contextStart = Date.now();
 const page = await context.newPage();
+
+/**
+ * Frames come from CDP's screencast rather than Playwright's own recorder.
+ * recordVideo captures the page at CSS size and then PLACES that image in the
+ * requested video size — asking for 1080x1920 around a 540x960 viewport wrote
+ * a film with the game sitting in the top-left quarter and grey around it.
+ * Page.screencastFrame hands back device pixels, so at deviceScaleFactor 2 the
+ * frames are a true 1080x1920.
+ *
+ * Frames only arrive when something changes, so their timestamps are the film:
+ * they are written to a concat list with real per-frame durations and the
+ * encoder resamples that to a constant frame rate.
+ */
+const cdp = await context.newCDPSession(page);
+const frames = [];
+cdp.on('Page.screencastFrame', ({ data, sessionId, metadata }) => {
+  const file = join(raw, `f${String(frames.length).padStart(5, '0')}.jpg`);
+  writeFileSync(file, Buffer.from(data, 'base64'));
+  frames.push({ file, t: metadata.timestamp });
+  cdp.send('Page.screencastFrameAck', { sessionId }).catch(() => {});
+});
+const startCapture = () => cdp.send('Page.startScreencast', {
+  format: 'jpeg',
+  quality: 95,
+  maxWidth: VIDEO_SIZE.width,
+  maxHeight: VIDEO_SIZE.height,
+  everyNthFrame: 1,
+});
 
 const errors = [];
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
@@ -141,8 +167,8 @@ await page.reload();
 await page.waitForSelector('#play-btn', { timeout: 20000 });
 await page.waitForTimeout(400);
 
-// Half a second of pre-roll so the cut does not land on the first painted frame.
-const TAKE_AT = Math.max(0, (Date.now() - contextStart) / 1000 - 0.5);
+// The camera only rolls from here, so the boot above costs the film nothing.
+await startCapture();
 
 // ---- 1. the title card ----------------------------------------------------
 await page.waitForTimeout(600);
@@ -212,8 +238,11 @@ await closeSheet();
 // ---- 8. end on the reef ---------------------------------------------------
 await page.waitForTimeout(2600);
 
+await cdp.send('Page.stopScreencast');
 await context.close();
 await browser.close();
+
+if (!frames.length) throw new Error('The screencast produced no frames');
 
 if (errors.length) {
   console.error('Page errors during recording:\n' + errors.join('\n'));
@@ -221,19 +250,34 @@ if (errors.length) {
 }
 
 // ---- encode ---------------------------------------------------------------
-const webm = readdirSync(raw).filter((f) => f.endsWith('.webm')).map((f) => join(raw, f))[0];
-if (!webm) throw new Error('Playwright wrote no video into ' + raw);
+/**
+ * The concat demuxer with an explicit duration per frame, rather than a fixed
+ * input rate: screencast frames arrive only when the page changes, so a still
+ * sheet is one frame that has to be held, not one frame that flashes past.
+ */
+// concat resolves each entry against the list file's own directory, so the
+// frames go in by name — an absolute or repo-relative path is looked for
+// underneath .raw/ and never found.
+const lines = frames.flatMap((f, i) => {
+  const next = frames[i + 1];
+  const dur = next ? Math.max(1 / 240, next.t - f.t) : 1 / FPS;
+  return [`file '${basename(f.file)}'`, `duration ${dur.toFixed(4)}`];
+});
+// The last file is repeated: concat drops the final entry's duration otherwise.
+lines.push(`file '${basename(frames[frames.length - 1].file)}'`);
+const listFile = join(raw, 'frames.txt');
+writeFileSync(listFile, lines.join('\n') + '\n');
 
 const mp4 = join(out, `reefy-promo-${lang}.mp4`);
 // yuv420p and the even-dimension filter are what make the file play on phones
 // and upload cleanly; without them YouTube re-encodes from a format some
 // players refuse outright.
 execFileSync('ffmpeg', [
-  '-y', '-ss', TAKE_AT.toFixed(2), '-i', webm,
-  '-r', '30',
+  '-y', '-f', 'concat', '-safe', '0', '-i', listFile,
+  '-r', String(FPS), '-fps_mode', 'cfr',
   '-c:v', 'libx264', '-preset', 'slow', '-crf', '20',
   '-pix_fmt', 'yuv420p',
-  '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+  '-vf', `scale=${VIDEO_SIZE.width}:${VIDEO_SIZE.height}:flags=lanczos`,
   '-movflags', '+faststart',
   '-an', mp4,
 ], { stdio: 'inherit' });
@@ -241,17 +285,18 @@ execFileSync('ffmpeg', [
 if (wantGif) {
   // A GIF of the whole film would be tens of megabytes and it lives in git
   // history forever, so this is a trimmed highlight: the tank, then feeding.
-  // 480px wide at 12fps is the point where the loop is still legible and the
-  // file still small enough to commit.
+  // 360px at 10fps with a 96-colour palette lands just over 2 MB — the ceiling
+  // CLAUDE.md sets for this file. Every one of those three numbers was tried
+  // higher first; the frames are sharp now, and sharp frames do not compress.
   const gif = join(out, `reefy-promo-${lang}.gif`);
   const palette = join(raw, 'palette.png');
   // The window is the reef and the feeding — the two seconds either side of it
   // are a title card and a shop list, neither of which reads at GIF size.
-  const trim = ['-ss', '8', '-t', '11'];
-  const scale = 'fps=12,scale=480:-1:flags=lanczos';
-  execFileSync('ffmpeg', ['-y', ...trim, '-i', mp4, '-vf', `${scale},palettegen=max_colors=128`, palette], { stdio: 'inherit' });
+  const trim = ['-ss', '8', '-t', '10'];
+  const scale = 'fps=10,scale=360:-1:flags=lanczos';
+  execFileSync('ffmpeg', ['-y', ...trim, '-i', mp4, '-vf', `${scale},palettegen=max_colors=96`, palette], { stdio: 'inherit' });
   execFileSync('ffmpeg', ['-y', ...trim, '-i', mp4, '-i', palette,
-    '-lavfi', `${scale}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3`, gif], { stdio: 'inherit' });
+    '-lavfi', `${scale}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=4`, gif], { stdio: 'inherit' });
   console.log('Wrote ' + gif);
 }
 
