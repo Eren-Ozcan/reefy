@@ -72,10 +72,10 @@ The Coral Festival's first run started 2026-08-24 and ends 2026-08-28, so the
 tier measurement below cannot be taken yet — `npm run event:dump` needs players
 to have played, and a service-account key.
 
-**The store listing was rebuilt on 2026-08-26 and is sitting on disk, uploaded
-nowhere.** New plates, new feature graphics and new copy for both languages;
-the live listing is still the 2026-08-20 set. The upload stalled on a browser
-permission, not on a decision — see "Store listing is now stale" below.
+**The rebuilt store listing is uploaded** (2026-08-26). New plates, new feature
+graphics and new copy went up for both languages: tr-TR published the same day,
+en-US is in review. See "Store listing is now stale" below for what each
+language carries and what is still empty.
 
 ## Pending
 
@@ -284,12 +284,12 @@ Everything below was checked on 1.2.1 installed from the closed-test track.
       Settings reads `store: —` until the Pearls tab has been opened once,
       because prices are fetched lazily — the dash is not a failure.
 - [x] The Coral Festival is running and scoring (58 points, ends 2026-08-28).
-- [ ] **The store listing's screenshots are the launch blocker.** Every plate on
-      the live listing shows the removed right-edge rail. Fresh sets for en and
-      tr, captioned, plus both feature graphics, are regenerated and sitting in
-      `docs/store-assets-originals/` and mirrored to the pictures repo —
-      they have NOT been uploaded. A production listing is the first thing a
-      stranger sees, and right now it advertises a UI the game no longer has.
+- [x] **The store listing's screenshots are uploaded** (2026-08-26). The plates
+      advertising the removed right-edge rail are gone from both languages.
+      tr-TR went out as submission 12 and published at 11:23; en-US followed as
+      a six-change submission and is in review. Each language carries the eight
+      captioned plates on both phone and 7-inch tablet, its own feature graphic
+      and the rebuilt short and full description.
 - [x] **Measured on 1.2.2 (2026-08-25), and the answer is unambiguous.** The
       diagnostic reads:
 
@@ -505,9 +505,10 @@ game's own save write.
 
 - [x] The three closed-test conditions are struck through and "Üretime başvur"
       is live on the dashboard (seen 2026-08-25).
-- [ ] Do not apply yet. A production listing is the first thing a stranger
-      sees, and the live listing still shows the removed right-edge rail — the
-      screenshots below have to be uploaded first.
+- [ ] The screenshot blocker is cleared as of 2026-08-26 — the live listing no
+      longer shows the removed right-edge rail. Applying is now a decision, not
+      a dependency; the one thing worth waiting for is the en-US review coming
+      back, so a reviewer does not land on a half-updated listing.
 
 ### Coral Festival — what the first run has to answer
 
@@ -631,28 +632,39 @@ evidence for whether the numbers are right.
         nine minutes and `spotless` for clean glass everywhere else. Dirt is
         cleaned by tapping canvas spots, which a script cannot aim at.
 
-- [ ] **None of it is uploaded.** The live listing is still the 2026-08-20 set.
-      Attempted on 2026-08-26 and stopped by the browser, not by a decision:
-      the Claude in Chrome extension lost host permission for
-      `play.google.com` mid-session (`Cannot access contents of the page`) and
-      would not recover. **The extension needs play.google.com enabled before
-      this can be retried.**
+- [x] **All of it is uploaded** (2026-08-26). Eight captioned plates per
+      language on phone AND 7-inch tablet, both feature graphics, and the four
+      text fields. tr-TR went out as submission 12 and published at 11:23;
+      en-US followed as a six-change submission and is in review. The en-US
+      submission also carried an app-icon change that was already sitting
+      unsubmitted before this session.
 
-      Two things learned in the attempt that will save the next one time:
+      An earlier attempt the same day was stopped by the browser, not by a
+      decision: the extension lost host permission for `play.google.com`
+      mid-session and would not recover. Four things that make the next
+      listing pass cheap:
 
       - A bare console URL opens on Chrome's default account
         (`crazything5341@gmail.com`) and lands on the *create developer
         account* signup form. Do not fill it in. Append
         `?authuser=yilkgamesstudio@gmail.com` to the console URL instead.
-      - "Öğe ekle" in the graphics section is a `<button>`, not an
-        `<input type=file>`, so `file_upload` refuses it. The real input has to
-        be located first.
-
-      To upload: eight captioned plates per language on phone AND 7-inch
-      tablet, both feature graphics, and four text fields (short and full
-      description per language). Files are in
-      `docs/store-assets-originals/` and mirrored to the private
-      `Eren-Ozcan/pictures` repo at `15fe376`.
+      - "Öğe ekle" is a `<button>`, not an `<input type=file>`. Clicking it
+        *creates* a real multiple file input on `document.body`, which
+        `file_upload` then accepts — and that one input can be reused for every
+        subsequent upload into the same slot.
+      - Assets land in the library auto-selected, and the slot takes them in
+        **reverse** library order, so a single multi-file upload arrives
+        backwards. Uploading one file at a time and pressing "Ekle" after each
+        is what puts the eight plates in the order `listing-copy.md` specifies.
+      - The console's `<input>` fields accept a native value setter plus an
+        `input` event, but its `<textarea>`s ignore it and stay empty in the
+        Angular model. Use `document.execCommand('insertText')` on a focused
+        textarea, or real keystrokes.
+      - **"Kaydet" is not always the last step.** The tr-TR save reached review
+        and published without anyone pressing "incelemeye gönder"; the en-US
+        save an hour later sat in "Henüz incelemeye gönderilmeyen değişiklikler"
+        until the button was pressed. Managed publishing is off, so do not
+        assume a save is still a draft — check the publishing overview.
 
 - [ ] **The 10-inch tablet set is empty in both languages.** Not a blocker, and
       better than the pre-redesign images that were there; worth filling if a
