@@ -17,6 +17,14 @@ Thumbs.db
 # Private/local-only store & marketing assets (mirrored to private Eren-Ozcan/pictures repo)
 docs/store-assets-originals/
 
+# Video, same rule as the images: the promo film and its raw capture stay out.
+# The README's short GIF is the one exception, agreed the same way the three
+# still images were — see CLAUDE.md. Written by tools/record-promo.mjs.
+*.mp4
+*.webm
+*.gif
+!docs/readme/*.gif
+
 # Signed build outputs. A release bundle is 11 MB and is reproducible from a
 # tag plus the keystore, so it never belongs in history.
 *.aab
