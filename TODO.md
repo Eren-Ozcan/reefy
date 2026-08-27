@@ -520,8 +520,18 @@ Chrome with Playwright's `chromium.connectOverCDP` — `page.addInitScript` is t
 part that matters, since a plain evaluate-then-reload loses to the running
 game's own save write.
 
-### Production access — unlocked on 2026-08-25
+### Production access — applied on 2026-08-27
 
+- [x] **The production-access application was submitted on 2026-08-27 19:26.**
+      The dashboard now shows "Üretim erişimi başvurunuzu aldık · Başvuru formunuz
+      incelenmektedir · genellikle 7 gün veya daha kısa"; the result comes to the
+      account owner by email, and the Production track stays locked until it
+      clears. Form answers (target audience 13+, first-year installs 0-10k, the
+      closed-test changes) are recorded in the reefy release-prep memory.
+      By the time it was sent, everything the entries below waited on was done:
+      the en-US listing is live (published 27 Aug), and the promo video is set in
+      the listing for both locales (tr-TR `youtu.be/pmPuA2fRvI0`, en-US
+      `youtu.be/9s-tTbnXiHM`).
 - [x] The three closed-test conditions are struck through and "Üretime başvur"
       is live on the dashboard (seen 2026-08-25).
 - [ ] The screenshot blocker is cleared as of 2026-08-26 — the live listing no
