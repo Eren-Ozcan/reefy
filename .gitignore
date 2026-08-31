@@ -4,6 +4,7 @@ dist/
 .DS_Store
 Thumbs.db
 .vscode/
+.claude/
 *.log
 
 # Screenshots dropped at the repo root, plus any stray capture. Art the app actually
