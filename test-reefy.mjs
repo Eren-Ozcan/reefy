@@ -2,9 +2,9 @@ import { chromium } from 'playwright';
 
 const out = process.argv[2] || '.';
 const browser = await chromium.launch();
-// Dil AÇIKÇA sabitlenir: artık iki dil var ve tespit cihazın diline bakıyor,
-// yani sabitlenmezse koşu geliştiricinin makinesinin diline göre değişirdi.
-// Türkçe'nin kendi ayağı aşağıda, kendi sayfasında.
+// The language is pinned EXPLICITLY: there are two languages now and detection
+// looks at the device language, so without pinning the run would vary with the
+// developer's machine locale. Turkish gets its own leg below, on its own page.
 const page = await browser.newPage({ viewport: { width: 900, height: 640 }, locale: 'en-US' });
 
 const errors = [];
@@ -35,7 +35,7 @@ if (await welcomeOk.count()) await welcomeOk.click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/2-aquarium.png' });
 
-// Besle: ücretli yem seç, 3 kez suya dokun, tam maliyet düşümünü HUD'dan doğrula
+// Feed: pick paid food, tap the water 3 times, verify the full cost deduction in the HUD
 await page.click('#carebar button[data-care="feed"]');
 await page.waitForTimeout(300);
 await page.click('.feed-opt[data-feed="lezzet"]');
@@ -50,27 +50,27 @@ await page.waitForTimeout(150);
 const coinsAfter = Number((await page.locator('#hud-coins').textContent()).trim());
 const feedSpend = coinsBefore - coinsAfter;
 if (feedSpend !== 24) {
-  throw new Error(`Yem düşümü beklenmiyor: ${coinsBefore} -> ${coinsAfter} (fark ${feedSpend}, beklenen 24)`);
+  throw new Error(`Unexpected feed deduction: ${coinsBefore} -> ${coinsAfter} (diff ${feedSpend}, expected 24)`);
 }
 await page.click('#mode-done');
 await page.waitForTimeout(300);
 await page.screenshot({ path: out + '/2b-feeding.png' });
 
-// Mağaza: balık satın al
+// Shop: buy a fish
 await page.click('#bottombar button[data-act="shop"]');
 await page.waitForTimeout(400);
 await page.click('.buy-btn[data-sp="lepistes"]');
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/3-shop-fish.png' });
 
-// Mağaza sekmeleri
+// Shop tabs
 await page.click('.tab[data-tab="eggs"]');
 await page.waitForTimeout(300);
 await page.screenshot({ path: out + '/4-shop-eggs.png' });
 
 await page.click('.tab[data-tab="decor"]');
 await page.waitForTimeout(300);
-// İlk dekoru satın al (150 altın civarı)
+// Buy the first decor item (around 150 coins)
 await page.locator('.buy-btn[data-decor]').first().click();
 await page.waitForTimeout(300);
 await page.screenshot({ path: out + '/5-shop-decor.png' });
@@ -85,8 +85,9 @@ await page.locator('.buy-btn[data-iap]').first().click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/7-shop-iap.png' });
 
-// Kuluçkalı yumurta: satın al -> hızlandır -> topla.
-// Web önizlemesinde gerçek satın alma yok (StubIAP), inci dev kancasından verilir.
+// Incubating egg: buy -> speed up -> collect.
+// There is no real purchase in the web preview (StubIAP); pearls come from the
+// dev hook.
 await page.evaluate(() => {
   const g = window.__reefyGame;
   g.save.pearls += 200;
@@ -99,23 +100,23 @@ if (pearlsForEgg < 110) errors.push(`EGG: yeterli inci yok (${pearlsForEgg})`);
 const capBefore = (await page.locator('#bottombar button[data-act="aquarium"] small').textContent()).trim();
 await page.click('.buy-btn[data-egg="abis"]');
 await page.waitForTimeout(400);
-if (await page.locator('[data-egg-row]').count() === 0) errors.push('EGG: kuluçka satırı görünmedi');
+if (await page.locator('[data-egg-row]').count() === 0) errors.push('EGG: incubation row did not appear');
 await page.screenshot({ path: out + '/7b-egg-hatching.png' });
 await page.locator('[data-speed-egg]').first().click();
 await page.waitForTimeout(400);
 await page.locator('[data-collect-egg]').first().click();
 await page.waitForTimeout(600);
 const reveal = await page.locator('.reveal-egg').count();
-if (reveal === 0) errors.push('EGG: toplama sonrası açılış ekranı gelmedi');
-await page.waitForTimeout(1400); // açılış animasyonu: balık ve buton 1.1sn sonra görünür
+if (reveal === 0) errors.push('EGG: reveal screen did not come up after collecting');
+await page.waitForTimeout(1400); // reveal animation: fish and button appear after 1.1s
 await page.screenshot({ path: out + '/7c-egg-collected.png' });
-// Açılış ekranı mağaza panelinin YERİNE geçer; .reveal-ok ile kapanınca panel de kapanır.
+// The reveal screen REPLACES the shop panel; closing it with .reveal-ok closes the panel too.
 await page.click('.reveal-ok');
 await page.waitForTimeout(400);
 const capAfter = (await page.locator('#bottombar button[data-act="aquarium"] small').textContent()).trim();
-if (capBefore === capAfter) errors.push(`EGG: balık sayısı artmadı (${capBefore} -> ${capAfter})`);
+if (capBefore === capAfter) errors.push(`EGG: fish count did not increase (${capBefore} -> ${capAfter})`);
 
-// Envanter: dekor sekmesine geç, dekoru yerleştir
+// Inventory: switch to the decor tab, place the decor
 await page.click('#bottombar button[data-act="inventory"]');
 await page.waitForTimeout(400);
 await page.click('.tab[data-tab="decor"]');
@@ -124,7 +125,7 @@ await page.locator('[data-place]').first().click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/8-inventory.png' });
 
-// Dekor sürükleme: düzenleme moduna gir, dekoru sürükle, konumun kayıtta değiştiğini doğrula
+// Decor dragging: enter edit mode, drag the decor, verify the position changed in the save
 await page.click('.edit-mode-btn');
 await page.waitForTimeout(300);
 const decorBefore = await page.evaluate(() => {
@@ -155,7 +156,7 @@ const decorAfter = await page.evaluate(() => {
   return save.decorPlaced[save.activeTank][0].fx;
 });
 if (Math.abs(decorAfter - decorBefore) < 0.15) {
-  throw new Error(`Dekor sürüklenmedi: ${decorBefore} -> ${decorAfter}`);
+  throw new Error(`Decor was not dragged: ${decorBefore} -> ${decorAfter}`);
 }
 await page.click('#mode-done');
 await page.waitForTimeout(400);
@@ -175,7 +176,7 @@ await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/11-friends.png' });
 await page.click('.close-btn');
 
-// Daha: Görevler + Koleksiyon + Ayarlar
+// More: Quests + Collection + Settings
 await page.click('#bottombar button[data-act="quests"]');
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/12-quests.png' });
@@ -193,7 +194,7 @@ await page.waitForTimeout(300);
 await page.screenshot({ path: out + '/14-settings.png' });
 await page.click('.close-btn');
 
-// Balık taşıma: test kancasıyla altın+seviye ver, ikinci akvaryumu al, balığı kartından taşı
+// Moving a fish: grant coins+level via the test hook, buy the second tank, move the fish from its card
 await page.evaluate(() => {
   const g = window.__reefyGame;
   g.save.coins += 5000;
@@ -210,27 +211,27 @@ await page.click('.close-btn');
 await page.waitForTimeout(300);
 
 const fishBefore = await page.evaluate(() => window.__reefyGame.fishes.length);
-// Balığa dokun — konumu oyundan al; balık hareket ettiği için birkaç deneme yap
+// Tap the fish - read its position from the game; retry a few times since the fish moves
 for (let i = 0; i < 5; i++) {
   const pos = await page.evaluate(() => {
     const fs = window.__reefyGame.fishes;
     let f = fs[0];
-    for (const c of fs) if (c.y > f.y) f = c; // HUD'dan uzak, en alttaki balık
+    for (const c of fs) if (c.y > f.y) f = c; // the lowest fish, away from the HUD
     return { x: f.x, y: f.y };
   });
   await page.mouse.click(pos.x, pos.y);
   await page.waitForTimeout(350);
   if (await page.locator('.fish-info').count()) break;
 }
-if (!(await page.locator('.fish-info').count())) throw new Error('Balık kartı açılamadı');
+if (!(await page.locator('.fish-info').count())) throw new Error('Could not open the fish card');
 await page.screenshot({ path: out + '/15-fish-card.png' });
 
-// Yeniden adlandır: kart üzerinden isim değiştir, kayda işlenmeli
+// Rename: change the name from the card, it must be written to the save
 await page.fill('#fish-name-input', 'Poyraz');
 await page.click('#fish-name-save');
 await page.waitForTimeout(300);
 const renamed = await page.evaluate(() => window.__reefyGame.fishes.some((f) => f.name === 'Poyraz'));
-if (!renamed) throw new Error('Balık yeniden adlandırılamadı');
+if (!renamed) throw new Error('Could not rename the fish');
 await page.screenshot({ path: out + '/15b-fish-renamed.png' });
 
 await page.click('.move-btn[data-move="tank-kumsal"]');
@@ -243,11 +244,11 @@ const moved = await page.evaluate(() => {
   };
 });
 if (moved.active !== fishBefore - 1 || moved.inKumsal !== 1) {
-  throw new Error(`Balık taşınamadı: aktif ${fishBefore} -> ${moved.active}, kumsalda ${moved.inKumsal}`);
+  throw new Error(`Could not move the fish: active ${fishBefore} -> ${moved.active}, in Kumsal ${moved.inKumsal}`);
 }
 await page.screenshot({ path: out + '/16-fish-moved.png' });
 
-// Yem paketi: mağazadan stok al, stoktan yemle (altın düşmemeli)
+// Food pack: buy stock from the shop, feed from stock (coins must not drop)
 await page.click('#bottombar button[data-act="shop"]');
 await page.waitForTimeout(300);
 await page.click('.tab[data-tab="feeds"]');
@@ -263,7 +264,7 @@ const pack = await page.evaluate(() => ({
   stock: window.__reefyGame.save.feedOwned.lezzet,
 }));
 if (coinsBeforePack - pack.coins !== 70 || pack.stock !== 10) {
-  throw new Error(`Yem paketi hatalı: ${coinsBeforePack} -> ${pack.coins}, stok ${pack.stock} (beklenen -70, 10)`);
+  throw new Error(`Food pack wrong: ${coinsBeforePack} -> ${pack.coins}, stock ${pack.stock} (expected -70, 10)`);
 }
 await page.click('#carebar button[data-care="feed"]');
 await page.waitForTimeout(300);
@@ -276,12 +277,12 @@ const afterStockFeed = await page.evaluate(() => ({
   stock: window.__reefyGame.save.feedOwned.lezzet,
 }));
 if (afterStockFeed.coins !== pack.coins || afterStockFeed.stock !== 9) {
-  throw new Error(`Stoktan yemleme hatalı: altın ${pack.coins} -> ${afterStockFeed.coins}, stok ${afterStockFeed.stock} (beklenen aynı altın, stok 9)`);
+  throw new Error(`Feeding from stock wrong: coins ${pack.coins} -> ${afterStockFeed.coins}, stock ${afterStockFeed.stock} (expected same coins, stock 9)`);
 }
 await page.click('#mode-done');
 await page.waitForTimeout(200);
 
-// Envanter: balık listesi (akvaryuma göre gruplu, gelirli)
+// Inventory: fish list (grouped by tank, with income)
 await page.click('#bottombar button[data-act="inventory"]');
 await page.waitForTimeout(400);
 await page.screenshot({ path: out + '/18-inventory-fish.png' });
@@ -291,7 +292,7 @@ await page.screenshot({ path: out + '/19-inventory-feeds.png' });
 await page.click('.close-btn');
 await page.waitForTimeout(200);
 
-// Kazanç raporu
+// Earnings report
 await page.click('#bottombar button[data-act="you"]');
 await page.waitForTimeout(300);
 await page.click('.more-btn[data-go="earnings"]');
@@ -300,7 +301,7 @@ await page.screenshot({ path: out + '/20-earnings.png' });
 await page.click('.close-btn');
 await page.waitForTimeout(200);
 
-// Uyuyan balıklar da yaşamalı: diğer akvaryumdaki balığın ilerlemesi artmalı
+// Dormant fish must live too: progress of the fish in the other tank must increase
 await page.evaluate(() => {
   const d = window.__reefyGame.dormant[0];
   d.progress = 0.1;
@@ -310,10 +311,10 @@ const dormantP0 = await page.evaluate(() => window.__reefyGame.dormant[0].progre
 await page.waitForTimeout(1500);
 const dormantP1 = await page.evaluate(() => window.__reefyGame.dormant[0].progress);
 if (!(dormantP1 > dormantP0)) {
-  throw new Error(`Uyuyan balık büyümedi: ${dormantP0} -> ${dormantP1}`);
+  throw new Error(`Dormant fish did not grow: ${dormantP0} -> ${dormantP1}`);
 }
 
-// Envanterden satış: uyuyan balığı yetişkin yap, akvaryum değiştirmeden listeden sat
+// Selling from inventory: make the dormant fish an adult, sell it from the list without switching tanks
 await page.evaluate(() => { window.__reefyGame.dormant[0].progress = 1; });
 const sell0 = await page.evaluate(() => ({
   coins: window.__reefyGame.save.coins,
@@ -329,13 +330,13 @@ const sell1 = await page.evaluate(() => ({
   total: window.__reefyGame.fishes.length + window.__reefyGame.dormant.length,
 }));
 if (sell1.total !== sell0.total - 1 || sell1.coins <= sell0.coins) {
-  throw new Error(`Envanterden satış hatalı: balık ${sell0.total} -> ${sell1.total}, altın ${sell0.coins} -> ${sell1.coins}`);
+  throw new Error(`Selling from inventory wrong: fish ${sell0.total} -> ${sell1.total}, coins ${sell0.coins} -> ${sell1.coins}`);
 }
 await page.screenshot({ path: out + '/22-fish-sold.png' });
 await page.click('.close-btn');
 await page.waitForTimeout(200);
 
-// Akvaryum kirliliği: leke ekle -> büyüme/gelir cezası ve cam bulanıklığı uygulanmalı, tıklayınca temizlenmeli
+// Tank dirt: add a smudge -> growth/income penalty and glass blur must apply, and tapping must clean it
 const dirty = await page.evaluate(() => {
   const g = window.__reefyGame;
   const tid = g.save.activeTank;
@@ -348,7 +349,7 @@ const dirty = await page.evaluate(() => {
   return { dirtPct: g.dirtPct(tid), growthMult: g.growthMult, w: g.bounds.w, h: g.bounds.h };
 });
 if (dirty.dirtPct <= 0 || dirty.growthMult >= 1) {
-  throw new Error(`Kirlilik cezası uygulanmadı: dirtPct=${dirty.dirtPct}, growthMult=${dirty.growthMult}`);
+  throw new Error(`Dirt penalty was not applied: dirtPct=${dirty.dirtPct}, growthMult=${dirty.growthMult}`);
 }
 await page.waitForTimeout(300);
 // This used to assert a BlurFilter on the whole scene. b9dd3bb replaced that with
@@ -359,7 +360,7 @@ const grimy = await page.evaluate(() => {
   return { visible: g.grimeSprite.visible, alpha: g.grimeSprite.alpha, dirtDrawn: g.dirtG.visible };
 });
 if (!grimy.visible || grimy.alpha <= 0) {
-  throw new Error(`Kirli akvaryumda cam kiri çizilmedi: ${JSON.stringify(grimy)}`);
+  throw new Error(`Glass grime was not drawn in a dirty tank: ${JSON.stringify(grimy)}`);
 }
 await page.screenshot({ path: out + '/23-dirty-tank.png' });
 
@@ -372,7 +373,7 @@ const atTarget = await page.evaluate(
   target,
 );
 if (!/CANVAS/.test(atTarget || '')) {
-  throw new Error(`Kir lekesinin üstünde UI var, dokunuş sahneye ulaşmıyor: ${atTarget}`);
+  throw new Error(`UI sits on top of the dirt smudge, the tap does not reach the scene: ${atTarget}`);
 }
 await page.mouse.click(target.x, target.y);
 await page.waitForTimeout(300);
@@ -384,7 +385,7 @@ if (cleaned.count !== 2 || cleaned.growthMult <= dirty.growthMult) {
   throw new Error(`Kir temizlenemedi: adet ${cleaned.count} (beklenen 2), growthMult ${dirty.growthMult} -> ${cleaned.growthMult}`);
 }
 await page.screenshot({ path: out + '/24-dirt-cleaned.png' });
-// Kalan lekeleri de temizle (0.3 yukarıda temizlendi), cam netliğe dönmeli
+// Clean the remaining smudges too (0.3 was cleaned above), the glass must go clear
 await page.mouse.click(0.5 * dirty.w, 0.5 * dirty.h);
 await page.waitForTimeout(200);
 await page.mouse.click(0.7 * dirty.w, 0.35 * dirty.h);
@@ -401,27 +402,27 @@ if (spotless.count !== 0 || spotless.grimeVisible) {
 }
 await page.screenshot({ path: out + '/25-tank-spotless.png' });
 
-// Profil: istatistikler satışları/yemlemeyi yansıtmalı
+// Profile: stats must reflect the sales/feeding
 await page.click('#bottombar button[data-act="you"]');
 await page.waitForTimeout(300);
 await page.click('.more-btn[data-go="profile"]');
 await page.waitForTimeout(400);
 const profileText = await page.locator('.panel-body').textContent();
 if (!profileText.includes('Fish sold') || !profileText.includes('Dirt cleaned')) {
-  throw new Error('Profil istatistikleri eksik görünüyor');
+  throw new Error('Profile stats look incomplete');
 }
 await page.screenshot({ path: out + '/26-profile.png' });
 await page.click('.close-btn');
 await page.waitForTimeout(200);
 
-// Mercan Şenliği: kendi saati sabitlenmiş AYRI bir sayfada.
-// Etkinlik takvimi tarihe bağlı; ana koşunun saatini kaydırmak günlük görev
-// gününü de kaydırırdı, o yüzden bu bölüm temiz bir bağlamda çalışır.
+// Coral Festival: on a SEPARATE page with its own clock pinned.
+// The event calendar depends on the date; shifting the main run's clock would
+// shift the daily-quest day too, so this section runs in a clean context.
 {
   const fest = await browser.newPage({ viewport: { width: 900, height: 640 }, locale: 'en-US' });
   fest.on('pageerror', (e) => errors.push('FEST PAGEERROR: ' + e.message));
-  // setFixedTime, install DEĞİL: install zamanlayıcıları da durdurur ve oyun
-  // döngüsü hiç başlamaz. Etkinlik takvimi sadece new Date() okur.
+  // setFixedTime, NOT install: install also freezes timers and the game loop
+  // never starts. The event calendar only reads new Date().
   await fest.clock.setFixedTime(new Date('2026-08-25T10:00:00Z'));
   await fest.goto('http://localhost:5173/');
   await fest.waitForTimeout(1200);
@@ -438,17 +439,17 @@ await page.waitForTimeout(200);
   if (await festWelcome.count()) await festWelcome.first().click();
   await fest.waitForTimeout(400);
 
-  // Puanlama gerçekten questEvent üzerinden akıyor mu
+  // Does scoring actually flow through questEvent
   const scored = await fest.evaluate(() => {
     const g = window.__reefyGame;
     g.save.event = { id: '', points: 0, claimed: [] };
     g.questEvent('feed', 10);
     return g.save.event;
   });
-  if (scored.points !== 10) errors.push(`FEST: yemleme puanı işlenmedi (${JSON.stringify(scored)})`);
-  if (scored.id !== 'coral-festival-2026-08') errors.push(`FEST: etkinlik durumu kurulmadı (${scored.id})`);
+  if (scored.points !== 10) errors.push(`FEST: feeding points were not recorded (${JSON.stringify(scored)})`);
+  if (scored.id !== 'coral-festival-2026-08') errors.push(`FEST: event state was not set up (${scored.id})`);
 
-  // İki kademe açacak kadar puan ver, panelde talep et
+  // Grant enough points to unlock two tiers, claim them in the panel
   const coinsBefore = await fest.evaluate(() => {
     const g = window.__reefyGame;
     g.save.event.points = 500;
@@ -457,9 +458,9 @@ await page.waitForTimeout(200);
   });
   await fest.click('#bottombar button[data-act="quests"]');
   await fest.waitForTimeout(400);
-  if (await fest.locator('.festival').count() === 0) errors.push('FEST: şenlik bloğu görünmedi');
+  if (await fest.locator('.festival').count() === 0) errors.push('FEST: festival block did not appear');
   const tierBtns = await fest.locator('[data-event-tier]').count();
-  if (tierBtns !== 2) errors.push(`FEST: talep edilebilir kademe sayısı 2 değil (${tierBtns})`);
+  if (tierBtns !== 2) errors.push(`FEST: claimable tier count is not 2 (${tierBtns})`);
   await fest.screenshot({ path: out + '/27-festival.png' });
   await fest.locator('[data-event-tier]').first().click();
   await fest.waitForTimeout(400);
@@ -467,22 +468,22 @@ await page.waitForTimeout(200);
     coins: window.__reefyGame.save.coins,
     claimed: window.__reefyGame.save.event.claimed,
   }));
-  if (after.coins <= coinsBefore) errors.push(`FEST: kademe ödülü yatmadı (${coinsBefore} -> ${after.coins})`);
-  if (after.claimed.length !== 1) errors.push(`FEST: kademe talep edilmiş olarak işaretlenmedi (${JSON.stringify(after.claimed)})`);
+  if (after.coins <= coinsBefore) errors.push(`FEST: tier reward was not paid (${coinsBefore} -> ${after.coins})`);
+  if (after.claimed.length !== 1) errors.push(`FEST: tier was not marked as claimed (${JSON.stringify(after.claimed)})`);
   const leftBtns = await fest.locator('[data-event-tier]').count();
-  if (leftBtns !== 1) errors.push(`FEST: talep edilen kademe listeden düşmedi (${leftBtns})`);
+  if (leftBtns !== 1) errors.push(`FEST: the claimed tier did not drop off the list (${leftBtns})`);
   await fest.screenshot({ path: out + '/28-festival-claimed.png' });
   await fest.close();
 }
 
-// Dil: Türk cihaz Türkçe açılmalı, ayarlardan İngilizce'ye geçilebilmeli
+// Language: a Turkish device must start in Turkish, and it must be possible to switch to English in settings
 {
   const trPage = await browser.newPage({ viewport: { width: 900, height: 640 }, locale: 'tr-TR' });
   trPage.on('pageerror', (e) => errors.push('LANG PAGEERROR: ' + e.message));
   await trPage.goto('http://localhost:5173/');
   await trPage.waitForTimeout(1200);
   const playLabel = (await trPage.locator('#play-btn').textContent()).trim();
-  if (!playLabel.includes('Oyna')) errors.push(`LANG: tr-TR cihazda menü Türkçe değil (${playLabel})`);
+  if (!playLabel.includes('Oyna')) errors.push(`LANG: menu is not Turkish on a tr-TR device (${playLabel})`);
   await trPage.screenshot({ path: out + '/29-lang-tr.png' });
 
   await trPage.click('#play-btn');
@@ -498,41 +499,42 @@ await page.waitForTimeout(200);
   if (await trWelcome.count()) await trWelcome.first().click();
   await trPage.waitForTimeout(400);
 
-  // Dil satırı iki dil varken görünmeli
+  // The language row must be visible when there are two languages
   await trPage.click('#bottombar button[data-act="you"]');
   await trPage.waitForTimeout(300);
   await trPage.click('.more-btn[data-go="settings"]');
   await trPage.waitForTimeout(400);
-  if (await trPage.locator('.lang-toggle').count() === 0) errors.push('LANG: ayarlarda dil satırı yok');
+  if (await trPage.locator('.lang-toggle').count() === 0) errors.push('LANG: no language row in settings');
   await trPage.screenshot({ path: out + '/30-lang-settings.png' });
 
-  // Bulut verisi silme satırı: iki dokunuşla onay, ilk dokunuş sadece silahlar
+  // Cloud data deletion row: two-tap confirmation, the first tap only arms it
   const delBtn = trPage.locator('#cloud-delete');
-  if (await delBtn.count() === 0) errors.push('SIL: bulut verisi silme satırı yok');
+  if (await delBtn.count() === 0) errors.push('DELETE: no cloud data deletion row');
   else {
     await delBtn.click();
     await trPage.waitForTimeout(200);
     const armedText = (await delBtn.textContent()).trim();
-    if (!armedText.includes('tekrar dokun')) errors.push(`SIL: ilk dokunuş onay istemedi (${armedText})`);
-    // Web önizlemesinde Firebase yapılandırması yok; onaylamak hata toast'ı
-    // vermeli ama SAYFAYI PATLATMAMALI — asıl sınanan bu.
+    if (!armedText.includes('tekrar dokun')) errors.push(`DELETE: the first tap did not ask for confirmation (${armedText})`);
+    // There is no Firebase configuration in the web preview; confirming must
+    // produce an error toast but MUST NOT BLOW UP THE PAGE - that is what is
+    // actually under test here.
     await delBtn.click();
     await trPage.waitForTimeout(1200);
-    if (await delBtn.count() === 0) errors.push('SIL: onay sonrası buton kayboldu');
+    if (await delBtn.count() === 0) errors.push('DELETE: the button disappeared after confirming');
   }
   await trPage.screenshot({ path: out + '/31-cloud-delete.png' });
 
-  // İngilizce'ye geç — sayfa kendini yeniler
+  // Switch to English - the page reloads itself
   await trPage.click('[data-lang="en"]');
   await trPage.waitForTimeout(2500);
   const enLabel = (await trPage.locator('#play-btn').textContent()).trim();
-  if (!enLabel.includes('Play')) errors.push(`LANG: İngilizce'ye geçiş sonrası menü İngilizce değil (${enLabel})`);
+  if (!enLabel.includes('Play')) errors.push(`LANG: menu is not English after switching to English (${enLabel})`);
   const storedLang = await trPage.evaluate(() => localStorage.getItem('reefy-lang'));
-  if (storedLang !== 'en') errors.push(`LANG: seçim kaydedilmedi (${storedLang})`);
+  if (storedLang !== 'en') errors.push(`LANG: the choice was not saved (${storedLang})`);
   await trPage.close();
 }
 
-// Kayıt doğrulaması
+// Save verification
 await page.waitForTimeout(6500);
 const save = await page.evaluate(() => JSON.parse(localStorage.getItem('reefy-save-v1')));
 console.log('SAVE: v=' + save.v, 'fish=' + save.fishes.length, 'coins=' + save.coins,

@@ -12,12 +12,13 @@ const config: CapacitorConfig = {
     SystemBars: {
       insetsHandling: 'disable',
     },
-    // skipNativeAuth ZORUNLU olarak true: oyunun tüm veri katmanı (cloud-save.ts,
-    // services.ts FirebaseSocial) Firebase JS SDK'sını kullanıyor. Varsayılan
-    // (false) davranışta eklenti oturumu NATIVE SDK'da açar; JS SDK'nın oturumu
-    // ayrı kaldığı için giriş "başarılı" görünür ama Firestore yazmaları hâlâ
-    // eski anonim kullanıcıya gider. true iken native katman yalnızca hesap
-    // seçiciyi gösterip kimlik bilgisini döndürür, oturumu JS SDK açar.
+    // skipNativeAuth MUST be true: the game's entire data layer (cloud-save.ts,
+    // services.ts FirebaseSocial) uses the Firebase JS SDK. With the default
+    // (false) behaviour the plugin opens the session in the NATIVE SDK; since
+    // the JS SDK's session stays separate, sign-in looks "successful" but
+    // Firestore writes still go to the old anonymous user. With true, the
+    // native layer only shows the account picker and returns the credential,
+    // and the JS SDK opens the session.
     FirebaseAuthentication: {
       skipNativeAuth: true,
       providers: ['google.com'],

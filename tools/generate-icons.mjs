@@ -1,10 +1,10 @@
-// Reefy app icon üretici.
+// Reefy app icon generator.
 //
-// Kaynak: tools/icon-src/fish-full.svg (arka plan + balık, legacy launcher ve
-// mağaza ikonu için) ve tools/icon-src/fish-foreground.svg (şeffaf arka
-// planlı balık, adaptive icon foreground katmanı için).
+// Sources: tools/icon-src/fish-full.svg (background + fish, for the legacy
+// launcher and the store icon) and tools/icon-src/fish-foreground.svg (fish on
+// a transparent background, for the adaptive icon foreground layer).
 //
-// Kullanım: node tools/generate-icons.mjs
+// Usage: node tools/generate-icons.mjs
 
 import sharp from "sharp";
 import { mkdirSync } from "node:fs";
@@ -29,8 +29,8 @@ async function renderPng(svgPath, size, outPath, { flatten } = {}) {
 }
 
 async function main() {
-  // Android legacy launcher icons (ic_launcher / ic_launcher_round) - aynı kare görüntü,
-  // OS gerektiğinde yuvarlak maske uygular.
+  // Android legacy launcher icons (ic_launcher / ic_launcher_round) - the same
+  // square image; the OS applies a round mask when it needs one.
   for (const [density, size] of Object.entries(LAUNCHER_SIZES)) {
     const dir = join(RES, `mipmap-${density}`);
     mkdirSync(dir, { recursive: true });
@@ -38,19 +38,19 @@ async function main() {
     await renderPng(FULL_SVG, size, join(dir, "ic_launcher_round.png"));
   }
 
-  // Adaptive icon foreground katmanı (şeffaf arka plan, balık ortalanmış).
+  // Adaptive icon foreground layer (transparent background, fish centered).
   for (const [density, size] of Object.entries(FOREGROUND_SIZES)) {
     const dir = join(RES, `mipmap-${density}`);
     mkdirSync(dir, { recursive: true });
     await renderPng(FOREGROUND_SVG, size, join(dir, "ic_launcher_foreground.png"));
   }
 
-  // iOS app icon (opak olmalı, alfa kanalı kabul edilmiyor).
+  // iOS app icon (must be opaque, an alpha channel is not accepted).
   const iosDir = join(root, "ios/App/App/Assets.xcassets/AppIcon.appiconset");
   mkdirSync(iosDir, { recursive: true });
   await renderPng(FULL_SVG, 1024, join(iosDir, "AppIcon-512@2x.png"), { flatten: true });
 
-  // Play Store yüksek çözünürlüklü ikon (512x512) - gitignore'lu originals klasörü
+  // Play Store high-resolution icon (512x512) - gitignored originals folder
   // + private pictures reposu.
   const storeDir = join(root, "docs/store-assets-originals");
   mkdirSync(storeDir, { recursive: true });
@@ -60,7 +60,7 @@ async function main() {
   mkdirSync(picturesDir, { recursive: true });
   await renderPng(FULL_SVG, 512, join(picturesDir, "icon-512.png"), { flatten: true });
 
-  console.log("Tamamlandı.");
+  console.log("Done.");
 }
 
 main().catch((err) => {
