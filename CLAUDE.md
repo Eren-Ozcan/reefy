@@ -38,6 +38,25 @@ Rules for that folder:
 Everything else — feature graphics, store plates, the icon, captioned sets —
 stays out, exactly as above.
 
+## Licensing
+
+This repo is proprietary: the root `LICENSE` is an all-rights-reserved notice
+(copyright Yilk Games), and GitHub therefore reports no open-source license.
+Never replace it with MIT or any other permissive licence, and never leave a
+scaffold's own LICENSE file (Expo's, Unity's, a starter template's) in the repo
+root — that would publish this project under someone else's terms.
+
+Third-party components are recorded in `THIRD-PARTY-NOTICES.md`. The Nunito and
+Fredoka web fonts are SIL OFL, and the OFL requires its licence text to
+accompany every distribution of the font files — not just the repo. The texts
+live in `public/licenses/`, which Vite copies to `dist/licenses/`, so the web
+bundle and the Android build both carry them. When adding a font, SDK or asset
+pack: keep its licence text (in `public/licenses/` for anything that ships),
+then add a row to `THIRD-PARTY-NOTICES.md`.
+
+`package.json` is `"private": true` with `"license": "UNLICENSED"` — keep it
+that way, or `npm publish` would push the whole game source to the registry.
+
 ## Studio-wide info
 
 For studio-wide (not specific to this game) questions like the Google account,
