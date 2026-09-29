@@ -886,6 +886,13 @@ live, so for the first time there is something to point a link at.
 - [ ] Biome marks are raster PNGs (`src/icons/`) while the UI icons are inline
       SVG (`src/icons.ts`). Deliberate — they are illustrations, not
       affordances — but worth revisiting if they ever need to take a tint.
+- [ ] Turn on GitHub secret scanning for this repo (Settings → Code security).
+      It is off here while arrow-crack, cengeBulmaca and LittleGrandHotel have
+      it on. Expect one `google_api_key` alert for
+      `android/app/google-services.json`: the Android key was checked on
+      2026-09-27 with gcloud and is restricted to `com.yilkgames.reefy`, four
+      signing SHA-1s and Firebase APIs only, so close it as "won't fix" with
+      that reason. App Check stays the real fix (`pictures/STUDIO.md`).
 
 ### Privacy policy and Data Safety
 
