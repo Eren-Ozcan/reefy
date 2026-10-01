@@ -532,6 +532,14 @@ game's own save write.
       the en-US listing is live (published 27 Aug), and the promo video is set in
       the listing for both locales (tr-TR `youtu.be/pmPuA2fRvI0`, en-US
       `youtu.be/9s-tTbnXiHM`).
+- [x] **Production access was approved (seen 2026-10-01)** and 1.2.4
+      (versionCode 11) was sent to production the same day: "Publish 3 changes"
+      in Publishing overview carried the full rollout, 177 countries and "rest of
+      the world". Managed publishing is on, so the changes went to Google review
+      first; the pending list is empty and the overview's last-published date
+      reads 1 Oct 2026. Not yet confirmed live on the Play store page.
+      Next: once it is live, drop the Play badge files in (see "Google's Play
+      badge" above) and re-run `npm run store:promo:wide` for both languages.
 - [x] The three closed-test conditions are struck through and "Üretime başvur"
       is live on the dashboard (seen 2026-08-25).
 - [ ] The screenshot blocker is cleared as of 2026-08-26 — the live listing no
