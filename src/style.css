@@ -148,7 +148,7 @@ html, body {
   border-radius: 28px;
   color: var(--ink-deep); /* the menu card stays a light surface, unlike the in-game panels */
   backdrop-filter: blur(12px);
-  box-shadow: 0 24px 60px rgba(20, 60, 75, 0.25), inset 0 1px 0 rgba(255,255,255,0.6);
+  box-shadow: 0 24px 60px rgba(20, 60, 75, 0.25);
   animation: float-in 0.8s ease both;
   z-index: 2;
 }
@@ -157,33 +157,23 @@ html, body {
   to { transform: none; opacity: 1; }
 }
 .logo-wrap { position: relative; display: inline-block; }
-.logo-wrap::before {
-  content: ''; position: absolute; inset: -18px; z-index: -1;
-  background: radial-gradient(circle, rgba(255,178,110,0.45) 0%, transparent 70%);
-  animation: glow-pulse 3s ease-in-out infinite;
-}
-@keyframes glow-pulse { 0%, 100% { opacity: 0.6; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.08); } }
+/* No halo behind the logo: a pulsing glow here was one of a dozen light effects
+   competing for the eye; the logo's own bob is enough movement. */
 .logo { font-size: 72px; animation: bob 3s ease-in-out infinite; }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 #menu h1 {
   font-size: 56px; letter-spacing: 2px;
-  background: linear-gradient(100deg, #17505f 40%, #2f9e8f 50%, #17505f 60%);
-  background-size: 240% 100%;
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  text-shadow: 0 2px 0 rgba(255,255,255,0.35);
-  animation: shine-sweep 5s ease-in-out infinite;
+  color: #17505f;
 }
-@keyframes shine-sweep { 0%, 100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
 .tagline { color: #2c6272; margin: 10px 0 26px; line-height: 1.5; }
 #play-btn {
   font-size: var(--fs-lg); font-weight: 700;
   padding: 14px 52px; border: none; border-radius: var(--btn-radius);
-  background: linear-gradient(180deg, #ffa25c, #ff7e4d);
+  background: var(--accent-2);
   color: #fff; cursor: pointer;
-  box-shadow: 0 8px 20px rgba(255, 126, 77, 0.45), inset 0 2px 0 rgba(255,255,255,0.35);
+  box-shadow: 0 6px 16px rgba(20, 60, 75, 0.28);
   transition: transform 0.15s ease;
 }
-#play-btn:hover { transform: scale(1.05); }
 #play-btn:active { transform: var(--btn-press); }
 .menu-foot { margin-top: 22px; font-size: var(--fs-xs); color: #3d7385; }
 .menu-demo-note { margin-top: 6px; opacity: 0.85; }
@@ -311,7 +301,7 @@ html, body {
   flex: 1.5 1 0;
   background: var(--accent-2);
   border-color: rgba(0, 0, 0, 0.12);
-  box-shadow: 0 6px 18px rgba(255, 138, 92, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 18px rgba(255, 138, 92, 0.35);
 }
 #carebar button.care-collect {
   justify-content: center;
@@ -521,7 +511,6 @@ html, body {
 #bottombar button.active {
   background: var(--accent);
   color: #06282b;
-  box-shadow: 0 4px 14px rgba(53, 196, 172, 0.3);
 }
 #bottombar button.active span { font-weight: 800; }
 #bottombar button.active small { color: #06282b; opacity: 0.72; }
@@ -707,10 +696,9 @@ html, body {
   color: #06282b; font-weight: 800; font-size: var(--fs-sm);
   padding: 11px 20px; border-radius: var(--btn-radius);
   min-height: var(--btn-h);
-  box-shadow: 0 4px 14px rgba(53, 196, 172, 0.25);
+  box-shadow: var(--card-shadow);
   transition: transform 0.12s ease, background 0.12s ease;
 }
-.buy-btn:hover { transform: scale(1.04); }
 .buy-btn:active { transform: var(--btn-press); }
 .buy-btn:disabled { background: var(--card-2); color: var(--ink-faint); box-shadow: none; cursor: default; transform: none; }
 
@@ -751,7 +739,6 @@ html, body {
   box-shadow: var(--card-shadow);
   transition: transform 0.12s ease;
 }
-.feed-opt:hover { transform: scale(1.02); }
 .feed-emoji { font-size: var(--fs-xl); }
 .feed-info { flex: 1; display: flex; flex-direction: column; }
 .feed-info b { font-size: var(--fs-sm); color: var(--ink); }
@@ -988,7 +975,6 @@ html, body {
   transition: transform 0.12s ease;
 }
 .more-btn span { font-size: var(--fs-xs); font-weight: 700; }
-.more-btn:hover { transform: scale(1.05); }
 
 /* Ayarlar isim düzenleme */
 .name-edit { display: flex; gap: 6px; }
@@ -999,7 +985,7 @@ html, body {
 }
 .name-edit input:focus { border-color: var(--accent); }
 .lb-global { width: 100%; margin-bottom: 12px; }
-.buy-btn.iap { background: var(--btn-real); color: #0a2340; box-shadow: 0 4px 14px rgba(116, 169, 238, 0.25); }
+.buy-btn.iap { background: var(--btn-real); color: #0a2340; box-shadow: var(--card-shadow); }
 
 /* Yumurtalar */
 .egg-emoji { font-size: 52px; animation: bob 2.6s ease-in-out infinite; }
