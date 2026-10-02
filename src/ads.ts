@@ -43,6 +43,22 @@ export const REWARDED_AD_PEARLS = 5;
 export const REWARDED_ADS_PER_DAY = 3;
 
 /**
+ * The growth boost: an optional rewarded ad that fast-forwards one growing fish.
+ *
+ * Players asked for exactly this — a reason to watch that is about the fish they
+ * are waiting on rather than a currency drip. It has its own daily cap so it
+ * neither eats nor is eaten by the pearl ads. Ten minutes is a bit under one
+ * pearl's worth of speed-up (SPEEDUP_MS_PER_PEARL is 12), which keeps the ad
+ * from out-competing the pearl it stands in for, and with five a day it tops
+ * out at under an hour of skipped waiting.
+ */
+export const GROWTH_AD_MS = 10 * 60 * 1000;
+export const GROWTH_ADS_PER_DAY = 5;
+
+/** What a rewarded ad pays out. The reward itself is applied by the caller. */
+export type RewardKind = 'pearls' | 'growth';
+
+/**
  * Devices that should be served TEST ads instead of live ones.
  *
  * Tapping your own live ad is what gets an AdMob account suspended, and testing
@@ -125,7 +141,7 @@ export interface AdsProvider {
    * which doesn't exist in the version of @capacitor-community/admob we use. */
   maybeShowInterstitial(): void;
   /** The rewarded ad flow, deliberately started by the player. */
-  showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }>;
+  showRewarded(kind?: RewardKind): Promise<{ ok: boolean; msg: string; grantPearls?: number }>;
   /** Why ads are unavailable, if they are — empty when they work. Shown in Settings. */
   readonly lastError?: string;
 }
@@ -224,7 +240,7 @@ export class AdMobAds implements AdsProvider {
       .finally(() => void this.loadInterstitial());
   }
 
-  async showRewarded(): Promise<{ ok: boolean; msg: string; grantPearls?: number }> {
+  async showRewarded(kind: RewardKind = 'pearls'): Promise<{ ok: boolean; msg: string; grantPearls?: number }> {
     // One retry, here, where the player has actually asked for an ad. Setup runs
     // once at launch and reaches the network; a hiccup in that moment used to
     // disable ads for the WHOLE session with no way back, which on a phone that
@@ -245,6 +261,7 @@ export class AdMobAds implements AdsProvider {
       await AdMob.showRewardVideoAd();
       if (!rewarded) return { ok: false, msg: t('You exited before finishing the ad, no reward given.') };
       this.lastRewarded = now;
+      if (kind === 'growth') return { ok: true, msg: '' };
       return { ok: true, msg: t('You watched the ad! +{n} pearls 🦪', { n: REWARDED_AD_PEARLS }), grantPearls: REWARDED_AD_PEARLS };
     } catch {
       return { ok: false, msg: t('No ad is available right now, try again later.') };

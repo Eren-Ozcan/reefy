@@ -46,7 +46,7 @@ vi.mock('./cloud-save', () => ({
 }));
 
 const { Game } = await import('./game');
-const { REWARDED_ADS_PER_DAY } = await import('./ads');
+const { REWARDED_ADS_PER_DAY, GROWTH_ADS_PER_DAY, GROWTH_AD_MS } = await import('./ads');
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -95,5 +95,43 @@ describe('the rewarded-ad daily cap', () => {
     game.save.adRewardDay = '';
     game.save.adRewardCount = 0;
     expect(game.adRewardsLeftToday()).toBe(REWARDED_ADS_PER_DAY);
+  });
+});
+
+describe('the growth-boost ad', () => {
+  // A stand-in for a live Fish: applyGrowthAd only touches progress, name and the species' growthMs.
+  const fish = (progress: number, growthMs = 30 * 60 * 1000) =>
+    ({ progress, name: 'Bubbles', sp: { growthMs } }) as unknown as Parameters<InstanceType<typeof Game>['applyGrowthAd']>[0];
+
+  it('has its own allowance, separate from the pearl ads', () => {
+    const game = new Game();
+    game.applyGrowthAd(fish(0));
+    expect(game.growthAdsLeftToday()).toBe(GROWTH_ADS_PER_DAY - 1);
+    expect(game.adRewardsLeftToday()).toBe(REWARDED_ADS_PER_DAY);
+  });
+
+  it('skips exactly GROWTH_AD_MS of growth and no more than the fish has left', () => {
+    const game = new Game();
+    const f = fish(0.1);
+    game.applyGrowthAd(f);
+    expect(f.progress).toBeCloseTo(0.1 + GROWTH_AD_MS / (30 * 60 * 1000));
+
+    const nearly = fish(0.95);
+    game.applyGrowthAd(nearly);
+    expect(nearly.progress).toBe(1);
+  });
+
+  it('refuses an adult and does not spend the allowance on it', () => {
+    const game = new Game();
+    expect(game.applyGrowthAd(fish(1)).ok).toBe(false);
+    expect(game.growthAdsLeftToday()).toBe(GROWTH_ADS_PER_DAY);
+  });
+
+  it('gives the allowance back when the day changes', () => {
+    const game = new Game();
+    for (let i = 0; i < GROWTH_ADS_PER_DAY; i++) game.applyGrowthAd(fish(0));
+    expect(game.growthAdsLeftToday()).toBe(0);
+    game.save.growthAdDay = '2020-01-01';
+    expect(game.growthAdsLeftToday()).toBe(GROWTH_ADS_PER_DAY);
   });
 });

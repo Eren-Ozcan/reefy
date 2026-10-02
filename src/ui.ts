@@ -4,6 +4,7 @@ import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
 import { SAD_THRESHOLD } from './fish';
+import { GROWTH_AD_MS } from './ads';
 import { INCOME_CAP_HOURS, type FishEarning, type Game } from './game';
 import { ACHIEVEMENTS, msUntilDailyReset, msUntilWeeklyReset } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById } from './species';
@@ -2060,9 +2061,36 @@ export class UI {
         ${f.bonus > 0 ? `<div class="card-meta bonus-line">${tt('✨ Feed bonus: sale +{n}%', { n: Math.round(f.bonus * 100) })}</div>` : ''}
         ${f.isAdult
           ? `<button class="buy-btn sell">${tt('🪙 Sell for {n}', { n: fmt(gain) })}</button>`
-          : `<p class="growing">${tt('Growing… wait for it to become an adult to sell 🌱')}</p>`}
+          : `<p class="growing">${tt('Growing… wait for it to become an adult to sell 🌱')}</p>
+             <button class="buy-btn grow-ad" id="fish-grow-ad" ${this.game.growthAdsLeftToday() > 0 ? '' : 'disabled'}>${
+               this.game.growthAdsLeftToday() > 0
+                 ? tt('🎬 Watch an ad: grow {n} min faster', { n: GROWTH_AD_MS / 60000 })
+                 : tt('Back tomorrow')}</button>
+             <small class="grow-ad-left">${tt('{n} left today', { n: this.game.growthAdsLeftToday() })}</small>`}
         ${moveHTML}
       </div>`);
+    el.querySelector<HTMLButtonElement>('#fish-grow-ad')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      // Checked again here: the card may have been open since before the day's last ad.
+      if (this.game.growthAdsLeftToday() <= 0) {
+        audio.error();
+        this.toast(tt("That's all the ads for today — come back tomorrow."));
+        return;
+      }
+      btn.disabled = true;
+      void this.game.services.ads.showRewarded('growth').then((res) => {
+        if (!res.ok) {
+          audio.error();
+          btn.disabled = false;
+          this.toast(res.msg);
+          return;
+        }
+        const out = this.game.applyGrowthAd(f);
+        this.toast(out.msg);
+        // Redraw: the bar, the sell button (if it just grew up) and the counter all change.
+        this.showFishInfo(f);
+      });
+    });
     el.querySelector('#fish-name-save')!.addEventListener('click', () => {
       const input = el.querySelector<HTMLInputElement>('#fish-name-input')!;
       const name = input.value.replace(/[<>&"']/g, '').trim();

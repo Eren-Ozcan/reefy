@@ -4,7 +4,7 @@ import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } 
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
 import { EventDef, EventTier, activeEvent, claimableEvent, tierReached } from './events';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
-import { REWARDED_ADS_PER_DAY } from './ads';
+import { GROWTH_ADS_PER_DAY, GROWTH_AD_MS, REWARDED_ADS_PER_DAY } from './ads';
 import { DirtSpot, FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
 import { Services, createServices, submitPlayScore } from './services';
@@ -408,7 +408,6 @@ export class Game {
 
     this.applyOffline();
     this.dirtTimer = this.dirtDelayFor(this.save.activeTank);
-    this.armCleanAd();
     this.applyDailyGift();
     this.ensureQuestDay();
 
@@ -1241,6 +1240,36 @@ export class Game {
     this.save.adRewardCount++;
   }
 
+  // ---------- growth-boost ad ----------
+
+  /** Growth-boost ads still available today (own cap, counted in the save like the pearl ads). */
+  growthAdsLeftToday(): number {
+    if (this.save.growthAdDay !== this.todayKey()) return GROWTH_ADS_PER_DAY;
+    return Math.max(0, GROWTH_ADS_PER_DAY - this.save.growthAdCount);
+  }
+
+  /**
+   * Pays out a watched growth-boost ad: skips GROWTH_AD_MS of growth on one fish
+   * and counts it against today's cap. Called only after the ad paid out.
+   */
+  applyGrowthAd(f: Fish): { ok: boolean; msg: string } {
+    if (f.progress >= 1) return { ok: false, msg: t('Already an adult — nothing left to grow') };
+    const today = this.todayKey();
+    if (this.save.growthAdDay !== today) {
+      this.save.growthAdDay = today;
+      this.save.growthAdCount = 0;
+    }
+    this.save.growthAdCount++;
+    f.progress = Math.min(1, f.progress + GROWTH_AD_MS / f.sp.growthMs);
+    this.syncSave();
+    return {
+      ok: true,
+      msg: f.progress >= 1
+        ? t('{name} is all grown up! 🎉', { name: f.name })
+        : t('{name} grew {n} minutes faster 🌱', { name: f.name, n: GROWTH_AD_MS / 60000 }),
+    };
+  }
+
   /** The event scoring right now, or null when none is running. */
   activeEvent(): EventDef | null {
     return activeEvent(this.todayKey());
@@ -1535,37 +1564,6 @@ export class Game {
   private static readonly CLEAN_REWARD_COINS = 5;
   private static readonly CLEAN_REWARD_XP = 1;
 
-  // ---------- Cleaning ad (once per session) ----------
-  //
-  // The cleaning ad only appears when a TANK IS FULLY CLEANED: that's the natural
-  // break point where the player finishes the task they started. The previous version
-  // triggered at a random spot count, which meant showing an ad WHILE THE PLAYER WAS
-  // STILL MID-CLEANUP — something Google Play's "Better Ads Experiences" policy
-  // directly prohibits.
-  //
-  // The field is deliberately not persisted to the save: keeping it in memory
-  // structurally guarantees the "only once per fresh launch" rule — returning from
-  // the background doesn't count as a new session. Without this boundary, since dirt
-  // keeps regenerating, it would trigger repeatedly within a single session.
-
-  /** Whether the "fully cleaned" ad can still be shown this session. */
-  private cleanAdArmed = false;
-
-  /** Once at startup: if there's dirt on screen, arm the right for this session. */
-  private armCleanAd(): void {
-    const spots = this.save.dirtSpots[this.save.activeTank]?.length ?? 0;
-    // If there's no dirt at startup, there's nothing to clean either; skip this session.
-    this.cleanAdArmed = spots > 0;
-  }
-
-  /** Called AFTER every successful cleanup; tries if no dirt remains in the tank. */
-  private countCleanForAd(): void {
-    if (!this.cleanAdArmed) return;
-    if ((this.save.dirtSpots[this.save.activeTank]?.length ?? 0) > 0) return;
-    this.cleanAdArmed = false; // once per session
-    this.services.ads.maybeShowInterstitial();
-  }
-
   /** A single notification for spots cleaned back-to-back: instead of a toast per spot,
    *  they're batched over a short window and shown together (prevents toast stacking). */
   private cleanToastCount = 0;
@@ -1627,9 +1625,6 @@ export class Game {
 
     this.syncSave();
     this.ui.refreshHUD();
-    // The ad attempt is at the VERY END of this function: particles, sound, coins, and
-    // HUD update apply first so the ad doesn't step on top of the player's reward.
-    this.countCleanForAd();
   }
 
   /** Draws the dirt spots in the active tank. */

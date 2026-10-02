@@ -93,6 +93,8 @@ export interface SaveData {
   cleanRewardCount: number; // number of spots cleaned with a reward today
   adRewardDay: string;      // rewarded ads are capped per day — the day that cap is counted against
   adRewardCount: number;    // rewarded ads already watched today
+  growthAdDay: string;      // the growth-boost ads have their own daily cap — the day it is counted against
+  growthAdCount: number;    // growth-boost ads already watched today
   spotlessAt: Record<string, number>; // tankId -> when it was last left with no dirt at all
   petDay: string;           // you can pet one fish once a day — last petting day
   music: boolean;
@@ -175,6 +177,8 @@ export function defaultSave(): SaveData {
     cleanRewardCount: 0,
     adRewardDay: '',
     adRewardCount: 0,
+    growthAdDay: '',
+    growthAdCount: 0,
     spotlessAt: {},
     petDay: '',
     music: true,
@@ -377,6 +381,8 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   // Saves written before the rewarded-ad cap carry neither field.
   if (typeof merged.adRewardDay !== 'string') merged.adRewardDay = '';
   if (typeof merged.adRewardCount !== 'number' || !Number.isFinite(merged.adRewardCount)) merged.adRewardCount = 0;
+  if (typeof merged.growthAdDay !== 'string') merged.growthAdDay = '';
+  if (typeof merged.growthAdCount !== 'number' || !Number.isFinite(merged.growthAdCount)) merged.growthAdCount = 0;
   // Saves from before the post-clean grace carry no timestamps; an empty map just
   // means nobody has earned the grace yet, which is the correct starting point.
   if (!merged.spotlessAt || typeof merged.spotlessAt !== 'object') merged.spotlessAt = {};
