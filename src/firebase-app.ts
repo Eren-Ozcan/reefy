@@ -32,7 +32,10 @@ import {
   type AuthCredential,
   type User,
 } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+// The lite build: this game only does one-shot getDoc/setDoc/deleteDoc over REST — no
+// listeners, no offline cache — and it is about 420 kB smaller than the full SDK.
+// Reaching for onSnapshot or persistence later means switching back to 'firebase/firestore'.
+import { getFirestore, type Firestore } from 'firebase/firestore/lite';
 import { FIREBASE_CONFIG, isFirebaseConfigured } from './firebase-config';
 import { t } from './i18n';
 

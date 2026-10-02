@@ -32,7 +32,7 @@ vi.mock('@revenuecat/purchases-capacitor', () => ({
 
 vi.mock('capacitor-game-connect-8', () => ({ CapacitorGameConnect: {} }));
 vi.mock('./firebase-app', () => ({ ensureUid: async () => 'uid-1', firestore: () => ({}) }));
-vi.mock('firebase/firestore', () => ({
+vi.mock('firebase/firestore/lite', () => ({
   deleteDoc: async () => undefined,
   doc: () => ({}),
   getDoc: async () => ({ exists: () => false, data: () => ({}) }),

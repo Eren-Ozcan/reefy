@@ -28,7 +28,7 @@ vi.mock('./firebase-app', () => ({
   firestore: () => ({}),
 }));
 
-vi.mock('firebase/firestore', () => ({
+vi.mock('firebase/firestore/lite', () => ({
   doc: (_db: unknown, col: string, uid: string) => ({ path: `${col}/${uid}` }),
   getDoc: () => getDocMock(),
   setDoc: (ref: unknown, data: unknown) => setDocMock(ref, data),

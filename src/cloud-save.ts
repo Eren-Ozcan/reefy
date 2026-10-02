@@ -28,7 +28,7 @@
 //   idiom as ads.ts/billing.ts).
 
 import { Capacitor } from '@capacitor/core';
-import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
 import { ensureUid, firestore } from './firebase-app';
 import { hasProgress, parseSave, progressFingerprint, SAVE_SCHEMA_VERSION, type SaveData } from './save';
 
@@ -62,7 +62,7 @@ const UPLOAD_THROTTLE_MS = 300_000;
 // processes the result later if it arrives after that.
 const AUTH_TIMEOUT_MS = 15_000;
 const FETCH_TIMEOUT_MS = 4000;
-// setDoc() does NOT resolve while offline: Firestore queues the write locally
+// With the full Firestore SDK setDoc() would NOT resolve while offline: it queues the write locally
 // and keeps the promise pending until the server acknowledges it. Without a
 // timeout, the finally block inside upload() never runs, `uploading` stays
 // locked, and cloud save dies entirely for the rest of the session — so

@@ -11,7 +11,7 @@
 import { Capacitor } from '@capacitor/core';
 import { CapacitorGameConnect } from 'capacitor-game-connect-8';
 import { Purchases, PURCHASES_ERROR_CODE, type PurchasesPackage } from '@revenuecat/purchases-capacitor';
-import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
 import { AdMobAds, StubAds, type AdsProvider } from './ads';
 import { ensureUid, firestore } from './firebase-app';
 import { isFirebaseConfigured } from './firebase-config';
