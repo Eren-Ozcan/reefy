@@ -555,13 +555,23 @@ export const SPEEDUP_MS_PER_PEARL = 12 * 60 * 1000;
 
 export const PITY_LIMIT = 8; // legendary-guarantee counter for the golden egg
 
-/** Adult fish's hourly passive coin income (by rarity). */
+/**
+ * Adult fish's hourly passive coin income (by rarity).
+ *
+ * Tuned as a share of the species' average sale price, and that share RISES with
+ * rarity on purpose: a common is worth selling, a legendary is worth keeping.
+ *   common 5%  ·  uncommon 7%  ·  rare 9%  ·  epic 10%  ·  legendary 12%  per hour
+ * i.e. a fish has earned its own sale price in about 19 / 14 / 11 / 10 / 8 hours.
+ * Selling a fish and re-buying it is still far faster while the player is
+ * actively playing; this is what rewards the ones they hold and the time away.
+ * (It used to be 1.6-3.3%, which made keeping any fish pointless.)
+ */
 export const RARITY_INCOME: Record<Rarity, number> = {
-  common: 25,
-  uncommon: 60,
-  rare: 150,
-  epic: 400,
-  legendary: 1000,
+  common: 40,
+  uncommon: 190,
+  rare: 740,
+  epic: 1830,
+  legendary: 7500,
 };
 
 /** Nicknames picked at hatch time and stored in the save, so they are never
