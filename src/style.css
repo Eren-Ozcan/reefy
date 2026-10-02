@@ -1098,3 +1098,7 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
     animation: none;
   }
 }
+
+/* Quest reset countdown and the achievements' bulk claim */
+.reset-note { margin-left: 6px; font-weight: 600; font-size: 11.5px; color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+.claim-all { width: 100%; margin-bottom: 10px; }

@@ -1107,7 +1107,36 @@ export class Game {
     if (!this.save.weeklyQuest.claimed.includes(wq.id) && (this.save.weeklyQuest.progress[wq.id] ?? 0) >= wq.target) n++;
     const ev = this.visibleEvent();
     if (ev) n += this.eventClaimable(ev);
-    return n;
+    return n + this.claimableAchievements();
+  }
+
+  /** Achievements completed but not yet collected. They used to be invisible from
+   *  the dock, so a finished one could sit unclaimed for days. */
+  claimableAchievements(): number {
+    return ACHIEVEMENTS.filter(
+      (a) => a.check(this.save) >= a.target && !this.save.achievementsClaimed.includes(a.id),
+    ).length;
+  }
+
+  /** Collects every finished achievement in one go; one toast, one save. */
+  claimAllAchievements(): { ok: boolean; msg: string } {
+    let coins = 0;
+    let pearls = 0;
+    let n = 0;
+    for (const a of ACHIEVEMENTS) {
+      if (this.save.achievementsClaimed.includes(a.id) || a.check(this.save) < a.target) continue;
+      this.save.achievementsClaimed.push(a.id);
+      coins += a.rewardCoins;
+      pearls += a.rewardPearls;
+      n++;
+    }
+    if (n === 0) return { ok: false, msg: t('Achievement not completed yet.') };
+    this.save.coins += coins;
+    this.save.pearls += pearls;
+    audio.levelup();
+    this.syncSave();
+    this.ui.refreshHUD();
+    return { ok: true, msg: t('{n} achievements: +{coins} coins, +{pearls} pearls', { n, coins, pearls }) };
   }
 
   /** The one goal worth surfacing on the scene: the nearest daily quest still in play,

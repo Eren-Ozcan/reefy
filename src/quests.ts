@@ -68,6 +68,21 @@ export function weekKeyFor(d: Date): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** Milliseconds until the daily quests roll over. The quest day is the UTC date
+ *  (see Game.ensureQuestDay), so this counts down to 00:00 UTC. */
+export function msUntilDailyReset(now: Date): number {
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return next - now.getTime();
+}
+
+/** Milliseconds until the weekly quest rolls over: the next Monday 00:00, local time
+ *  (the week key is built from local date parts, see weekKeyFor). */
+export function msUntilWeeklyReset(now: Date): number {
+  const day = now.getDay() || 7; // Monday=1 .. Sunday=7
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (8 - day));
+  return next.getTime() - now.getTime();
+}
+
 /** Deterministic weekly quest selection from the week key */
 export function weeklyQuestForWeek(week: string): QuestDef {
   let h = 0;

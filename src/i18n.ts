@@ -1024,6 +1024,9 @@ const TR: Record<string, string> = {
   '{n} affordable': '{n} alınabilir',
   '{n} items': '{n} ürün',
   '{n} ready': '{n} hazır',
+  '{n} achievements: +{coins} coins, +{pearls} pearls': '{n} başarım: +{coins} altın, +{pearls} inci',
+  'Claim all ({n})': 'Hepsini al ({n})',
+  'Resets in {time}': '{time} sonra sıfırlanır',
   'Fishing Boat Shipwreck': 'Balıkçı Teknesi Batık',
   'Galleon Shipwreck': 'Kalyon Batık',
 };

@@ -5,7 +5,7 @@ import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
 import { SAD_THRESHOLD } from './fish';
 import { INCOME_CAP_HOURS, type FishEarning, type Game } from './game';
-import { ACHIEVEMENTS } from './quests';
+import { ACHIEVEMENTS, msUntilDailyReset, msUntilWeeklyReset } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById } from './species';
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { TANK_CAP_BONUS, TankDef } from './tanks';
@@ -1529,6 +1529,16 @@ export class UI {
       ${rows}`;
   }
 
+  /** "Resets in 5h 12m" — the player had no way to tell when dailies or the weekly turn over. */
+  private resetNote(ms: number): string {
+    const mins = Math.max(1, Math.ceil(ms / 60000));
+    const d = Math.floor(mins / 1440);
+    const h = Math.floor((mins % 1440) / 60);
+    const m = mins % 60;
+    const time = d > 0 ? tt('{d}d {h}h', { d, h }) : tt('{h}h {m}m', { h, m });
+    return `<small class="reset-note">${tt('Resets in {time}', { time })}</small>`;
+  }
+
   private renderQuests(): void {
     const s = this.game.save;
     const daily = this.game.dailyQuests();
@@ -1579,9 +1589,9 @@ export class UI {
 
     const el = this.panelShell(tt('Quests'), `
       ${this.festivalHTML()}
-      <h3 class="inv-head">${tt('Daily quests 🔥 Streak: {n} days', { n: s.streak })}</h3>
+      <h3 class="inv-head">${tt('Daily quests 🔥 Streak: {n} days', { n: s.streak })} ${this.resetNote(msUntilDailyReset(new Date()))}</h3>
       ${dailyHTML}
-      <h3 class="inv-head">${tt('Weekly quest')}</h3>
+      <h3 class="inv-head">${tt('Weekly quest')} ${this.resetNote(msUntilWeeklyReset(new Date()))}</h3>
       ${weeklyHTML}
       <button class="nav-row" id="go-achievements">
         <span class="nav-row-main">
@@ -1618,7 +1628,13 @@ export class UI {
 
   private renderAchievements(): void {
     const s = this.game.save;
-    const rows = ACHIEVEMENTS.map((a) => {
+    // Finished-but-unclaimed first, then in progress, claimed last: what the player
+    // came here to do is at the top instead of somewhere down a long scroll.
+    const rank = (a: (typeof ACHIEVEMENTS)[number]): number =>
+      s.achievementsClaimed.includes(a.id) ? 2 : a.check(s) >= a.target ? 0 : 1;
+    const ordered = ACHIEVEMENTS.map((a, i) => ({ a, i })).sort((x, y) => rank(x.a) - rank(y.a) || x.i - y.i).map((x) => x.a);
+    const readyCount = this.game.claimableAchievements();
+    const rows = ordered.map((a) => {
       const cur = Math.min(a.target, a.check(s));
       const claimed = s.achievementsClaimed.includes(a.id);
       const done = cur >= a.target;
@@ -1635,8 +1651,16 @@ export class UI {
             : ''}
         </div>`;
     }).join('');
+    const claimAll = readyCount > 1
+      ? `<button class="buy-btn claim-all" id="ach-claim-all">${tt('Claim all ({n})', { n: readyCount })}</button>`
+      : '';
 
-    const el = this.panelShell(tt('Achievements'), rows);
+    const el = this.panelShell(tt('Achievements'), claimAll + rows);
+    el.querySelector('#ach-claim-all')?.addEventListener('click', () => {
+      const res = this.game.claimAllAchievements();
+      this.toast(res.msg);
+      if (res.ok) this.renderAchievements();
+    });
     el.querySelectorAll<HTMLButtonElement>('[data-ach]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const res = this.game.claimAchievement(btn.dataset.ach!);
