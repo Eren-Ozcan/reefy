@@ -1024,7 +1024,7 @@ const TR: Record<string, string> = {
   'Ready': 'Hazır',
   'You': 'Sen',
   'Arrange': 'Düzen',
-  '{n} affordable': '{n} alınabilir',
+  '{n} to buy': '{n} uygun',
   '{n} items': '{n} ürün',
   '{n} ready': '{n} hazır',
   '🎬 Watch an ad: grow {n} min faster': '🎬 Reklam izle: {n} dk daha hızlı büyüsün',

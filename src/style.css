@@ -327,12 +327,9 @@ html, body {
 
 /* Cleanliness as a gauge. A full ring is "done" at a glance, where a percentage
    has to be compared against a maximum the player is expected to remember. */
-#carebar button.care-round {
-  flex: 0 0 auto;
-  width: 58px;
-  padding: 6px 4px;
-  justify-content: center;
-}
+/* Same cell as Feed and Arrange (equal flex, same three lines); the ring stands in
+   for the icon and is sized to it so the row stays one height. */
+#carebar button.care-round { justify-content: center; }
 .clean-ring {
   position: relative;
   width: 30px; height: 30px; border-radius: 50%;
@@ -347,7 +344,7 @@ html, body {
   border-radius: 50%; background: #16383f;
   display: grid; place-items: center;
 }
-.clean-face .icon { width: 15px; height: 15px; }
+.clean-face .icon { width: 12px; height: 12px; }
 #carebar button.care-round.urgent .clean-ring { background: conic-gradient(var(--accent-2) calc(var(--clean, 100) * 1%), #23505c 0); }
 
 
@@ -725,7 +722,13 @@ html, body {
   padding: 10px; border-radius: 16px;
   box-shadow: 0 10px 30px rgba(20, 60, 75, 0.3);
   width: min(340px, 92vw);
-  animation: slide-up 0.25s ease;
+  animation: feed-pop-in 0.25s ease;
+}
+/* Its own keyframes: slide-up ends on `transform: none`, which dropped the picker's
+   translateX(-50%) for the length of the animation and parked it off-centre over the dock. */
+@keyframes feed-pop-in {
+  from { transform: translateX(-50%) translateY(24px); opacity: 0; }
+  to   { transform: translateX(-50%); opacity: 1; }
 }
 #feed-pop.hidden { display: none; }
 .feed-opt {

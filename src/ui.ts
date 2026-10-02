@@ -287,7 +287,7 @@ export class UI {
         <button data-care="feed">${ICON_FEED}<span>${tt('Feed')}</span><small></small></button>
         <button data-care="clean" class="care-round" id="clean-chip">
           <span class="clean-ring"><span class="clean-face">${ICON_CLEAN}</span></span>
-          <span>${tt('Clean')}</span>
+          <span>${tt('Clean')}</span><small></small>
         </button>
         <button data-care="arrange">${ICON_ARRANGE}<span>${tt('Arrange')}</span><small></small></button>
         <button data-care="eggs" class="hidden">${ICON_EGG}<span>${tt('Eggs')}</span><small></small></button>
@@ -520,6 +520,8 @@ export class UI {
       cleanBtn.classList.toggle('urgent', clean < 100);
       cleanBtn.style.setProperty('--clean', String(clean));
       cleanBtn.title = tt('Glass {n}% clean', { n: clean });
+      const cleanSmall = cleanBtn.querySelector('small');
+      if (cleanSmall) cleanSmall.textContent = `${Math.round(clean)}%`;
     }
 
     // The egg chip exists only while something is incubating: an empty countdown
@@ -781,7 +783,7 @@ export class UI {
     const eggsReady = this.game.readyEggs();
     set('shop', eggsReady > 0
       ? tt('{n} egg ready', { n: eggsReady })
-      : tt('{n} affordable', { n: this.game.affordableShopItems() }));
+      : tt('{n} to buy', { n: this.game.affordableShopItems() }));
     set('inventory', bag > 0 ? tt('{n} items', { n: bag }) : '');
     set('quests', ready > 0 ? tt('{n} ready', { n: ready }) : '');
     set('you', `${tt('Lv')} ${s.level}`);
