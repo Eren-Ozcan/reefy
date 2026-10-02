@@ -686,6 +686,21 @@ export class UI {
     const t = document.createElement('div');
     t.className = 'toast';
     t.textContent = msg;
+    // Running short of pearls is the one moment the shop is relevant, and until now it
+    // ended in a dead-end message. Every pearl purchase reports the same line, so the
+    // shortcut is attached here rather than at each call site.
+    if (msg === tt('Not enough pearls')) {
+      const go = document.createElement('button');
+      go.className = 'toast-action';
+      go.textContent = tt('Get pearls');
+      go.addEventListener('click', () => {
+        audio.click();
+        this.dismissToast(t);
+        this.setActiveTab('shop');
+        this.renderShop('pearls');
+      });
+      t.appendChild(go);
+    }
     this.toastHost.appendChild(t);
     // Prevent stacking: start closing the oldest toasts above the limit early.
     // Marked with .dismissed so ones already closing aren't counted.
@@ -1016,13 +1031,17 @@ export class UI {
           </div>`;
       }).join('')}</div>`;
     } else {
-      const packs = this.game.services.iap.packs();
+      // The Starter Pack is the best value on the shelf (pearls AND coins for a dollar more
+      // than the smallest pack), so it leads and says so.
+      const packs = [...this.game.services.iap.packs()].sort((a, b) => Number(b.id === 'starter') - Number(a.id === 'starter'));
       const adsRemoved = s.adsRemoved;
       // Shown rather than silently enforced: a Watch button that starts
       // refusing with no explanation reads as a broken button.
       const adsLeft = this.game.adRewardsLeftToday();
       body = `
-        <p class="dex-info">${tt("💎 Pearl packs are purchased with real money. You're in <b>{store}</b> mode — purchases are enabled in the Google Play / App Store build. You can also earn pearls from quests, level-ups, and collection sets.", { store: this.game.services.iap.storeLabel })}</p>
+        <p class="dex-info">${this.game.services.iap.storeLabel === tt('Web preview')
+          ? tt("💎 Pearl packs are purchased with real money. You're in <b>{store}</b> mode — purchases are enabled in the Google Play / App Store build. You can also earn pearls from quests, level-ups, and collection sets.", { store: this.game.services.iap.storeLabel })
+          : tt('💎 Pearl packs are bought with real money. You can also earn pearls from quests, level-ups, and collection sets.')}</p>
         <div class="grid">
           <div class="card">
             <div class="egg-emoji">🎬</div>
@@ -1039,7 +1058,8 @@ export class UI {
               ? `<button class="buy-btn owned" disabled>${tt('You own this ✓')}</button>`
               : `<button class="buy-btn iap" data-iap="${p.id}">${p.priceLabel}</button>`}
           </div>` : `
-          <div class="card">
+          <div class="card ${p.id === 'starter' ? 'best-value' : ''}">
+            ${p.id === 'starter' ? `<span class="best-tag">${tt('⭐ Best value')}</span>` : ''}
             <div class="egg-emoji">${p.emoji}</div>
             <div class="card-name">${tt(p.name)}</div>
             <div class="card-desc">${tt('🦪 {n} pearls {bonus}', { n: p.pearls, bonus: p.bonus ? `<br/><b>${tt(p.bonus)}</b>` : '' })}</div>
