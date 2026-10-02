@@ -9,9 +9,17 @@
   --card-2: #1e474f;
   --card-line: rgba(255, 255, 255, 0.07);
   --ink: #e8f3f1;
-  --ink-soft: #93b3b6;
-  --ink-faint: #6d9199;
+  --ink-soft: rgba(232, 243, 241, 0.78);
+  --ink-faint: rgba(232, 243, 241, 0.62);
   --ink-deep: #1e3a45;
+
+  /* Type scale: five sizes, nothing readable below 12px. Raw px values (there were 30
+     of them, in half-pixel steps) are what made screens disagree with each other. */
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-md: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 28px;
   --accent: #35c4ac;
   --accent-deep: #1f8578;
   --accent-2: #ff8a5c;
@@ -126,7 +134,7 @@ html, body {
 }
 .menu-fish span:nth-child(1) { top: 22%; animation-duration: 26s; animation-delay: 0s; font-size: 38px; }
 .menu-fish span:nth-child(2) { top: 68%; animation-duration: 32s; animation-delay: 6s; font-size: 52px; }
-.menu-fish span:nth-child(3) { top: 44%; animation-duration: 22s; animation-delay: 13s; font-size: 30px; }
+.menu-fish span:nth-child(3) { top: 44%; animation-duration: 22s; animation-delay: 13s; font-size: var(--fs-xl); }
 @keyframes swim-by {
   from { transform: translateX(-15vw) scaleX(-1); }
   to { transform: translateX(115vw) scaleX(-1); }
@@ -168,7 +176,7 @@ html, body {
 @keyframes shine-sweep { 0%, 100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
 .tagline { color: #2c6272; margin: 10px 0 26px; line-height: 1.5; }
 #play-btn {
-  font-size: 22px; font-weight: 700;
+  font-size: var(--fs-lg); font-weight: 700;
   padding: 14px 52px; border: none; border-radius: var(--btn-radius);
   background: linear-gradient(180deg, #ffa25c, #ff7e4d);
   color: #fff; cursor: pointer;
@@ -177,7 +185,7 @@ html, body {
 }
 #play-btn:hover { transform: scale(1.05); }
 #play-btn:active { transform: var(--btn-press); }
-.menu-foot { margin-top: 22px; font-size: 12px; color: #3d7385; }
+.menu-foot { margin-top: 22px; font-size: var(--fs-xs); color: #3d7385; }
 .menu-demo-note { margin-top: 6px; opacity: 0.85; }
 
 .menu-bubbles { position: absolute; inset: 0; overflow: hidden; z-index: 1; }
@@ -283,17 +291,17 @@ html, body {
 #carebar button:active { transform: var(--btn-press); }
 #carebar button .icon { width: 18px; height: 18px; }
 #carebar button span {
-  font-size: 11px; font-weight: 800; color: var(--ink);
+  font-size: var(--fs-xs); font-weight: 800; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
 }
 #carebar button small {
   font-family: var(--font-num);
-  font-size: 9.5px; font-weight: 700; color: var(--ink-faint);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-faint);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
 }
 /* Only the status line turns: the chip itself staying calm is what lets a single
    warm line read as "this one needs you" across four otherwise identical chips. */
-#carebar button.urgent small { color: var(--accent-2); }
+#carebar button.urgent small { color: var(--accent); }
 
 /* The collect button is a care cell now, not a thing standing on the water. It is
    the row's one warm cell, and it takes a little more width because its status
@@ -311,9 +319,9 @@ html, body {
 }
 #carebar button.care-collect span {
   color: #ffffff; letter-spacing: 0.5px;
-  font-size: 17px; line-height: 1.1;
+  font-size: var(--fs-md); line-height: 1.1;
 }
-#carebar button.care-collect small { color: rgba(255, 255, 255, 0.9); font-size: 11px; }
+#carebar button.care-collect small { color: rgba(255, 255, 255, 0.9); font-size: var(--fs-xs); }
 /* Nothing to collect: still there, still legible, just not asking to be pressed. */
 #carebar button.care-collect.empty { background: #d98a6d; box-shadow: none; }
 
@@ -369,7 +377,7 @@ html, body {
   width: 22px; height: 22px; margin: -3px -6px -3px 0;
   border: 0; border-radius: 50%;
   background: var(--accent); color: #062a30;
-  font: inherit; font-size: 15px; font-weight: 800; line-height: 1;
+  font: inherit; font-size: var(--fs-sm); font-weight: 800; line-height: 1;
   display: grid; place-items: center;
   cursor: pointer;
   transition: transform 0.12s ease, filter 0.2s ease;
@@ -387,7 +395,7 @@ html, body {
   backdrop-filter: blur(16px);
   border-radius: 999px;
   padding: 7px 14px;
-  font-size: 15px;
+  font-size: var(--fs-sm);
   box-shadow: 0 4px 16px rgba(4, 18, 24, 0.35);
   flex: none; min-width: 0; white-space: nowrap;
 }
@@ -402,13 +410,13 @@ html, body {
   background: var(--accent-2);
   border-color: rgba(0, 0, 0, 0.12);
   color: #46170a;
-  font-size: 13px; font-weight: 800;
+  font-size: var(--fs-sm); font-weight: 800;
 }
 /* It no longer competes for the top row's width — it sits in the goal row, where
    the strip beside it is the elastic cell. Fixed here so the flame and the figure
    never truncate: two glyphs that mean nothing cut short. */
 #goal-row .hud-streak { flex: none; padding: 7px 10px; gap: 4px; }
-.hud-streak .streak-flame { font-size: 14px; line-height: 1; }
+.hud-streak .streak-flame { font-size: var(--fs-sm); line-height: 1; }
 .hud-streak b { font-variant-numeric: tabular-nums; }
 .hud-streak.hidden { display: none; }
 /* Seventh-day tease: the pearl the next daily gift pays three of instead of one.
@@ -434,8 +442,8 @@ html, body {
 /* Daily streak ladder */
 .streak { text-align: center; padding: 4px 2px 6px; }
 .streak-count { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 18px; }
-.streak-count b { font-family: var(--font-num); font-size: 40px; font-weight: 800; line-height: 1; color: var(--accent-2); }
-.streak-count span { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.streak-count b { font-family: var(--font-num); font-size: 40px; font-weight: 800; line-height: 1; color: var(--accent); }
+.streak-count span { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-soft); }
 
 .streak-strip { display: flex; gap: 6px; margin-bottom: 16px; }
 .streak-cell {
@@ -444,13 +452,13 @@ html, body {
   min-height: 62px; padding: 8px 2px;
   background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
 }
-.streak-day { font-family: var(--font-num); font-size: 11px; font-weight: 800; color: var(--ink-faint); }
+.streak-day { font-family: var(--font-num); font-size: var(--fs-xs); font-weight: 800; color: var(--ink-faint); }
 .streak-prize {
   display: flex; align-items: center; gap: 2px;
-  font-family: var(--font-num); font-size: 11.5px; font-weight: 800; color: var(--ink-soft);
+  font-family: var(--font-num); font-size: var(--fs-xs); font-weight: 800; color: var(--ink-soft);
 }
 .streak-prize .icon { width: 13px; height: 13px; }
-.streak-tick { font-size: 15px; font-weight: 800; color: var(--accent); }
+.streak-tick { font-size: var(--fs-sm); font-weight: 800; color: var(--accent); }
 
 .streak-cell.done { background: var(--card-2); }
 .streak-cell.today {
@@ -461,14 +469,14 @@ html, body {
 /* The seventh cell is the promise the whole ladder is built around. */
 .streak-cell:last-child { border-color: rgba(255, 216, 138, 0.35); }
 
-.streak-note { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 16px; }
+.streak-note { font-size: var(--fs-xs); color: var(--ink-soft); margin-bottom: 16px; }
 .streak-best {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 14px;
   background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
-  font-size: 13px; color: var(--ink-soft);
+  font-size: var(--fs-sm); color: var(--ink-soft);
 }
-.streak-best b { font-family: var(--font-num); color: var(--ink); font-size: 14px; }
+.streak-best b { font-family: var(--font-num); color: var(--ink); font-size: var(--fs-sm); }
 
 /* ---------- Alt bar ---------- */
 
@@ -489,21 +497,21 @@ html, body {
 #bottombar button {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   border: none; background: transparent;
-  font-size: 25px; cursor: pointer;
+  font-size: var(--fs-xl); cursor: pointer;
   padding: 8px 4px; border-radius: var(--chip-radius);
   color: var(--ink-soft);
   flex: 1 1 0; min-width: 0; min-height: 54px;
   transition: background 0.15s ease, transform 0.15s ease;
 }
 #bottombar button span {
-  font-size: 11px; font-weight: 600;
+  font-size: var(--fs-xs); font-weight: 600;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* The status line under each label. Kept at a reserved height so the dock does not
    change height as counts appear and disappear. */
 #bottombar button small {
   font-family: var(--font-num);
-  font-size: 9.5px; font-weight: 700; line-height: 1;
+  font-size: var(--fs-xs); font-weight: 700; line-height: 1;
   min-height: 10px;
   color: var(--ink-faint);
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -520,7 +528,7 @@ html, body {
 }
 #bottombar button.active span { font-weight: 800; }
 #bottombar button.active small { color: #06282b; opacity: 0.72; }
-#bottombar button.has-badge small { color: var(--accent-2); }
+#bottombar button.has-badge small { color: var(--accent); }
 
 /* The current objective, one line above the dock. Previously this lived only inside
    the Quests panel, so the bar filling was something the player never saw happen. */
@@ -557,7 +565,7 @@ html, body {
 
 .goal-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .goal-text {
-  font-size: 11.5px; font-weight: 700; color: var(--ink);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .goal-bar { height: 5px; background: rgba(255, 255, 255, 0.12); border-radius: 999px; overflow: hidden; }
@@ -570,7 +578,7 @@ html, body {
 .goal-reward {
   display: flex; align-items: center; gap: 4px;
   font-family: var(--font-num);
-  font-size: 12px; font-weight: 800; white-space: nowrap;
+  font-size: var(--fs-xs); font-weight: 800; white-space: nowrap;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.07);
   padding: 5px 11px; border-radius: 999px;
@@ -625,11 +633,11 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 20px 10px;
 }
-.panel-head h2 { font-size: 21px; color: var(--ink); letter-spacing: -0.2px; }
+.panel-head h2 { font-size: var(--fs-lg); color: var(--ink); letter-spacing: -0.2px; }
 .close-btn {
   border: none; background: var(--card-2); color: var(--ink-soft);
   width: var(--btn-h); height: var(--btn-h); border-radius: 50%;
-  font-size: 16px; cursor: pointer; flex-shrink: 0;
+  font-size: var(--fs-md); cursor: pointer; flex-shrink: 0;
 }
 .panel-body {
   padding: 10px 20px 24px; overflow-y: auto; min-height: 0; flex: 1 1 auto;
@@ -661,8 +669,8 @@ html, body {
   box-shadow: 0 12px 40px rgba(12, 40, 52, 0.4);
   animation: slide-up 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.05);
 }
-.tutorial-card h2 { font-size: 19px; color: var(--ink); margin-bottom: 10px; }
-.tutorial-card p { font-size: 14.5px; line-height: 1.5; color: var(--ink-soft); margin-bottom: 18px; }
+.tutorial-card h2 { font-size: var(--fs-lg); color: var(--ink); margin-bottom: 10px; }
+.tutorial-card p { font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-soft); margin-bottom: 18px; }
 .tutorial-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 18px; }
 .tutorial-dots .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
 .tutorial-dots .dot.active { background: var(--accent); width: 20px; border-radius: 4px; }
@@ -686,20 +694,20 @@ html, body {
 /* An egg the player already paid for. It sits in the same grid as the tiers
    for sale, so it needs to read as "yours, in progress" at a glance. */
 .card.hatching { outline: 2px solid var(--accent); }
-.card.hatching .egg-left { font-size: 13px; font-weight: 700; color: var(--ink); }
+.card.hatching .egg-left { font-size: var(--fs-sm); font-weight: 700; color: var(--ink); }
 .card-art { line-height: 0; }
-.card-name { font-weight: 700; font-size: 14px; }
-.card-name.big { font-size: 20px; margin-top: 8px; }
-.card-desc { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; min-height: 30px; }
-.card-meta { font-size: 11px; color: var(--ink-faint); }
+.card-name { font-weight: 700; font-size: var(--fs-sm); }
+.card-name.big { font-size: var(--fs-lg); margin-top: 8px; }
+.card-desc { font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.4; min-height: 30px; }
+.card-meta { font-size: var(--fs-xs); color: var(--ink-faint); }
 .chip {
-  color: #fff; font-size: 10.5px; font-weight: 700;
+  color: #fff; font-size: var(--fs-xs); font-weight: 700;
   padding: 3px 10px; border-radius: 999px;
 }
 .buy-btn {
   border: none; cursor: pointer;
   background: var(--accent);
-  color: #06282b; font-weight: 800; font-size: 14.5px;
+  color: #06282b; font-weight: 800; font-size: var(--fs-sm);
   padding: 11px 20px; border-radius: var(--btn-radius);
   min-height: var(--btn-h);
   box-shadow: 0 4px 14px rgba(53, 196, 172, 0.25);
@@ -729,11 +737,11 @@ html, body {
   transition: transform 0.12s ease;
 }
 .feed-opt:hover { transform: scale(1.02); }
-.feed-emoji { font-size: 24px; }
+.feed-emoji { font-size: var(--fs-xl); }
 .feed-info { flex: 1; display: flex; flex-direction: column; }
-.feed-info b { font-size: 13.5px; color: var(--ink); }
-.feed-info small { font-size: 11px; color: var(--ink-soft); }
-.feed-cost { font-size: 12px; font-weight: 700; color: #f0c46a; white-space: nowrap; }
+.feed-info b { font-size: var(--fs-sm); color: var(--ink); }
+.feed-info small { font-size: var(--fs-xs); color: var(--ink-soft); }
+.feed-cost { font-size: var(--fs-xs); font-weight: 700; color: var(--ink); white-space: nowrap; }
 
 /* Mod aktifken alt bar gizlenir — zemindeki dekor ve su dokunulabilir kalır */
 #ui.mode-active #bottombar { display: none; }
@@ -743,7 +751,7 @@ html, body {
   position: absolute; bottom: calc(16px + var(--safe-b)); left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   background: rgba(23, 60, 74, 0.94); color: #fff;
-  font-size: 13px; font-weight: 600; text-align: center; line-height: 1.35;
+  font-size: var(--fs-sm); font-weight: 600; text-align: center; line-height: 1.35;
   padding: 14px 20px; border-radius: 20px;
   box-shadow: 0 6px 20px rgba(12, 40, 52, 0.35);
   width: min(88vw, 340px);
@@ -752,13 +760,13 @@ html, body {
 #mode-done {
   border: none; cursor: pointer;
   background: var(--accent);
-  color: #06282b; font-weight: 800; font-size: 13px;
+  color: #06282b; font-weight: 800; font-size: var(--fs-sm);
   padding: 10px 28px; border-radius: var(--btn-radius);
   min-height: var(--btn-h);
 }
 #mode-done:active { transform: var(--btn-press); }
 .edit-mode-btn { width: 100%; margin-bottom: 4px; }
-.bonus-line { color: #f0c46a; font-weight: 700; }
+.bonus-line { color: var(--ink); font-weight: 700; }
 
 /* Sekmeler — her zaman tamamı görünür, gerekirse alt satıra sarar */
 .tabs {
@@ -768,7 +776,7 @@ html, body {
 .tab {
   border: none; cursor: pointer; white-space: nowrap;
   background: var(--card); color: var(--ink-soft);
-  font-weight: 700; font-size: 13px;
+  font-weight: 700; font-size: var(--fs-sm);
   padding: 11px 14px; border-radius: 999px;
   min-height: 42px;
   transition: background 0.15s ease, color 0.15s ease;
@@ -777,18 +785,18 @@ html, body {
 .tab:hover { background: var(--card-2); }
 .tab.active { background: var(--accent); color: #06282b; }
 @media (max-width: 420px) {
-  .tab { font-size: 12px; padding: 10px 8px; }
+  .tab { font-size: var(--fs-xs); padding: 10px 8px; }
 }
 
 /* HUD akvaryum çipi */
-.hud-tank { cursor: pointer; font-size: 13.5px; }
+.hud-tank { cursor: pointer; font-size: var(--fs-sm); }
 .hud-tank .boost { color: var(--accent); }
 .inv-head .boost { color: var(--accent); font-weight: 800; }
 .boost-neg { color: #ff8177; font-weight: 800; }
 .dirt-badge { color: #e0a94f; font-weight: 800; }
 
 /* Envanter */
-.inv-head { font-size: 14px; color: var(--ink); margin: 14px 0 8px; }
+.inv-head { font-size: var(--fs-sm); color: var(--ink); margin: 14px 0 8px; }
 .inv-row {
   display: flex; align-items: center; gap: 10px;
   background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
@@ -797,12 +805,12 @@ html, body {
 }
 .inv-row.clickable { cursor: pointer; }
 .inv-art { line-height: 0; flex-shrink: 0; }
-.inv-art.feed-art { font-size: 30px; line-height: 1; }
-.inv-name { flex: 1; font-size: 13.5px; font-weight: 600; }
-.inv-sub { display: block; font-size: 11px; font-weight: 600; color: var(--ink-faint); margin-top: 2px; }
-.inv-right { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
+.inv-art.feed-art { font-size: var(--fs-xl); line-height: 1; }
+.inv-name { flex: 1; font-size: var(--fs-sm); font-weight: 600; }
+.inv-sub { display: block; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-faint); margin-top: 2px; }
+.inv-right { font-size: var(--fs-xs); font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
 .inv-sell { white-space: nowrap; padding: 8px 14px; }
-.empty { font-size: 13px; color: var(--ink-faint); padding: 8px 2px; }
+.empty { font-size: var(--fs-sm); color: var(--ink-faint); padding: 8px 2px; }
 .tank-swatch {
   width: 100%; height: 56px; border-radius: 10px;
 }
@@ -817,26 +825,26 @@ html, body {
   background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
   padding: 10px 14px;
   box-shadow: var(--card-shadow);
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 .lb-row.me { outline: 2.5px solid var(--accent); background: var(--card-2); }
 .lb-rank { width: 38px; font-weight: 800; color: var(--ink-soft); }
 .lb-name { flex: 1; font-weight: 600; }
 .lb-score { font-weight: 700; color: var(--ink-soft); }
-.lb-code { font-size: 11px; color: var(--ink-faint); margin-left: 6px; }
+.lb-code { font-size: var(--fs-xs); color: var(--ink-faint); margin-left: 6px; }
 .friend-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .friend-actions .tgl { white-space: nowrap; }
 
 .friend-code-box {
   display: flex; align-items: center; gap: 10px;
   background: var(--card); border: 1px solid var(--card-line); border-radius: 12px;
-  padding: 12px 14px; font-size: 14px; margin-bottom: 10px;
+  padding: 12px 14px; font-size: var(--fs-sm); margin-bottom: 10px;
 }
-.friend-code-box b { font-size: 16px; letter-spacing: 1px; color: var(--ink); flex: 1; }
+.friend-code-box b { font-size: var(--fs-md); letter-spacing: 1px; color: var(--ink); flex: 1; }
 .friend-add { display: flex; gap: 8px; margin-bottom: 6px; }
 .friend-add input {
   flex: 1; border: 2px solid var(--card-2); border-radius: 999px;
-  padding: 9px 16px; font-size: 14px; font-weight: 700;
+  padding: 9px 16px; font-size: var(--fs-sm); font-weight: 700;
   letter-spacing: 1px; text-transform: uppercase;
   outline: none; color: var(--ink); background: var(--card);
 }
@@ -866,18 +874,18 @@ html, body {
 /* The explanatory line under the cloud-deletion row. It has to say what the
    button does NOT touch, so it is a block of text rather than a set-note chip. */
 .set-note-block {
-  font-size: 11.5px; color: var(--ink-soft); line-height: 1.45;
+  font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.45;
   margin: -2px 0 10px; max-width: 46ch;
 }
 .tgl.armed { background: #b4423a; color: #fff; }
-.q-emoji { font-size: 24px; flex-shrink: 0; }
+.q-emoji { font-size: var(--fs-xl); flex-shrink: 0; }
 .q-mid { flex: 1; min-width: 0; }
-.q-name { font-size: 13px; font-weight: 700; }
+.q-name { font-size: var(--fs-sm); font-weight: 700; }
 .q-desc { font-weight: 500; color: var(--ink-soft); }
-.q-meta { font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
-.q-done { font-size: 20px; color: var(--accent); font-weight: 800; }
+.q-meta { font-size: var(--fs-xs); color: var(--ink-faint); margin-top: 3px; }
+.q-done { font-size: var(--fs-lg); color: var(--accent); font-weight: 800; }
 .quest-row .bar { height: 8px; margin-top: 5px; }
-.pity { font-size: 11.5px; font-weight: 700; color: #f0c46a; }
+.pity { font-size: var(--fs-xs); font-weight: 700; color: var(--ink); }
 
 /* A row that goes somewhere, as opposed to one that only reports. */
 .nav-row {
@@ -891,26 +899,26 @@ html, body {
 }
 .nav-row:active { transform: scale(0.985); }
 .nav-row-main { display: flex; flex-direction: column; gap: 2px; }
-.nav-row-main b { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; color: var(--ink); }
-.nav-row-main small { font-family: var(--font-num); font-size: 11.5px; font-weight: 700; color: var(--ink-faint); }
+.nav-row-main b { font-family: var(--font-display); font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.nav-row-main small { font-family: var(--font-num); font-size: var(--fs-xs); font-weight: 700; color: var(--ink-faint); }
 .nav-row-badge {
-  font-family: var(--font-num); font-size: 11.5px; font-weight: 800; white-space: nowrap;
+  font-family: var(--font-num); font-size: var(--fs-xs); font-weight: 800; white-space: nowrap;
   color: #46170a; background: var(--accent-2);
   padding: 5px 11px; border-radius: 999px;
 }
-.nav-row-chevron { font-size: 20px; color: var(--ink-faint); line-height: 1; }
+.nav-row-chevron { font-size: var(--fs-lg); color: var(--ink-faint); line-height: 1; }
 
 /* Daha menüsü */
 .more-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 10px 0 16px; }
 
 /* Profil */
 .profile-head { text-align: center; padding: 6px 0 12px; }
-.profile-name { font-size: 20px; font-weight: 800; color: var(--ink); }
-.profile-code { font-size: 12px; font-weight: 700; color: var(--ink-faint); letter-spacing: 1px; margin-top: 2px; }
-.stat-val { color: var(--ink); font-size: 14px; }
+.profile-name { font-size: var(--fs-lg); font-weight: 800; color: var(--ink); }
+.profile-code { font-size: var(--fs-xs); font-weight: 700; color: var(--ink-faint); letter-spacing: 1px; margin-top: 2px; }
+.stat-val { color: var(--ink); font-size: var(--fs-sm); }
 .fish-rename input {
   width: 140px; border: 2px solid var(--card-2); border-radius: 999px;
-  padding: 7px 12px; font-size: 13px; font-weight: 600;
+  padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
   outline: none; color: var(--ink); background: var(--card); text-align: center;
 }
 .fish-rename input:focus { border-color: var(--accent); }
@@ -918,19 +926,19 @@ html, body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   border: 1px solid var(--card-line); cursor: pointer;
   background: var(--card); border-radius: 16px;
-  font-size: 32px; padding: 18px 26px;
+  font-size: var(--fs-xl); padding: 18px 26px;
   box-shadow: var(--card-shadow);
   color: var(--ink-soft);
   transition: transform 0.12s ease;
 }
-.more-btn span { font-size: 12px; font-weight: 700; }
+.more-btn span { font-size: var(--fs-xs); font-weight: 700; }
 .more-btn:hover { transform: scale(1.05); }
 
 /* Ayarlar isim düzenleme */
 .name-edit { display: flex; gap: 6px; }
 .name-edit input {
   width: 130px; border: 2px solid var(--card-2); border-radius: 999px;
-  padding: 7px 12px; font-size: 13px; font-weight: 600;
+  padding: 7px 12px; font-size: var(--fs-sm); font-weight: 600;
   outline: none; color: var(--ink); background: var(--card);
 }
 .name-edit input:focus { border-color: var(--accent); }
@@ -939,7 +947,7 @@ html, body {
 
 /* Yumurtalar */
 .egg-emoji { font-size: 52px; animation: bob 2.6s ease-in-out infinite; }
-.odds { width: 100%; font-size: 12px; color: var(--ink-soft); }
+.odds { width: 100%; font-size: var(--fs-xs); color: var(--ink-soft); }
 .odd-row { display: flex; gap: 6px; justify-content: center; }
 
 /* Yumurta açılışı */
@@ -964,10 +972,10 @@ html, body {
 .reveal.hatched .reveal-fish { opacity: 1; transform: scale(1); }
 
 /* Koleksiyon */
-.dex-info { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 14px; line-height: 1.5; }
+.dex-info { font-size: var(--fs-xs); color: var(--ink-soft); margin-bottom: 14px; line-height: 1.5; }
 .dex-group { margin-bottom: 16px; }
 .dex-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.dex-count { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+.dex-count { font-size: var(--fs-xs); color: var(--ink-soft); font-weight: 600; }
 .dex-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .dex-card {
   background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 8px;
@@ -975,17 +983,17 @@ html, body {
   box-shadow: var(--card-shadow);
 }
 .dex-card.unknown { opacity: 0.6; }
-.dex-name { font-size: 10.5px; font-weight: 600; color: var(--ink-soft); }
+.dex-name { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-soft); }
 
 /* Ayarlar */
 .set-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 2px; font-size: 15px;
+  padding: 10px 2px; font-size: var(--fs-sm);
 }
 .tgl {
   border: none; cursor: pointer;
   background: var(--card-2); color: var(--ink-soft);
-  font-weight: 700; font-size: 13.5px;
+  font-weight: 700; font-size: var(--fs-sm);
   padding: 10px 20px; border-radius: var(--btn-radius);
   min-height: var(--btn-h);
 }
@@ -993,13 +1001,13 @@ html, body {
 .tgl.on { background: var(--accent); color: #06282b; }
 .tgl.danger { background: #5c2b26; color: #ffb3a6; }
 .set-links { display: flex; flex-direction: column; gap: 10px; padding: 12px 2px; }
-.set-links a { color: var(--accent); font-size: 14px; text-decoration: none; font-weight: 600; }
+.set-links a { color: var(--accent); font-size: var(--fs-sm); text-decoration: none; font-weight: 600; }
 hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
-.version { text-align: center; font-size: 11px; color: var(--ink-faint); margin-top: 14px; }
-.version .diag { font-size: 10px; opacity: 0.55; letter-spacing: 0.04em; }
+.version { text-align: center; font-size: var(--fs-xs); color: var(--ink-faint); margin-top: 14px; }
+.version .diag { font-size: var(--fs-xs); opacity: 0.55; letter-spacing: 0.04em; }
 
 /* Bulut kaydı: ayarlardaki durum etiketi ve çakışma seçim ekranı */
-.set-note { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+.set-note { font-size: var(--fs-sm); color: var(--ink-soft); font-weight: 600; }
 .set-note.ok { color: var(--accent); }
 
 .conflict-grid { display: flex; gap: 10px; margin-top: 12px; }
@@ -1008,14 +1016,14 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
   background: var(--card); border: 1px solid var(--card-line); border-radius: 14px;
   padding: 14px 10px; text-align: center;
 }
-.conflict-card h3 { margin: 0 0 8px; font-size: 14px; color: var(--ink); }
-.conflict-card p { margin: 3px 0; font-size: 13px; color: var(--ink-soft); }
-.conflict-card p.muted { color: var(--ink-faint); font-size: 11.5px; margin-bottom: 10px; }
-.conflict-card .buy-btn { width: 100%; padding: 10px 8px; font-size: 13px; }
+.conflict-card h3 { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--ink); }
+.conflict-card p { margin: 3px 0; font-size: var(--fs-sm); color: var(--ink-soft); }
+.conflict-card p.muted { color: var(--ink-faint); font-size: var(--fs-xs); margin-bottom: 10px; }
+.conflict-card .buy-btn { width: 100%; padding: 10px 8px; font-size: var(--fs-sm); }
 
 /* Balık bilgi */
 .fish-info { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.bar-row { width: 100%; max-width: 300px; text-align: left; font-size: 12.5px; color: var(--ink-soft); }
+.bar-row { width: 100%; max-width: 300px; text-align: left; font-size: var(--fs-xs); color: var(--ink-soft); }
 .bar {
   height: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 999px;
   overflow: hidden; margin-top: 4px;
@@ -1026,7 +1034,7 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
   transition: width 0.4s ease;
 }
 .bar > div.hunger { background: linear-gradient(90deg, #ffc36e, #ff8a5c); }
-.growing { font-size: 13px; color: var(--ink-soft); }
+.growing { font-size: var(--fs-sm); color: var(--ink-soft); }
 .sell { margin-top: 6px; }
 .fish-info .inv-head { width: 100%; max-width: 300px; text-align: left; }
 .move-list { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 6px; }
@@ -1036,18 +1044,18 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
 
 /* Return receipt — what happened while you were gone, itemised rather than narrated. */
 .receipt { padding: 2px 2px 4px; }
-.receipt-lede { font-size: 15px; color: var(--ink-soft); margin-bottom: 14px; }
-.receipt-lede b { font-family: var(--font-num); color: var(--ink); font-size: 17px; }
+.receipt-lede { font-size: var(--fs-sm); color: var(--ink-soft); margin-bottom: 14px; }
+.receipt-lede b { font-family: var(--font-num); color: var(--ink); font-size: var(--fs-md); }
 
 .receipt-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 11px 2px;
   border-top: 1px solid var(--card-line);
-  font-size: 14px; color: var(--ink-soft);
+  font-size: var(--fs-sm); color: var(--ink-soft);
 }
 .receipt-row b {
   display: flex; align-items: center; gap: 5px;
-  font-family: var(--font-num); font-size: 15px; font-weight: 800; color: var(--ink);
+  font-family: var(--font-num); font-size: var(--fs-sm); font-weight: 800; color: var(--ink);
 }
 .receipt-row .icon { width: 16px; height: 16px; }
 
@@ -1058,10 +1066,10 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
   background: var(--card); border: 1px solid var(--card-line); border-radius: 14px;
 }
 .receipt-gift-head { display: flex; flex-direction: column; gap: 2px; }
-.receipt-gift-head span { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; color: var(--ink); }
-.receipt-gift-head small { font-size: 11px; font-weight: 700; color: var(--accent-2); }
+.receipt-gift-head span { font-family: var(--font-display); font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.receipt-gift-head small { font-size: var(--fs-xs); font-weight: 700; color: var(--accent); }
 .receipt-gift-value { display: flex; align-items: center; gap: 5px; }
-.receipt-gift-value b { font-family: var(--font-num); font-size: 17px; font-weight: 800; color: var(--ink); }
+.receipt-gift-value b { font-family: var(--font-num); font-size: var(--fs-md); font-weight: 800; color: var(--ink); }
 .receipt-gift-value .icon { width: 18px; height: 18px; }
 .receipt-gift-value b + .icon { margin-left: 6px; }
 
@@ -1075,7 +1083,7 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
 }
 .toast {
   background: rgba(23, 60, 74, 0.92); color: #fff;
-  font-size: 13.5px; font-weight: 600;
+  font-size: var(--fs-sm); font-weight: 600;
   padding: 10px 20px; border-radius: 999px;
   box-shadow: 0 6px 20px rgba(12, 40, 52, 0.35);
   opacity: 0; transform: translateY(-8px);
@@ -1100,23 +1108,23 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
 }
 
 /* Quest reset countdown and the achievements' bulk claim */
-.reset-note { margin-left: 6px; font-weight: 600; font-size: 11.5px; color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+.reset-note { margin-left: 6px; font-weight: 600; font-size: var(--fs-xs); color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
 .claim-all { width: 100%; margin-bottom: 10px; }
 
 /* Optional growth-boost ad on a growing fish's card */
 .grow-ad { width: 100%; margin-top: 6px; }
-.grow-ad-left { display: block; text-align: center; color: var(--ink-faint); font-size: 11.5px; margin-top: 4px; }
+.grow-ad-left { display: block; text-align: center; color: var(--ink-faint); font-size: var(--fs-xs); margin-top: 4px; }
 
 /* Toast with a shortcut button (the "not enough pearls" one) */
 .toast:has(.toast-action) { pointer-events: auto; display: flex; align-items: center; gap: 10px; }
 .toast-action {
-  background: var(--accent-2); color: #06282b; font-weight: 800; font-size: 12.5px;
+  background: var(--accent-2); color: #06282b; font-weight: 800; font-size: var(--fs-xs);
   padding: 5px 12px; border-radius: 999px; flex: none;
 }
 /* The Starter Pack card on the pearls shelf */
 .card.best-value { position: relative; border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2) inset; }
 .best-tag {
   position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
-  background: var(--accent-2); color: #06282b; font-size: 11px; font-weight: 800;
+  background: var(--accent-2); color: #06282b; font-size: var(--fs-xs); font-weight: 800;
   padding: 2px 10px; border-radius: 999px; white-space: nowrap;
 }
