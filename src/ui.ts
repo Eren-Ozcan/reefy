@@ -246,8 +246,32 @@ function rarityChip(r: Rarity): string {
   return `<span class="chip" style="background:${info.color}">${tt(info.name)}</span>`;
 }
 
-function tankSwatch(t: TankDef): string {
-  return `<div class="tank-swatch" style="background:linear-gradient(180deg, ${hex(t.water[0])}, ${hex(t.water[1])} 55%, ${hex(t.water[2])}); border-bottom: 8px solid ${hex(t.sand)}"></div>`;
+/** Three fish for a tank card's backdrop. Picked from the species list by the tank's id,
+ *  so a card always shows the same ones, and the first-seen order is spread across the
+ *  list rather than clustering on the opening handful of common fish. */
+function tankCardFish(t: TankDef): Species[] {
+  let h = 0;
+  for (const ch of t.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return [0, 1, 2].map((i) => SPECIES[(h + i * 17) % SPECIES.length]);
+}
+
+/** A whole card that is the tank: its water and sand fill the card, a few fish swim in
+ *  it, and the text sits on a scrim over the bottom. The old preview was a 56px strip
+ *  of gradient above a flat dark panel, which read as an empty colour swatch. */
+function tankCard(t: TankDef, o: { locked?: boolean; active?: boolean; meta: string; action: string; desc?: boolean }): string {
+  const fish = tankCardFish(t).map((sp, i) => `<span class="tc-fish tc-fish-${i}">${fishSVG(sp, 52 - i * 6)}</span>`).join('');
+  return `
+    <div class="tank-card ${o.locked ? 'locked' : ''} ${o.active ? 'active-tank' : ''}"
+         style="--w0:${hex(t.water[0])};--w1:${hex(t.water[1])};--w2:${hex(t.water[2])};--sand:${hex(t.sand)}">
+      <div class="tc-art">${biomeIcon(t.biome)}${fish}</div>
+      <div class="tc-top">${rarityChip(t.rarity)}</div>
+      <div class="tc-body">
+        <div class="tc-name">${tt(t.name)}</div>
+        ${o.desc === false ? '' : `<div class="tc-desc">${tt(t.desc)}</div>`}
+        <div class="tc-meta">${o.meta}</div>
+        ${o.action}
+      </div>
+    </div>`;
 }
 
 export class UI {
@@ -1020,17 +1044,16 @@ export class UI {
         const ownedT = s.tanksOwned.includes(t.id);
         const locked = !ownedT && s.level < t.unlockLevel;
         const cur = t.currency === 'coins' ? '🪙' : '🦪';
-        return `
-          <div class="card ${locked ? 'locked' : ''}">
-            ${tankSwatch(t)}
-            <div class="card-name">${biomeIcon(t.biome)} ${tt(t.name)}</div>
-            ${rarityChip(t.rarity)}
-            <div class="card-desc">${tt(t.desc)}</div>
-            <div class="card-meta">${tt('+{n}% growth & income', { n: t.growthBonus })}${TANK_CAP_BONUS[t.rarity] ? ` • ${tt('🐟 +{n} capacity', { n: TANK_CAP_BONUS[t.rarity] })}` : ''}${locked ? ` • ${tt('Lv')} ${t.unlockLevel}` : ''}</div>
-            ${ownedT
-              ? `<button class="buy-btn owned" disabled>${tt('You own this ✓')}</button>`
-              : `<button class="buy-btn" data-tank="${t.id}" ${locked ? 'disabled' : ''}>${t.price === 0 ? tt('Free') : `${cur} ${fmt(t.price)}`}</button>`}
-          </div>`;
+        const capBonus = TANK_CAP_BONUS[t.rarity];
+        const meta = [
+          `<span class="tc-pill">${tt('+{n}% growth & income', { n: t.growthBonus })}</span>`,
+          capBonus ? `<span class="tc-pill">${tt('🐟 +{n} capacity', { n: capBonus })}</span>` : '',
+          locked ? `<span class="tc-pill tc-lock">${tt('Lv')} ${t.unlockLevel}</span>` : '',
+        ].join('');
+        const action = ownedT
+          ? `<button class="buy-btn owned" disabled>${tt('You own this ✓')}</button>`
+          : `<button class="buy-btn" data-tank="${t.id}" ${locked ? 'disabled' : ''}>${t.price === 0 ? tt('Free') : `${cur} ${fmt(t.price)}`}</button>`;
+        return tankCard(t, { locked, meta, action });
       }).join('')}</div>`;
     } else {
       // The Starter Pack is the best value on the shelf (pearls AND coins for a dollar more
@@ -1254,15 +1277,11 @@ export class UI {
         .map((t) => {
           const active = t.id === s.activeTank;
           const count = this.game.tankFishCount(t.id);
-          return `
-            <div class="card ${active ? 'active-tank' : ''}">
-              ${tankSwatch(t)}
-              <div class="card-name">${biomeIcon(t.biome)} ${tt(t.name)}</div>
-              <div class="card-meta">${tt('🐟 {n}/{cap} fish • +{boost}% growth & income', { n: count, cap: this.game.capacityFor(t.id), boost: this.game.tankBoostPct(t.id) })}</div>
-              ${active
-                ? `<button class="buy-btn owned" disabled>${tt('You are here 📍')}</button>`
-                : `<button class="buy-btn" data-switch="${t.id}">${tt('Switch')}</button>`}
-            </div>`;
+          const meta = `<span class="tc-pill">🐟 ${count}/${this.game.capacityFor(t.id)}</span><span class="tc-pill">+${this.game.tankBoostPct(t.id)}%</span>`;
+          const action = active
+            ? `<button class="buy-btn owned" disabled>${tt('You are here 📍')}</button>`
+            : `<button class="buy-btn" data-switch="${t.id}">${tt('Switch')}</button>`;
+          return tankCard(t, { active, meta, action, desc: false });
         }).join('')}</div>
         <p class="dex-info">${tt('New tanks are in the Shop → Tank tab! 🛒')}</p>`;
     }

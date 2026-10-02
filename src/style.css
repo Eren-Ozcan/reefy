@@ -814,11 +814,50 @@ html, body {
 .inv-right { font-size: var(--fs-xs); font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
 .inv-sell { white-space: nowrap; padding: 8px 14px; }
 .empty { font-size: var(--fs-sm); color: var(--ink-faint); padding: 8px 2px; }
-.tank-swatch {
-  width: 100%; height: 56px; border-radius: 10px;
+.tanks-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); grid-auto-rows: 1fr; }
+.tank-card.active-tank { outline: 3px solid var(--accent); }
+
+/* The card is the tank. Water gradient, sand floor, a few fish and a watermark of the
+   biome mark fill the whole card; the text rides on a scrim over the lower half so it
+   stays readable on the pale tanks (Iceberg) as well as the dark ones (Abyss). */
+.tank-card {
+  position: relative; overflow: hidden;
+  min-height: 236px; border-radius: 16px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: linear-gradient(180deg, var(--w0), var(--w1) 55%, var(--w2));
+  box-shadow: var(--card-shadow);
+  color: #fff;
 }
-.tanks-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
-.card.active-tank { outline: 3px solid var(--accent); }
+.tank-card.locked .tc-art { filter: saturate(0.5) brightness(0.8); }
+.tc-art { position: absolute; inset: 0; border-bottom: 14px solid var(--sand); }
+.tc-art .biome-icon {
+  position: absolute; right: -14px; top: 16px; width: 96px; height: 96px; opacity: 0.2;
+}
+.tc-fish { position: absolute; line-height: 0; }
+.tc-fish-0 { left: 14%; top: 22%; }
+.tc-fish-1 { left: 52%; top: 12%; transform: scaleX(-1); }
+.tc-fish-2 { left: 30%; top: 40%; }
+.tc-top { position: absolute; top: 10px; left: 10px; }
+.tc-body {
+  position: relative; display: flex; flex-direction: column; gap: 5px;
+  padding: 44px 10px 10px;
+  background: linear-gradient(180deg, transparent, rgba(8, 28, 36, 0.78) 45%);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+.tc-name { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-md); color: #fff; }
+.tc-desc {
+  font-size: var(--fs-xs); line-height: 1.35; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 2.7em;
+}
+.tc-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-pill {
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink);
+  background: rgba(8, 28, 36, 0.55); border-radius: 999px; padding: 2px 8px;
+  text-shadow: none;
+}
+.tc-pill.tc-lock { color: var(--accent); }
+.tank-card .buy-btn { width: 100%; text-shadow: none; }
 .buy-btn.owned { background: var(--card-2); color: var(--ink-soft); box-shadow: none; }
 
 /* Liderlik */
