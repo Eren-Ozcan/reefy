@@ -339,6 +339,11 @@ export class UI {
           <button data-act="you">${ICON_YOU}<span>${tt('You')}</span><small></small></button>
         </div>
       </div>
+      <div id="empty-tank" class="hidden">
+        <b>${tt('Your tank is empty')}</b>
+        <span>${tt('Pick your first fish and watch it grow.')}</span>
+        <button class="buy-btn" id="empty-tank-btn">${tt('Pick your first fish')}</button>
+      </div>
       <div id="feed-pop" class="hidden"></div>
       <div id="mode-chip" class="hidden"><span id="mode-label"></span><button id="mode-done">${tt('Done ✓')}</button></div>
       <div id="panel-host"></div>
@@ -410,6 +415,10 @@ export class UI {
     // along in the starter bundle. Sending the coin's plus to the fish shelf
     // instead would answer "where do coins come from" with a list of things to
     // spend them on.
+    root.querySelector('#empty-tank-btn')!.addEventListener('click', () => {
+      audio.click();
+      this.renderShop('fish');
+    });
     for (const id of ['#hud-coins-plus', '#hud-pearls-plus']) {
       root.querySelector(id)!.addEventListener('click', () => {
         audio.click();
@@ -530,6 +539,8 @@ export class UI {
   private refreshCareBar(): void {
     const s = this.game.save;
     const hungry = this.game.fishes.filter((f) => f.isSad).length;
+    // A tank with nothing in it is half a screen of bare water; say what to do about it.
+    this.root.querySelector('#empty-tank')?.classList.toggle('hidden', this.game.fishes.length > 0);
     const clean = 100 - this.game.dirtPct(s.activeTank);
     const placed = (s.decorPlaced[s.activeTank] ?? []).length;
 
@@ -860,7 +871,7 @@ export class UI {
     const wrap = document.createElement('div');
     wrap.className = 'panel-backdrop' + (redraw ? ' redraw' : '');
     const tabHTML = tabs
-      ? `<div class="tabs">${tabs.map((t) => `<button class="tab ${t.active ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}</div>`
+      ? `<div class="tabs" style="--tab-cols:${tabs.length <= 3 ? tabs.length : tabs.length === 4 ? 2 : 3}">${tabs.map((t) => `<button class="tab ${t.active ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}</div>`
       : '';
     wrap.innerHTML = `
       <div class="panel">
@@ -1723,7 +1734,7 @@ export class UI {
         const has = s.collection.includes(sp.id);
         return `
           <div class="dex-card ${has ? '' : 'unknown'}">
-            ${fishSVG(sp, 60, !has)}
+            ${fishSVG(sp, 72, !has)}
             <div class="dex-name">${has ? tt(sp.name) : '???'}</div>
           </div>`;
       }).join('');

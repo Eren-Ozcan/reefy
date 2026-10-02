@@ -332,7 +332,7 @@ html, body {
 #carebar button.care-round { justify-content: center; }
 .clean-ring {
   position: relative;
-  width: 30px; height: 30px; border-radius: 50%;
+  width: 22px; height: 22px; border-radius: 50%;
   display: grid; place-items: center;
   /* Opaque track, like the level ring: a translucent one lets the bright water
      through and reads as a full circle. */
@@ -731,6 +731,18 @@ html, body {
   to   { transform: translateX(-50%); opacity: 1; }
 }
 #feed-pop.hidden { display: none; }
+
+/* Empty tank: one card on the water saying what to do next. Gone in feed/edit modes. */
+#empty-tank {
+  position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
+  width: min(300px, 80vw);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  background: var(--panel-bg); border-radius: var(--sheet-radius); padding: 18px 16px;
+  box-shadow: var(--card-shadow);
+}
+#empty-tank b { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--ink); }
+#empty-tank span { font-size: var(--fs-sm); color: var(--ink-soft); }
+#empty-tank.hidden, #ui.mode-active #empty-tank { display: none; }
 .feed-opt {
   display: flex; align-items: center; gap: 10px;
   border: 1px solid var(--card-line); cursor: pointer;
@@ -772,9 +784,11 @@ html, body {
 .bonus-line { color: var(--ink); font-weight: 700; }
 
 /* Sekmeler — her zaman tamamı görünür, gerekirse alt satıra sarar */
+/* Equal cells in a grid: with flex-wrap, five tabs shared a row and the sixth sat alone
+   at full width, so the tab bar was a row of different-sized blocks. Up to three tabs
+   fit one row, four make 2x2 (the Turkish labels do not fit four across), more fill rows of three. */
 .tabs {
-  display: flex; gap: 4px; padding: 0 14px 6px;
-  flex-wrap: wrap;
+  display: grid; grid-template-columns: repeat(var(--tab-cols, 4), 1fr); gap: 6px; padding: 0 14px 8px;
 }
 .tab {
   border: none; cursor: pointer; white-space: nowrap;
@@ -783,12 +797,12 @@ html, body {
   padding: 11px 14px; border-radius: 999px;
   min-height: 42px;
   transition: background 0.15s ease, color 0.15s ease;
-  flex: 1 1 auto; text-align: center;
+  text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
 .tab:hover { background: var(--card-2); }
 .tab.active { background: var(--accent); color: #06282b; }
 @media (max-width: 420px) {
-  .tab { font-size: var(--fs-xs); padding: 10px 8px; }
+  .tab { padding: 10px 4px; }
 }
 
 /* HUD akvaryum çipi */
@@ -1018,14 +1032,16 @@ html, body {
 .dex-group { margin-bottom: 16px; }
 .dex-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .dex-count { font-size: var(--fs-xs); color: var(--ink-soft); font-weight: 600; }
-.dex-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.dex-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .dex-card {
   background: var(--card); border: 1px solid var(--card-line); border-radius: 12px; padding: 8px;
-  text-align: center; width: 86px;
+  text-align: center; min-width: 0;
   box-shadow: var(--card-shadow);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
+.dex-card svg { max-width: 100%; height: auto; }
 .dex-card.unknown { opacity: 0.6; }
-.dex-name { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-soft); }
+.dex-name { font-size: var(--fs-xs); font-weight: 600; color: var(--ink); line-height: 1.2; min-height: 2.4em; display: flex; align-items: center; }
 
 /* Ayarlar */
 .set-row {
