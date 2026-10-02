@@ -576,8 +576,15 @@ export class UI {
   private toggleFeedPop(): void {
     if (this.game.inputMode !== 'normal') { this.exitModes(); return; }
     const pop = this.root.querySelector('#feed-pop')!;
-    if (pop.classList.contains('hidden')) { this.renderFeedPop(); pop.classList.remove('hidden'); }
-    else pop.classList.add('hidden');
+    if (pop.classList.contains('hidden')) {
+      this.renderFeedPop();
+      // The dock grows with its goal line and the system font scale, so the picker
+      // is anchored to the dock's measured top instead of a fixed offset.
+      const dock = this.root.querySelector<HTMLElement>('#bottombar')!;
+      const lift = this.root.getBoundingClientRect().bottom - dock.getBoundingClientRect().top + 8;
+      (pop as HTMLElement).style.bottom = `${Math.round(lift)}px`;
+      pop.classList.remove('hidden');
+    } else pop.classList.add('hidden');
   }
 
   /** Redraws the feed picker with current stock. */
@@ -642,6 +649,7 @@ export class UI {
    *  (long text was growing the bar and covering the decor). */
   startEditMode(): void {
     this.closePanel();
+    this.root.querySelector('#feed-pop')!.classList.add('hidden');
     this.game.setEditMode(true);
     this.showModeChip(tt('🛠️ Drag decorations'));
     if (!this.game.save.editHintSeen) {
@@ -799,9 +807,16 @@ export class UI {
   }
 
   private panelShell(title: string, bodyHTML: string, tabs?: { id: string; label: string; active: boolean }[], blocking = false): HTMLElement {
+    // A purchase or a claim redraws the panel it happened in. Rebuilding it from
+    // scratch replayed the slide-up and threw the scroll position away, so every
+    // tap looked like the sheet closing and reopening. Redrawing the SAME panel
+    // now skips the entrance animation and keeps the player where they were.
+    const prev = this.panelHost.querySelector<HTMLElement>('.panel');
+    const redraw = prev !== null && prev.querySelector('.panel-head h2')?.innerHTML === title;
+    const keepScroll = redraw ? prev!.querySelector<HTMLElement>('.panel-body')?.scrollTop ?? 0 : 0;
     this.closePanel();
     const wrap = document.createElement('div');
-    wrap.className = 'panel-backdrop';
+    wrap.className = 'panel-backdrop' + (redraw ? ' redraw' : '');
     const tabHTML = tabs
       ? `<div class="tabs">${tabs.map((t) => `<button class="tab ${t.active ? 'active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}</div>`
       : '';
@@ -832,6 +847,7 @@ export class UI {
       });
     }
     this.panelHost.appendChild(wrap);
+    if (keepScroll > 0) wrap.querySelector<HTMLElement>('.panel-body')!.scrollTop = keepScroll;
     return wrap;
   }
 
