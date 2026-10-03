@@ -65,7 +65,7 @@ function blend(base: number, over: number, a: number): number {
     | Math.round(bb + (ob - bb) * a);
 }
 
-export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number }
+export interface OfflineSummary { minutes: number; grown: number; dailyGift: boolean; giftCoins: number; giftPearls: number; income: number; streakSaved: boolean }
 
 /** Earnings report row: per-fish hourly production (with tank+decor bonuses) and sell value. */
 export interface FishEarning {
@@ -125,7 +125,7 @@ export class Game {
   }
   private bubbles: { x: number; y: number; r: number; vy: number; phase: number }[] = [];
   private time = 0;
-  offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0, income: 0 };
+  offline: OfflineSummary = { minutes: 0, grown: 0, dailyGift: false, giftCoins: 0, giftPearls: 0, income: 0, streakSaved: false };
 
   readonly cloud = new CloudSave();
   /** Result of the startup cloud sync — read by the UI for informational display. */
@@ -1091,7 +1091,17 @@ export class Game {
     }
     if (this.save.lastDaily !== today) {
       const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
-      this.save.streak = this.save.lastDaily === yesterday ? this.save.streak + 1 : 1;
+      if (this.save.lastDaily === yesterday) {
+        this.save.streak += 1;
+      } else if (this.canFreezeStreak(today)) {
+        // One missed day a week is forgiven: the streak carries on instead of
+        // dropping to 1, and the grace is spent for the rest of that week.
+        this.save.streak += 1;
+        this.save.streakFreezeWeek = weekKeyFor(new Date());
+        this.offline.streakSaved = true;
+      } else {
+        this.save.streak = 1;
+      }
       this.save.bestStreak = Math.max(this.save.bestStreak, this.save.streak);
       this.save.lastDaily = today;
       const gift = Game.dailyGiftFor(this.save.streak);
@@ -1101,6 +1111,14 @@ export class Game {
       this.offline.giftCoins = gift.coins;
       this.offline.giftPearls = gift.pearls;
     }
+  }
+
+  /** Exactly one day was missed, a streak worth saving exists, and this week's grace is unspent. */
+  private canFreezeStreak(today: string): boolean {
+    if (this.save.streak < 2) return false;
+    if (this.save.streakFreezeWeek === weekKeyFor(new Date())) return false;
+    const dayBeforeYesterday = new Date(Date.now() - 2 * 86400_000).toISOString().slice(0, 10);
+    return this.save.lastDaily === dayBeforeYesterday && today !== this.save.lastDaily;
   }
 
   /** The daily gift for a given streak length. Kept in one place so the streak sheet

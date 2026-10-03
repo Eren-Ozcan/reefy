@@ -2465,6 +2465,7 @@ export class UI {
       body += `
         <div class="receipt-gift">
           <div class="receipt-gift-head"><span>${tt('Daily gift')}</span>${streakLine}</div>
+          ${o.streakSaved ? `<small class="receipt-note">${tt('You missed a day, but your streak was saved. This works once a week.')}</small>` : ''}
           <div class="receipt-gift-value">
             ${ICON_COIN}<b>+${fmt(o.giftCoins)}</b>
             ${o.giftPearls > 0 ? `${ICON_PEARL}<b>+${o.giftPearls}</b>` : ''}

@@ -881,6 +881,7 @@ const TR: Record<string, string> = {
   '🔊 Sound Effects': '🔊 Ses Efektleri',
   '📳 Vibration': '📳 Titreşim',
   '🔔 Reminders': '🔔 Hatırlatıcılar',
+  'You missed a day, but your streak was saved. This works once a week.': 'Bir günü kaçırdın ama serin korundu. Bu hak haftada bir kez geçerli.',
   '🐢 Reduce motion': '🐢 Hareketi azalt',
   'While you are away, fish and income progress at half speed, for up to 8 hours.': 'Sen yokken balıklar ve gelir yarı hızda, en fazla 8 saat ilerler.',
   'New species!': 'Yeni tür!',

@@ -104,6 +104,7 @@ export interface SaveData {
   reduceMotion: boolean;
   lastSeen: number;
   lastDaily: string;
+  streakFreezeWeek: string; // the week (weekKeyFor) whose one missed-day grace has been used
   tutorialDone: boolean;
   feedHintSeen: boolean; // whether the feed mode hint ("touch the water to feed") has been shown once
   editHintSeen: boolean; // whether the decor edit hint has been shown once
@@ -194,6 +195,7 @@ export function defaultSave(): SaveData {
     reduceMotion: false,
     lastSeen: Date.now(),
     lastDaily: '',
+    streakFreezeWeek: '',
     tutorialDone: false,
     feedHintSeen: false,
     editHintSeen: false,

@@ -15,6 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SaveData } from './save';
+import { weekKeyFor } from './quests';
 
 vi.mock('pixi.js', () => {
   class Node {
@@ -125,6 +126,27 @@ describe('the daily gift, at the day boundary', () => {
     const broken = gameWith((s) => { s.lastDaily = dayKey(Date.now() - 3 * DAY); s.streak = 5; });
     innards(broken).applyDailyGift();
     expect(broken.save.streak).toBe(1);
+  });
+
+  it('one missed day a week is forgiven, once', () => {
+    const saved = gameWith((s) => { s.lastDaily = dayKey(Date.now() - 2 * DAY); s.streak = 5; });
+    innards(saved).applyDailyGift();
+    expect(saved.save.streak).toBe(6);
+    expect(saved.offline.streakSaved).toBe(true);
+
+    // The grace for this week is already spent: the same gap breaks the streak.
+    const spent = gameWith((s) => {
+      s.lastDaily = dayKey(Date.now() - 2 * DAY); s.streak = 5;
+      s.streakFreezeWeek = weekKeyFor(new Date());
+    });
+    innards(spent).applyDailyGift();
+    expect(spent.save.streak).toBe(1);
+    expect(spent.offline.streakSaved).toBe(false);
+
+    // Two missed days is not forgiven.
+    const gone = gameWith((s) => { s.lastDaily = dayKey(Date.now() - 3 * DAY); s.streak = 5; });
+    innards(gone).applyDailyGift();
+    expect(gone.save.streak).toBe(1);
   });
 
   it('the best streak survives a break', () => {
