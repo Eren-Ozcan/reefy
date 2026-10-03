@@ -1187,6 +1187,17 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
   padding: 2px 10px; border-radius: 999px; white-space: nowrap;
 }
 
+/* Touch targets: every tappable at least 44 CSS px (Apple 44 pt; ~Material 48 dp).
+   A phone pass measured the + buttons at 22x22, the HUD chips at 35 tall, tabs at
+   42, the toast shortcut at 31 and the settings links at 20. */
+.hud-plus { position: relative; }
+.hud-plus::before { content: ''; position: absolute; inset: -11px; border-radius: 50%; } /* 22 to the eye, 44 to the thumb */
+#hud .hud-chip { min-height: 44px; }
+.tab { min-height: 44px; }
+.toast-action { min-height: 44px; display: inline-flex; align-items: center; }
+.set-links a { padding: 12px 0; }
+#carebar { gap: 8px; }
+
 /* A store or ad call in flight: the tap was taken, and a second one is ignored (see UI.withPending). */
 .buy-btn.pending { opacity: 0.7; pointer-events: none; animation: none; }
 .buy-btn.pending::after { content: ' …'; }
