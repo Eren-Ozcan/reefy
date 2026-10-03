@@ -23,6 +23,7 @@ import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   GoogleAuthProvider,
+  deleteUser,
   getAuth,
   linkWithCredential,
   onAuthStateChanged,
@@ -116,6 +117,28 @@ export function ensureUid(): Promise<string | null> {
     return null;
   });
   return uidPromise;
+}
+
+/**
+ * Deletes the Firebase Auth user itself, once its cloud data is gone: deleting
+ * the save and the friend-code record left the account standing, and Google
+ * Play's account-deletion rule (and Apple 5.1.1(v)) covers the account too.
+ *
+ * 'requires-login' when Firebase wants a fresh sign-in first, which happens to
+ * linked Google accounts whose last sign-in is old; anonymous users never hit it.
+ */
+export async function deleteCurrentUser(): Promise<'deleted' | 'none' | 'requires-login' | 'failed'> {
+  if (!isFirebaseConfigured()) return 'none';
+  const user = firebaseAuth().currentUser;
+  if (!user) return 'none';
+  try {
+    await deleteUser(user);
+    // The cached uid belongs to a user that no longer exists.
+    uidPromise = null;
+    return 'deleted';
+  } catch (e) {
+    return (e as { code?: string }).code === 'auth/requires-recent-login' ? 'requires-login' : 'failed';
+  }
 }
 
 // ---------- Persistent identity (account linking) ----------

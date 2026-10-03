@@ -1872,7 +1872,7 @@ export class UI {
       <hr/>
       <div class="set-row"><span>${tt('☁️ Delete my cloud data')}</span>
         <button class="tgl danger" id="cloud-delete">${tt('Delete')}</button></div>
-      <p class="set-note-block">${tt('Removes the copy of your save in the cloud and your friend-code record. The game on this device is untouched.')}</p>
+      <p class="set-note-block">${tt('Removes your cloud save, your friend-code record and your sign-in account. The game on this device is untouched.')}</p>
       <div class="set-row"><span>${tt('🗑️ Delete all progress')}</span><button class="tgl danger" data-t="reset">${tt('Reset')}</button></div>
       <p class="version">${tt('Reefy v{v} — made with love 🐠', { v: APP_VERSION })}<br/>
         <span class="diag">${storeCurrencyDiag}</span></p>

@@ -7,6 +7,7 @@ import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQue
 import { GROWTH_ADS_PER_DAY, GROWTH_AD_MS, REWARDED_ADS_PER_DAY } from './ads';
 import { DirtSpot, FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
+import { deleteCurrentUser } from './firebase-app';
 import { Services, createServices, submitPlayScore } from './services';
 import {
   EGGS, EggTier, FISH_NAMES, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, SPEEDUP_MS_PER_PEARL,
@@ -2448,6 +2449,13 @@ export class Game {
       // happily upload again on the next sync. Marking it stops that until
       // the player opts back in by linking again.
       this.cloudDeleted = true;
+      const account = await deleteCurrentUser();
+      if (account === 'requires-login') {
+        return { ok: true, msg: t('Your cloud data has been deleted. To delete the account as well, sign in again and repeat.') };
+      }
+      if (account === 'failed') {
+        return { ok: true, msg: t('Your cloud data has been deleted, but the account could not be removed. Try again later.') };
+      }
       return { ok: true, msg: t('Your cloud data has been deleted.') };
     }
     return { ok: false, msg: t('Could not reach the cloud. Try again later.') };
