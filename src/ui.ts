@@ -1,6 +1,7 @@
 import { AD_TEST_DEVICE_TAGS } from './ads';
 import { audio } from './audio';
 import { haptic, setHaptics } from './haptics';
+import { playCoinGain, reducedMotion, setReduceMotion } from './juice';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
@@ -283,6 +284,8 @@ export class UI {
   private game: Game;
   private root!: HTMLElement;
   private hudCoins!: HTMLElement;
+  /** Set while a coin-gain animation owns the counter, so refreshHUD leaves the text alone. */
+  private coinAnimating = false;
   private hudPearls!: HTMLElement;
   private hudTank!: HTMLElement;
   private hudStreak!: HTMLElement;
@@ -381,7 +384,7 @@ export class UI {
           case 'feed': this.toggleFeedPop(); break;
           case 'arrange': this.startEditMode(); break;
           case 'eggs': this.renderShop('eggs'); break;
-          case 'collect': this.toast(this.game.collectIncome().msg); break;
+          case 'collect': this.toast(this.withCoinGain(btn, () => this.game.collectIncome()).msg); break;
           // Cleaning has no mode of its own — the glass is scrubbed by tapping the
           // dirt itself, which is the whole point of the interaction. So the chip
           // reports the state and says where to tap rather than pretending to be
@@ -513,9 +516,31 @@ export class UI {
     this.game.setUiKeepOut(rects);
   }
 
+  /**
+   * Runs a coin-paying action and, if the balance went up, plays the gain beat:
+   * coins fly from `origin` into the HUD counter, which bumps and counts up. The
+   * action has already saved and refreshed by the time this animates, so the
+   * counter is held at the old value until the coins land.
+   */
+  private withCoinGain<T>(origin: HTMLElement | null, action: () => T): T {
+    const before = this.game.save.coins;
+    const rect = origin?.getBoundingClientRect();
+    const canAnimate = !this.coinAnimating && !!rect;
+    if (canAnimate) { this.coinAnimating = true; this.hudCoins.textContent = fmt(before); }
+    const result = action();
+    const after = this.game.save.coins;
+    if (!canAnimate) return result;
+    if (after <= before) { this.coinAnimating = false; this.refreshHUD(); return result; }
+    void playCoinGain(rect, this.hudCoins, ICON_COIN, before, after, fmt).finally(() => {
+      this.coinAnimating = false;
+      this.refreshHUD();
+    });
+    return result;
+  }
+
   refreshHUD(): void {
     const s = this.game.save;
-    this.hudCoins.textContent = fmt(s.coins);
+    if (!this.coinAnimating) this.hudCoins.textContent = fmt(s.coins);
     this.hudPearls.textContent = fmt(s.pearls);
     this.refreshStreakChip(s.streak);
     this.refreshCareBar();
@@ -1335,7 +1360,7 @@ export class UI {
     });
     el.querySelectorAll<HTMLButtonElement>('[data-sell]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const res = this.game.sellEarning(flat[Number(btn.dataset.sell)]);
+        const res = this.withCoinGain(btn, () => this.game.sellEarning(flat[Number(btn.dataset.sell)]));
         if (!res.ok) audio.error();
         this.toast(res.msg);
         if (res.ok) this.renderInventory('fish');
@@ -1685,7 +1710,7 @@ export class UI {
     el.querySelectorAll<HTMLButtonElement>('[data-claim]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const q = daily.find((x) => x.id === btn.dataset.claim)!;
-        const res = this.game.claimQuest(q);
+        const res = this.withCoinGain(btn, () => this.game.claimQuest(q));
         this.toast(res.msg);
         if (res.ok) this.renderQuests();
       });
@@ -2201,7 +2226,7 @@ export class UI {
     const sellBtn = el.querySelector<HTMLButtonElement>('.sell');
     if (sellBtn) {
       sellBtn.addEventListener('click', () => {
-        const res = this.game.sellFish(f);
+        const res = this.withCoinGain(sellBtn, () => this.game.sellFish(f));
         this.toast(res.msg);
         this.closePanel();
       });
@@ -2271,7 +2296,7 @@ export class UI {
     const sellBtn = el.querySelector<HTMLButtonElement>('.sell');
     if (sellBtn) {
       sellBtn.addEventListener('click', () => {
-        const res = this.game.sellDormant(fs);
+        const res = this.withCoinGain(sellBtn, () => this.game.sellDormant(fs));
         this.toast(res.msg);
         this.closePanel();
       });

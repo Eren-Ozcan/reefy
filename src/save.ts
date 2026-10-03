@@ -173,7 +173,9 @@ export function defaultSave(): SaveData {
     pityCounter: 0,
     streak: 0,
     bestStreak: 0,
-    incomePot: 0,
+    // Seeded so the very first COLLECT pays out something worth the flying coins
+    // (and the tutorial's "collect" step) instead of a single coin.
+    incomePot: 60,
     cleanRewardDay: '',
     cleanRewardCount: 0,
     adRewardDay: '',
