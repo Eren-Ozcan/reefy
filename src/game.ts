@@ -146,6 +146,19 @@ export class Game {
     this.services = createServices(this.save);
   }
 
+  /** First grown fish in the active tank, or null. Used by the guided tutorial. */
+  firstAdult(): Fish | null {
+    return this.fishes.find((f) => f.isAdult && f.tank === this.save.activeTank) ?? null;
+  }
+
+  /** On-screen box of a fish: its canvas position mapped to viewport pixels. */
+  fishScreenRect(f: Fish): DOMRect {
+    const c = this.app.canvas.getBoundingClientRect();
+    const k = c.width / (this.app.screen.width || 1);
+    const size = 56;
+    return new DOMRect(c.left + f.x * k - size / 2, c.top + f.y * k - size / 2, size, size);
+  }
+
   get bounds(): Bounds {
     return { w: this.app.screen.width, h: this.app.screen.height };
   }
@@ -1142,7 +1155,7 @@ export class Game {
 
   /** The one goal worth surfacing on the scene: the nearest daily quest still in play,
    *  preferring one already claimable so the reward is never left sitting unnoticed. */
-  nextGoal(): { id: string; name: string; progress: number; target: number; coins: number; pearls: number } | null {
+  nextGoal(): { id: string; name: string; event: QuestEvent; progress: number; target: number; coins: number; pearls: number } | null {
     const open = this.dailyQuests().filter((q) => !this.save.quests.claimed.includes(q.id));
     if (!open.length) return null;
     const withProgress = open.map((q) => ({
@@ -1157,6 +1170,7 @@ export class Game {
     return {
       id: pick.q.id,
       name: pick.q.name,
+      event: pick.q.event,
       progress: pick.p,
       target: pick.q.target,
       coins: pick.q.rewardCoins,

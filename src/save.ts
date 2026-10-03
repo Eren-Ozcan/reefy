@@ -150,9 +150,10 @@ export function defaultSave(): SaveData {
     playerName: 'Misafir-' + Math.floor(1000 + Math.random() * 9000),
     friendCode: makeFriendCode(),
     fishes: [
-      // The first fish starts 60% grown: the first sale (the first win) happens within the game's first ~1 minute
-      { sp: 'lepistes', progress: 0.6, hunger: 0.9, name: 'Baloncuk', seed: 11, tank: START_TANK },
-      { sp: 'neon-tetra', progress: 0.3, hunger: 0.85, name: 'Mercan', seed: 42, tank: START_TANK },
+      // The guppy starts 88% grown and both fish start hungry: the guided tutorial feeds one,
+      // then sells the guppy once it has finished growing (about half a minute in)
+      { sp: 'lepistes', progress: 0.88, hunger: 0.3, name: 'Baloncuk', seed: 11, tank: START_TANK },
+      { sp: 'neon-tetra', progress: 0.3, hunger: 0.35, name: 'Mercan', seed: 42, tank: START_TANK },
     ],
     collection: [],
     feedOwned: {},

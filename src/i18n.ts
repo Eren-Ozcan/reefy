@@ -922,6 +922,16 @@ const TR: Record<string, string> = {
   'Complete daily quests, place decorations, and grow your tank to make room for more fish!': 'Günlük görevleri tamamla, dekor yerleştir, akvaryumunu büyüterek daha fazla balığa yer aç!',
   'Next': 'İleri',
   "Let's dive in! 🎉": 'Hadi başlayalım! 🎉',
+  'This reef is now yours. Let us show you the three things you will do most.': 'Bu resif artık senin. En çok yapacağın üç şeyi birlikte yapalım.',
+  "Let's start": 'Başlayalım',
+  'Tap the water near a fish to drop feed.': 'Yem atmak için bir balığın yakınındaki suya dokun.',
+  'Pick a feed.': 'Bir yem seç.',
+  'Your fish are hungry. Tap Feed.': 'Balıkların aç. Besle düğmesine dokun.',
+  'Your fish earn coins while you play. Tap Collect.': 'Balıkların sen oynarken para kazanıyor. Topla düğmesine dokun.',
+  'Your guppy is fully grown. Tap it, then sell it.': 'Lepistes tam büyüdü. Ona dokun, sonra sat.',
+  'Your guppy is almost grown. One moment...': 'Lepistes neredeyse büyüdü. Bir saniye...',
+  'You are all set. Quests will tell you what to do next.': 'Hazırsın. Sırada ne yapacağını Görevler söyler.',
+  'Skip': 'Atla',
 
   // ---- ui.ts: panel titles ----
   '🛒 Shop': '🛒 Mağaza', '🎒 Inventory': '🎒 Envanter', '🏆 Social': '🏆 Sosyal', '☰ Menu': '☰ Menü',

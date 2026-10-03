@@ -2,13 +2,14 @@ import { AD_TEST_DEVICE_TAGS } from './ads';
 import { audio } from './audio';
 import { haptic, setHaptics } from './haptics';
 import { playCoinGain, reducedMotion, setReduceMotion } from './juice';
+import { runGuidedTutorial } from './tutorial';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
 import { SAD_THRESHOLD } from './fish';
 import { GROWTH_AD_MS } from './ads';
 import { INCOME_CAP_HOURS, type FishEarning, type Game } from './game';
-import { ACHIEVEMENTS, msUntilDailyReset, msUntilWeeklyReset } from './quests';
+import { ACHIEVEMENTS, msUntilDailyReset, msUntilWeeklyReset, type QuestEvent } from './quests';
 import { EggTier, PITY_LIMIT, RARITY_INCOME, RARITY_INFO, Rarity, SPECIES, Species, speciesById } from './species';
 import { FEEDS, FEED_PACKS, FeedDef, feedById } from './feeds';
 import { TANK_CAP_BONUS, TankDef } from './tanks';
@@ -403,8 +404,8 @@ export class UI {
       audio.click();
       const id = this.goalQuestId;
       const goal = this.game.nextGoal();
-      if (!id || !goal || goal.progress < goal.target) { this.setActiveTab('quests'); this.renderQuests(); return; }
-      const res = this.game.claimQuestById(id);
+      if (!id || !goal || goal.progress < goal.target) { if (goal) this.goToGoal(goal.event); else { this.setActiveTab('quests'); this.renderQuests(); } return; }
+      const res = this.withCoinGain(root.querySelector<HTMLElement>('#next-goal'), () => this.game.claimQuestById(id));
       this.toast(res.msg);
       if (!res.ok) audio.error();
       this.refreshHUD();
@@ -514,6 +515,26 @@ export class UI {
       }];
     });
     this.game.setUiKeepOut(rects);
+  }
+
+  /** Takes the player to the place where a quest of this kind gets done, not to the quest list. */
+  private goToGoal(ev: QuestEvent): void {
+    switch (ev) {
+      case 'feed': if (this.game.inputMode === 'normal') this.toggleFeedPop(); break;
+      case 'sell': this.renderInventory('fish'); break;
+      case 'hatch': this.renderShop('eggs'); break;
+      case 'buyFish': case 'collect': this.renderShop('fish'); break;
+      case 'placeDecor': this.renderShop('decor'); break;
+      case 'earn': this.pointAt('#collect-btn'); break;
+      case 'clean': this.pointAt('[data-care="clean"]'); this.toast(tt('Tap the dirt on the glass to scrub it off.')); break;
+    }
+  }
+
+  /** A short pulse on one control: "this one". */
+  private pointAt(selector: string): void {
+    const el = this.root.querySelector<HTMLElement>(selector);
+    if (!el || reducedMotion()) return;
+    el.animate([{ scale: '1' }, { scale: '1.12' }, { scale: '1' }, { scale: '1.12' }, { scale: '1' }], { duration: 900, easing: 'ease-in-out' });
   }
 
   /**
@@ -2395,41 +2416,15 @@ export class UI {
     });
   }
 
-  /** Mandatory step-by-step tutorial on first launch: can't be dismissed by tapping outside, advances via "Next". */
+  /** First-launch tutorial: a welcome card, then three guided actions (see tutorial.ts). */
   private runTutorial(): void {
-    const s = this.game.save;
-    if (s.tutorialDone) return;
-    const steps: { title: string; body: string }[] = [
-      { title: tt('🌊 Welcome to Reefy!'), body: tt('This reef is now yours. Grow your fish, complete your collection, and build your own reef.') },
-      { title: tt('🍤 Learn to feed'), body: tt('Tap "Feed" in the care bar at the top, pick a feed, then tap the water to feed. Quality feed boosts sale price!') },
-      { title: tt('🐟 Sell and grow'), body: tt('Tap adult fish to sell them, then use your earnings to buy new species and grow your reef.') },
-      { title: tt('📋 Daily quests'), body: tt('Complete daily quests, place decorations, and grow your tank to make room for more fish!') },
-    ];
-    let i = 0;
-    const wrap = document.createElement('div');
-    wrap.className = 'tutorial-backdrop';
-    const render = (): void => {
-      const last = i === steps.length - 1;
-      wrap.innerHTML = `
-        <div class="tutorial-card">
-          <h2>${steps[i].title}</h2>
-          <p>${steps[i].body}</p>
-          <div class="tutorial-dots">${steps.map((_, k) => `<span class="dot ${k === i ? 'active' : ''}"></span>`).join('')}</div>
-          <button class="buy-btn tutorial-next">${last ? tt("Let's dive in! 🎉") : tt('Next')}</button>
-        </div>`;
-      wrap.querySelector('.tutorial-next')!.addEventListener('click', () => {
-        audio.click();
-        if (last) {
-          s.tutorialDone = true;
-          this.game.syncSave();
-          wrap.remove();
-        } else {
-          i++;
-          render();
-        }
-      });
-    };
-    render();
-    this.root.appendChild(wrap);
+    runGuidedTutorial({
+      root: this.root,
+      game: this.game,
+      exitModes: () => this.exitModes(),
+      toast: (m) => this.toast(m),
+      // After the tutorial the player gets a single, obvious next thing: the goal strip.
+      onFinish: () => this.pointAt('#next-goal'),
+    });
   }
 }
