@@ -280,7 +280,6 @@ html, body {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--panel-bg);
-  backdrop-filter: blur(16px);
   color: var(--ink-soft);
   cursor: pointer;
   padding: 7px 4px; border-radius: var(--chip-radius);
@@ -384,12 +383,13 @@ html, body {
    action closes the chip. */
 .hud-money .hud-plus { order: 3; }
 
+/* No backdrop-filter on in-game chrome: --panel-bg is 94% opaque, so the blur is invisible, but it
+   re-blurs the live WebGL canvas every frame (31fps -> 60fps on a Kirin 710 phone without it). */
 .hud-chip {
   display: flex; align-items: center; gap: 6px;
   background: var(--panel-bg);
   color: var(--ink);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
   border-radius: 999px;
   padding: 7px 14px;
   font-size: var(--fs-sm);
@@ -605,7 +605,6 @@ html, body {
   max-height: 76vh;
   background: var(--panel-bg);
   color: var(--ink);
-  backdrop-filter: blur(16px);
   border-top: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
   display: flex; flex-direction: column;
@@ -659,7 +658,6 @@ html, body {
 .tutorial-card {
   width: min(400px, 100%);
   background: var(--panel-bg);
-  backdrop-filter: blur(10px);
   border-radius: var(--radius);
   padding: 28px 24px 24px;
   text-align: center;
