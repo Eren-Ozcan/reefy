@@ -2115,7 +2115,9 @@ export class Game {
     audio.setBiome(this.activeTank.biome);
     this.syncSave();
     this.ui.refreshHUD();
-    this.services.ads.maybeShowInterstitial();
+    // A beat after the scene has redrawn, not on top of it: the ad used to cover the
+    // tank the player had just chosen to look at.
+    window.setTimeout(() => this.services.ads.maybeShowInterstitial(), 1500);
     return { ok: true, msg: `${t(this.activeTank.name)} 🌊` };
   }
 
@@ -2184,6 +2186,7 @@ export class Game {
       this.save.level++;
       this.save.pearls += 3;
       track('level_up', { level: this.save.level });
+      this.ui.onLevelUp?.(this.save.level);
       audio.levelup();
       this.ui.toast(t('⭐ Level {n}! +3 pearls, capacity {cap} fish', { n: this.save.level, cap: this.capacity }));
     }

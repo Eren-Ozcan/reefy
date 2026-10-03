@@ -88,7 +88,12 @@ describe('switching tanks', () => {
     const game = headlessGame();
     game.save.tanksOwned.push(SECOND_TANK);
 
+    vi.useFakeTimers();
     expect(game.switchTank(SECOND_TANK).ok).toBe(true);
+    // Not on top of the redraw: the ad waits a beat after the switch.
+    expect(maybeShowInterstitial).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(2000);
+    vi.useRealTimers();
     expect(maybeShowInterstitial).toHaveBeenCalledTimes(1);
   });
 

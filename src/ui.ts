@@ -552,6 +552,16 @@ export class UI {
     }
   }
 
+  /** Called on each level-up. A guest who has put real time in gets one nudge to back the save up. */
+  onLevelUp(level: number): void {
+    const s = this.game.save;
+    if (level < 4 || s.cloudNudgeSeen) return;
+    if (!isAccountLinkingAvailable() || isLinked()) return;
+    s.cloudNudgeSeen = true;
+    this.game.syncSave();
+    this.toast(tt('☁️ Sign in from Settings (You tab) to keep your reef safe on any phone.'));
+  }
+
   /** A short pulse on one control: "this one". */
   private pointAt(selector: string): void {
     const el = this.root.querySelector<HTMLElement>(selector);
@@ -1261,6 +1271,7 @@ export class UI {
           void this.withPending(btn, () => this.game.services.iap.purchase(iapId)).then((res) => {
             if (!res) return; // a second tap while the first purchase was still open
             if (res.ok) {
+              this.game.save.payer = true;
               if (res.grantPearls) this.game.save.pearls += res.grantPearls;
               if (res.grantCoins) this.game.save.coins += res.grantCoins;
               if (res.grantRemovesAds) this.game.save.adsRemoved = true;

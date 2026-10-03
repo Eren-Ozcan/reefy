@@ -37,9 +37,10 @@ const { defaultSave } = await import('./save');
 
 /** An ads provider that has already got past setup and has an ad in hand —
  *  the only state in which an interstitial could actually be shown. */
-function armedAds(adsRemoved: boolean): InstanceType<typeof AdMobAds> {
+function armedAds(adsRemoved: boolean, payer = false): InstanceType<typeof AdMobAds> {
   const save = defaultSave();
   save.adsRemoved = adsRemoved;
+  save.payer = payer;
   const ads = new AdMobAds(save);
   const internals = ads as unknown as {
     ready: boolean;
@@ -66,6 +67,11 @@ describe('the interstitial guard', () => {
 
   it('shows nothing once remove-ads is owned', () => {
     armedAds(true).maybeShowInterstitial();
+    expect(showInterstitial).not.toHaveBeenCalled();
+  });
+
+  it('shows nothing to anyone who has paid for pearls, even without remove-ads', () => {
+    armedAds(false, true).maybeShowInterstitial();
     expect(showInterstitial).not.toHaveBeenCalled();
   });
 

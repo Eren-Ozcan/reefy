@@ -884,6 +884,7 @@ const TR: Record<string, string> = {
   'You missed a day, but your streak was saved. This works once a week.': 'Bir günü kaçırdın ama serin korundu. Bu hak haftada bir kez geçerli.',
   '🐢 Reduce motion': '🐢 Hareketi azalt',
   'While you are away, fish and income progress at half speed, for up to 8 hours.': 'Sen yokken balıklar ve gelir yarı hızda, en fazla 8 saat ilerler.',
+  '☁️ Sign in from Settings (You tab) to keep your reef safe on any phone.': "☁️ Resifini her telefonda güvende tutmak için Ayarlar'dan (Sen sekmesi) giriş yap.",
   'New species!': 'Yeni tür!',
   'Unlocks at level {n}': "Seviye {n}'de açılır",
   '🥚 Your egg has hatched!': '🥚 Yumurtan çatladı!',

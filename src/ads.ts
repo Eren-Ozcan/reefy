@@ -252,7 +252,8 @@ export class AdMobAds implements AdsProvider {
   }
 
   maybeShowInterstitial(): void {
-    if (!this.ready || this.save.adsRemoved || !this.interstitialReady) return;
+    // Anyone who has paid for anything is done with interstitials, not only the remove-ads buyer.
+    if (!this.ready || this.save.adsRemoved || this.save.payer || !this.interstitialReady) return;
     const now = Date.now();
     if (now - this.lastInterstitial < interstitialCooldownMs()) return;
     this.lastInterstitial = now;

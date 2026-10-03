@@ -102,6 +102,8 @@ export interface SaveData {
   haptics: boolean;
   notifications: boolean;
   reduceMotion: boolean;
+  payer: boolean;           // has bought something with real money; never shown interstitials
+  cloudNudgeSeen: boolean;  // the one-time "back up your progress" hint has been shown
   lastSeen: number;
   lastDaily: string;
   streakFreezeWeek: string; // the week (weekKeyFor) whose one missed-day grace has been used
@@ -193,6 +195,8 @@ export function defaultSave(): SaveData {
     haptics: true,
     notifications: true,
     reduceMotion: false,
+    payer: false,
+    cloudNudgeSeen: false,
     lastSeen: Date.now(),
     lastDaily: '',
     streakFreezeWeek: '',
@@ -236,7 +240,7 @@ export function defaultSave(): SaveData {
  *   on first launch WITHOUT giving the gift (see game.ts applyDailyGift);
  *   anything greater than 1 shows a real return, and that counts
  * - `quests.day` / `weeklyQuest.day` — the quest day is set up on its own at launch
- * - `music`/`sfx`/`haptics`/`notifications`/`reduceMotion`/`lang` settings and the `feedHintSeen`/`editHintSeen` hints —
+ * - `music`/`sfx`/`haptics`/`notifications`/`reduceMotion`/`lang` settings and the `cloudNudgeSeen` hint and the `feedHintSeen`/`editHintSeen` hints —
  *   not progress, just UI state
  * - `friendCode`, default `playerName` — randomly generated
  * - `adsRemoved` — never restored from the cloud anyway, the on-device value is kept
@@ -299,7 +303,7 @@ function isDefaultPlayerName(name: string): boolean {
  */
 const FINGERPRINT_IGNORED = [
   'lastSeen', 'incomePot', 'dirtSpots',
-  'music', 'sfx', 'haptics', 'notifications', 'reduceMotion', 'lang', 'tutorialDone', 'feedHintSeen', 'editHintSeen',
+  'music', 'sfx', 'haptics', 'notifications', 'reduceMotion', 'cloudNudgeSeen', 'lang', 'tutorialDone', 'feedHintSeen', 'editHintSeen',
   'adsRemoved',
 ] as const satisfies readonly (keyof SaveData)[];
 
