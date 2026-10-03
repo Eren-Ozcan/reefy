@@ -144,6 +144,9 @@ export interface AdsProvider {
   showRewarded(kind?: RewardKind): Promise<{ ok: boolean; msg: string; grantPearls?: number }>;
   /** Why ads are unavailable, if they are — empty when they work. Shown in Settings. */
   readonly lastError?: string;
+  /** True when the consent SDK requires a privacy-options entry point in Settings. */
+  readonly privacyOptionsRequired?: boolean;
+  showPrivacyOptions?(): Promise<void>;
 }
 
 export class StubAds implements AdsProvider {
@@ -180,6 +183,8 @@ export class AdMobAds implements AdsProvider {
         info = await AdMob.showConsentForm();
       }
       if (!info.canRequestAds) this.lastError = `consent: ${String(info.status)}`;
+      // The enum itself is not exported from the plugin's package root.
+      this.privacyOptionsRequired = String(info.privacyOptionsRequirementStatus) === 'REQUIRED';
       return info.canRequestAds;
     } catch (e) {
       // Recorded rather than swallowed. This call reaches Google's UMP servers,
@@ -193,6 +198,14 @@ export class AdMobAds implements AdsProvider {
 
   /** Why ads are unavailable, if they are. Surfaced in Settings — see ui.ts. */
   lastError = '';
+
+  /** UMP says this player (EEA/UK) must be able to revisit their consent choice. */
+  privacyOptionsRequired = false;
+
+  /** Re-opens the consent form so the player can change or withdraw consent. */
+  async showPrivacyOptions(): Promise<void> {
+    await AdMob.showPrivacyOptionsForm();
+  }
 
   /** Guards against two setups running at once when a retry lands mid-flight. */
   private setupInFlight: Promise<void> | null = null;

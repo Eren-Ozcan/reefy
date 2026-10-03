@@ -20,6 +20,10 @@ import { isAccountLinkingAvailable, isLinked, linkedLabel, linkWithGoogle } from
 import { isPlayLeaderboardAvailable, showPlayLeaderboard } from './services';
 import type { FishSave } from './save';
 
+/** Same address as the Play Console listing and PRIVACY.md. Google Play's User
+ *  Data policy wants it reachable from inside the app too, not only the store. */
+const PRIVACY_POLICY_URL = 'https://yilkgames.com/privacy-policy/';
+
 function hex(c: number): string {
   return '#' + c.toString(16).padStart(6, '0');
 }
@@ -1856,8 +1860,12 @@ export class UI {
       <div class="set-row"><span>${tt('🧾 Restore purchases')}</span>
         <button class="tgl" id="restore-iap">${tt('Restore')}</button></div>
       <p class="set-note-block">${tt('Brings back Remove Ads if you bought it on this store account — after a reinstall or on a new phone.')}</p>
+      ${this.game.services.ads.privacyOptionsRequired ? `
+      <div class="set-row"><span>${tt('🔒 Ad privacy choices')}</span>
+        <button class="tgl" id="privacy-options">${tt('Change')}</button></div>` : ''}
       <hr/>
       <div class="set-links">
+        <a href="${PRIVACY_POLICY_URL}" target="_blank" rel="noopener">📄 ${tt('Privacy policy')}</a>
         <a href="https://reefy.games" target="_blank" rel="noopener">🌐 reefy.games</a>
         <a href="mailto:destek@reefy.games">✉️ destek@reefy.games</a>
       </div>
@@ -1878,6 +1886,13 @@ export class UI {
       this.game.syncSave();
       audio.click();
       this.toast(tt('Name updated: {name}', { name }));
+    });
+    el.querySelector('#privacy-options')?.addEventListener('click', () => {
+      audio.click();
+      void this.game.services.ads.showPrivacyOptions?.().catch(() => {
+        audio.error();
+        this.toast(tt('Could not open the privacy choices. Try again later.'));
+      });
     });
     el.querySelector('#restore-iap')!.addEventListener('click', () => {
       const btn = el.querySelector<HTMLButtonElement>('#restore-iap')!;
