@@ -5,7 +5,7 @@
 > This file stays here as the game-specific source that feeds that page — keep it
 > accurate, but publish nothing from it.
 
-_Last updated: 8 August 2026_
+_Last updated: 3 October 2026_
 
 Reefy is published by Yilk Games. This policy describes this game specifically;
 the studio-wide policy covering all of our games is at
@@ -101,6 +101,19 @@ system settings (Google Settings → Ads → Opt out of Ads Personalization / Re
 advertising ID).
 
 If you buy the ad-free version, no ads are requested at all.
+
+## Analytics and Remote Config (Google Firebase)
+
+Reefy uses Google Firebase Analytics to see how the game is used: tutorial
+progress, level-ups, in-game currency earned and spent, and the steps of ad and
+purchase flows. Each event is tied to a random app-instance ID, plus your device
+model, operating system version, language, country and app version. There is no
+crash reporting.
+
+Collection stays off until the ad-consent flow has answered. In the EEA and the
+UK, declining there means nothing is sent. Reefy also downloads ad-pacing
+settings (how often ads may appear) with Firebase Remote Config, which uses a
+random installation ID.
 
 ## Purchases
 
