@@ -412,14 +412,45 @@ function migrate(parsed: Record<string, unknown>): SaveData {
   return merged;
 }
 
-export function loadSave(): SaveData {
+/** The previous good save, written just before each overwrite. */
+const BACKUP_KEY = `${KEY}.bak`;
+/** Where an unreadable save is parked instead of being overwritten, for support. */
+const CORRUPT_KEY = `${KEY}.corrupt`;
+
+function parses(raw: string): boolean {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return defaultSave();
+    const v: unknown = JSON.parse(raw);
+    return !!v && typeof v === 'object';
+  } catch {
+    return false;
+  }
+}
+
+function readSave(key: string): SaveData | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
     return migrate(JSON.parse(raw) as Record<string, unknown>);
   } catch {
-    return defaultSave();
+    return null;
   }
+}
+
+/**
+ * A save that fails to parse used to fall back to a fresh save silently, and
+ * the next persist() six seconds later overwrote it — a guest player (no cloud
+ * copy) lost everything. Now the backup is tried first, and the unreadable
+ * text is parked rather than destroyed.
+ */
+export function loadSave(): SaveData {
+  const main = readSave(KEY);
+  if (main) return main;
+  let raw: string | null = null;
+  try { raw = localStorage.getItem(KEY); } catch { /* storage blocked */ }
+  if (raw) {
+    try { localStorage.setItem(CORRUPT_KEY, raw); } catch { /* quota: the backup still applies */ }
+  }
+  return readSave(BACKUP_KEY) ?? defaultSave();
 }
 
 /**
@@ -441,6 +472,10 @@ export function parseSave(raw: string): SaveData | null {
 export function persist(s: SaveData): void {
   s.lastSeen = Date.now();
   try {
+    // Keep the last copy that parses as the backup, so a write that dies
+    // halfway (or any other corruption) can be recovered from.
+    const prev = localStorage.getItem(KEY);
+    if (prev && parses(prev)) localStorage.setItem(BACKUP_KEY, prev);
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
     /* storage full/blocked — silently ignore */
@@ -449,4 +484,7 @@ export function persist(s: SaveData): void {
 
 export function wipeSave(): void {
   localStorage.removeItem(KEY);
+  // "Delete all progress" must not come back through the backup.
+  localStorage.removeItem(BACKUP_KEY);
+  localStorage.removeItem(CORRUPT_KEY);
 }
