@@ -100,6 +100,7 @@ export interface SaveData {
   music: boolean;
   sfx: boolean;
   haptics: boolean;
+  notifications: boolean;
   lastSeen: number;
   lastDaily: string;
   tutorialDone: boolean;
@@ -188,6 +189,7 @@ export function defaultSave(): SaveData {
     music: true,
     sfx: true,
     haptics: true,
+    notifications: true,
     lastSeen: Date.now(),
     lastDaily: '',
     tutorialDone: false,
@@ -230,7 +232,7 @@ export function defaultSave(): SaveData {
  *   on first launch WITHOUT giving the gift (see game.ts applyDailyGift);
  *   anything greater than 1 shows a real return, and that counts
  * - `quests.day` / `weeklyQuest.day` — the quest day is set up on its own at launch
- * - `music`/`sfx`/`haptics`/`lang` settings and the `feedHintSeen`/`editHintSeen` hints —
+ * - `music`/`sfx`/`haptics`/`notifications`/`lang` settings and the `feedHintSeen`/`editHintSeen` hints —
  *   not progress, just UI state
  * - `friendCode`, default `playerName` — randomly generated
  * - `adsRemoved` — never restored from the cloud anyway, the on-device value is kept
@@ -293,7 +295,7 @@ function isDefaultPlayerName(name: string): boolean {
  */
 const FINGERPRINT_IGNORED = [
   'lastSeen', 'incomePot', 'dirtSpots',
-  'music', 'sfx', 'haptics', 'lang', 'tutorialDone', 'feedHintSeen', 'editHintSeen',
+  'music', 'sfx', 'haptics', 'notifications', 'lang', 'tutorialDone', 'feedHintSeen', 'editHintSeen',
   'adsRemoved',
 ] as const satisfies readonly (keyof SaveData)[];
 

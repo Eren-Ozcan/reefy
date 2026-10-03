@@ -16,6 +16,7 @@ dependencies {
     implementation project(':capacitor-firebase-remote-config')
     implementation project(':capacitor-app')
     implementation project(':capacitor-haptics')
+    implementation project(':capacitor-local-notifications')
     implementation project(':revenuecat-purchases-capacitor')
     implementation project(':capacitor-game-connect-8')
 

@@ -2,6 +2,7 @@ import { AD_TEST_DEVICE_TAGS } from './ads';
 import { audio } from './audio';
 import { haptic, setHaptics } from './haptics';
 import { playCoinGain, reducedMotion, setReduceMotion } from './juice';
+import { askNotificationPermissionOnce } from './notifications';
 import { runGuidedTutorial } from './tutorial';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
@@ -1187,7 +1188,7 @@ export class UI {
           // now sits in the incubating queue above the tiers, and the buy
           // button is at the bottom of the list — keeping the scroll would
           // leave the player looking at the shop instead of their egg.
-          if (res.pending) { this.toast(res.msg); this.renderShop('eggs', 0); return; }
+          if (res.pending) { this.toast(res.msg); if (this.game.save.notifications) void askNotificationPermissionOnce(); this.renderShop('eggs', 0); return; }
           this.showEggReveal(egg, res.species!);
         } else if (btn.dataset.collectEgg) {
           const id = Number(btn.dataset.collectEgg);
@@ -1903,6 +1904,7 @@ export class UI {
       ${langRowHTML}
       <div class="set-row"><span>${tt('🎵 Music')}</span><button class="tgl ${s.music ? 'on' : ''}" data-t="music">${s.music ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('🔊 Sound Effects')}</span><button class="tgl ${s.sfx ? 'on' : ''}" data-t="sfx">${s.sfx ? tt('On') : tt('Off')}</button></div>
+      <div class="set-row"><span>${tt('🔔 Reminders')}</span><button class="tgl ${s.notifications ? 'on' : ''}" data-t="notifications">${s.notifications ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('📳 Vibration')}</span><button class="tgl ${s.haptics ? 'on' : ''}" data-t="haptics">${s.haptics ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('📤 Tell your friends')}</span><button class="tgl" data-t="share">${tt('Share')}</button></div>
       <div class="set-row"><span>${tt('🧾 Restore purchases')}</span>
@@ -1980,6 +1982,9 @@ export class UI {
           s.music = !s.music; audio.setMusic(s.music); this.game.syncSave(); this.renderSettings();
         } else if (t === 'sfx') {
           s.sfx = !s.sfx; audio.setSfx(s.sfx); audio.click(); this.game.syncSave(); this.renderSettings();
+        } else if (t === 'notifications') {
+          s.notifications = !s.notifications; this.game.syncSave(); this.renderSettings();
+          if (s.notifications) void askNotificationPermissionOnce();
         } else if (t === 'haptics') {
           s.haptics = !s.haptics; setHaptics(s.haptics); haptic('light'); this.game.syncSave(); this.renderSettings();
         } else if (t === 'share') {

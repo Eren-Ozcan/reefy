@@ -1,5 +1,6 @@
 import { Application, Container, FillGradient, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { track } from './analytics';
+import { cancelReminder, scheduleReminder, type Candidate } from './notifications';
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
@@ -314,6 +315,37 @@ export class Game {
     return Math.round(rate);
   }
 
+  /**
+   * When each reminder-worthy thing should be done if the app is left closed.
+   * Fish and income progress at the offline rate while away (see applyOffline),
+   * so the times are worked out with the same constants, using the current
+   * hunger as an estimate.
+   */
+  reminderCandidates(): Candidate[] {
+    const now = Date.now();
+    const out: Candidate[] = [];
+    const eggAt = Math.min(...this.save.pendingEggs.map((e) => e.readyAt));
+    if (Number.isFinite(eggAt)) out.push({ kind: 'egg', at: eggAt });
+
+    const growing = [
+      ...this.fishes.map((f) => ({ sp: f.sp, progress: f.progress, hunger: f.hunger, tank: f.tank })),
+      ...this.dormant.map((d) => ({ sp: speciesById(d.sp), progress: d.progress, hunger: d.hunger, tank: d.tank })),
+    ].filter((f) => f.progress < 1);
+    let fishMs = Infinity;
+    for (const f of growing) {
+      const speed = OFFLINE_SPEED * hungerGrowthMult(Math.max(0.05, f.hunger * 0.6)) * this.tankNetMult(f.tank);
+      if (speed > 0) fishMs = Math.min(fishMs, ((1 - f.progress) * f.sp.growthMs) / speed);
+    }
+    if (Number.isFinite(fishMs)) out.push({ kind: 'fish', at: now + fishMs });
+
+    const rate = this.incomePerHour;
+    if (rate > 0) {
+      const room = rate * INCOME_CAP_HOURS - this.save.incomePot;
+      if (room > 0) out.push({ kind: 'pot', at: now + (room / ((rate / 3600_000) * OFFLINE_SPEED)) });
+    }
+    return out;
+  }
+
   /** Transfers accumulated income into the coin balance. */
   collectIncome(): { ok: boolean; msg: string } {
     const amount = Math.floor(this.save.incomePot);
@@ -462,8 +494,10 @@ export class Game {
 
     window.setInterval(() => this.syncSave(), 6000);
     document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) void cancelReminder();
       if (document.hidden) {
         this.syncSave();
+        if (this.save.notifications) void scheduleReminder(this.reminderCandidates());
         // FORCE-write to the cloud when backgrounded: beforeunload may not fire when
         // Android/iOS kills the app, but visibilitychange does.
         this.cloud.flush(this.save);
