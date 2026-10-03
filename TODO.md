@@ -8,49 +8,49 @@ repeat-tap guard on ads and packs, ad privacy choices, in-app privacy policy
 link, account deletion, 44px touch targets), and so is the tutorial's wrong
 "bottom menu" instruction. What is still open, highest impact first:
 
-1. **Collecting doesn't feel like anything** (RWD-01, JUI-07, JUI-08). Collect,
+1. ~~**Collecting doesn't feel like anything**~~ DONE (coin fly, count-up, haptics, seeded pot; `juice.ts`) (RWD-01, JUI-07, JUI-08). Collect,
    sell and quest claims are a toast plus an instant number change. Wanted: coins
    flying from the source to the counter, the counter counting up and bumping,
    a light haptic. The first collect pays 1 coin; seed the pot so it pays ~50–100.
    Effort M.
-2. **The tutorial tells instead of shows** (FTUE-05/06/08/15). Four text cards,
+2. ~~**The tutorial tells instead of shows**~~ DONE (`tutorial.ts`) (FTUE-05/06/08/15). Four text cards,
    69 words, "Next" only, and the starter fish are already fed so there is
    nothing to feed. Wanted: one welcome card, then three guided actions with a
    spotlight and a hand: feed a hungry fish, collect a seeded pot, sell the fish
    that just grew. Effort M.
-3. **No analytics or remote config** (DATA-01…07). FTUE drop-off, level funnel,
+3. ~~**No analytics or remote config**~~ CODE DONE, NOT YET RUN ON A DEVICE (`analytics.ts`, `remote-config.ts`; native only, off until the ad-consent flow answers). Still to do: publish the four Remote Config keys (`interstitial_cooldown_ms`, `rewarded_cooldown_ms`, `rewarded_ads_per_day`, `growth_ads_per_day`) in the Firebase console, confirm events in DebugView on a Play build, name the sinks (earn/spend carry no reason yet), and update the privacy policy and the Play Data safety form to say Analytics is collected. (DATA-01…07). FTUE drop-off, level funnel,
    economy and ad placements are invisible after launch. Add Firebase Analytics
    (`tutorial_begin/complete`, `ftue_step`, `level_up`, `earn/spend_virtual_currency`,
    `rewarded_offer`, `interstitial`, `iap_flow`), respect consent, and move the ad
    cooldown and caps to Remote Config. Effort M.
-4. **No local notifications** (PRG-08). For this genre they are the strongest
+4. ~~**No local notifications**~~ CODE DONE, NOT YET RUN ON A DEVICE (`notifications.ts`: one reminder at most, soonest of egg hatched / fish grown / pot full, 09:00–21:00, at least 20 h apart; permission asked when the first egg goes in; Settings toggle). Needs a device check that the reminder arrives with the app closed. (PRG-08). For this genre they are the strongest
    reason to come back: fish grown, egg hatched, tank dirty, pot full. Ask for
    permission in context (first timer), not at launch; at most ~1 a day. Effort M.
-5. **No haptics at all** (JUI-01, HAP-*). Add `@capacitor/haptics` with a
+5. ~~**No haptics at all**~~ DONE (`haptics.ts`, Settings toggle) (JUI-01, HAP-*). Add `@capacitor/haptics` with a
    Settings toggle: light on collect/tap, success on claims, heavy on rare drops.
    Effort S.
-6. **No next action after the tutorial** (LAY-01, FTUE-21). Nothing is
+6. ~~**No next action after the tutorial**~~ DONE (goal strip pulses after the tutorial; tapping it goes to the screen the goal needs) (LAY-01, FTUE-21). Nothing is
    highlighted, and the "Next up" strip opens Quests instead of the screen the
    goal needs (e.g. Shop → Fish). Effort S.
-7. **Low contrast** (LAY-08). White text on COLLECT is 2.3:1, on Play 2.0–2.5:1,
+7. ~~**Low contrast**~~ DONE (COLLECT and Play use dark text; rarity chips re-coloured to 4.5:1) (LAY-08). White text on COLLECT is 2.3:1, on Play 2.0–2.5:1,
    on the rarity chips 2.15–2.63:1. Target 4.5:1 (3:1 for large text). Effort S.
-8. **Missing press states** (BTN-01). No `:active` on `.close-btn`, `.tab`,
+8. ~~**Missing press states**~~ DONE (`cta-breathe` now animates `scale`) (BTN-01). No `:active` on `.close-btn`, `.tab`,
    `.toast-action`, `.inv-row`, `.hud-tank`. `cta-breathe` animates `transform`,
    which overrides the `:active` scale on breathing CTAs. Breathe on the `scale`
    property instead. Effort S.
-9. **Dead clicks on level-locked items** (BTN-05, LAY-20). Their buy buttons are
+9. ~~**Dead clicks on level-locked items**~~ DONE (shop fish and tanks) (BTN-05, LAY-20). Their buy buttons are
    real `disabled`, so a tap does nothing. Use `aria-disabled` and show
    "Unlocks at level N" with a small shake. Effort S.
-10. **Toasts swallow taps on fish** (LAY-12). They sit over the water for 3.8 s
+10. ~~**Toasts swallow taps on fish**~~ DONE (LAY-12). They sit over the water for 3.8 s
     with `pointer-events: auto`. Make plain toasts `pointer-events: none`.
     Effort S.
-11. **Egg reveal is the same for every rarity** (JUI-11, RWD-03). The same 1.1 s
+11. ~~**Egg reveal is the same for every rarity**~~ DONE (wait 0.8–2.5 s by rarity, sparks for epic/legendary, "New species!" tag, haptic) (JUI-11, RWD-03). The same 1.1 s
     shake every time. Scale the anticipation with rarity, and add particles and a
     "New species!" tag for epic and legendary. Effort M.
-12. **Streak resets to 1 after one missed day** (PRG-09, RWD-12). Add one streak
+12. ~~**Streak resets to 1 after one missed day**~~ PARTLY DONE: one missed day a week is forgiven. Days still roll over at UTC midnight. Original note: (PRG-09, RWD-12). Add one streak
     freeze a week. Days roll over at UTC midnight, which is mid-afternoon in the
     Americas. Effort S.
-13. Smaller items:
+13. Smaller items, all DONE except the Turkish-name check on a real 360 px phone (the card now wraps):
     - The offline receipt doesn't say income caps at 8 h at half speed (RWD-13).
     - The feed picker has no outside-tap close (LAY-14).
     - Back doesn't leave feed/edit mode (LAY-16).
@@ -61,7 +61,7 @@ link, account deletion, 44px touch targets), and so is the tutorial's wrong
     - Guests aren't nudged to cloud save after real progress (PRG-14).
     - The interstitial shows right after the new tank is built, with no buffer
       (MON-06). Show it during a short transition before the switch.
-14. **Not in the rulebook:**
+14. **Not in the rulebook:** (all three DONE; the Pixi canvas now renders at up to 2x, so re-run `perf:check` on a low-end phone)
     - The Pixi canvas has no `resolution`/`autoDensity`, so the reef is likely
       blurry on high-DPR phones (`game.ts` `app.init`). Check on a device and
       measure with `perf:check`.
