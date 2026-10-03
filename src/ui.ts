@@ -36,8 +36,10 @@ export function fmt(n: number): string {
   // If the threshold check ran BEFORE rounding, values in 999_950-999_999
   // would hit the k-branch where (n/1000).toFixed(1) gives "1000.0" ->
   // "1000k"; the M threshold is checked against the rounded value (999_950).
-  if (n >= 999_950) return (n / 1_000_000).toFixed(1).replace('.0', '') + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + 'k';
+  // Locale decimal separator: 1,4k in Turkish, 1.4k in English.
+  const dec = (v: number): string => v.toLocaleString(getLang() === 'tr' ? 'tr-TR' : 'en-US', { maximumFractionDigits: 1 });
+  if (n >= 999_950) return dec(Math.round(n / 100_000) / 10) + 'M';
+  if (n >= 1000) return dec(Math.round(n / 100) / 10) + 'k';
   return String(n);
 }
 
@@ -249,9 +251,19 @@ export function decorSVG(d: DecorDef, size = 64): string {
   return `<svg viewBox="-36 -36 72 72" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><g transform="scale(${d.scale})">${body}</g></svg>`;
 }
 
+/** Chip colours checked at 4.5:1 or better; RARITY_INFO.color is a scene colour and does not clear that with white text. */
+const CHIP_COLORS: Record<Rarity, { bg: string; fg: string }> = {
+  common: { bg: '#9aa5ad', fg: '#0d2a33' },
+  uncommon: { bg: '#57b26a', fg: '#0d2a33' },
+  rare: { bg: '#3f8fd6', fg: '#06282b' },
+  epic: { bg: '#8a45bf', fg: '#ffffff' },
+  legendary: { bg: '#e5a52e', fg: '#0d2a33' },
+};
+
 function rarityChip(r: Rarity): string {
   const info = RARITY_INFO[r];
-  return `<span class="chip" style="background:${info.color}">${tt(info.name)}</span>`;
+  const { bg, fg } = CHIP_COLORS[r];
+  return `<span class="chip" style="background:${bg};color:${fg}">${tt(info.name)}</span>`;
 }
 
 /** Three fish for a tank card's backdrop. Picked from the species list by the tank's id,
@@ -377,6 +389,15 @@ export class UI {
         else if (act === 'quests') this.renderQuests();
         else this.renderYou();
       });
+    });
+
+    // Tapping anywhere outside the feed picker (and the Feed button that opens it) closes it.
+    document.addEventListener('pointerdown', (e) => {
+      const pop = root.querySelector('#feed-pop');
+      if (!pop || pop.classList.contains('hidden')) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('#feed-pop') || target.closest('[data-care="feed"]')) return;
+      pop.classList.add('hidden');
     });
 
     root.querySelectorAll<HTMLButtonElement>('#carebar button').forEach((btn) => {
@@ -825,6 +846,13 @@ export class UI {
       this.dismissPanel();
       return false;
     }
+    // Feed picker, feed mode and arrange mode are all "inside" something: back leaves
+    // them first instead of counting towards the exit.
+    if (this.game.inputMode !== 'normal' || !this.root.querySelector('#feed-pop')!.classList.contains('hidden')) {
+      audio.click();
+      this.exitModes();
+      return false;
+    }
     const now = Date.now();
     if (now < this.exitArmedUntil) return true;
     this.exitArmedUntil = now + 2000;
@@ -1050,7 +1078,7 @@ export class UI {
             <div class="card-name">${locked ? '🔒 ' + tt(sp.name) : tt(sp.name)}</div>
             ${rarityChip(sp.rarity)}
             <div class="card-meta">${tt('Sale: 🪙 {price} • {min} min', { price: fmt(sp.sellPrice), min: Math.round(sp.growthMs / 60000) })}${locked ? ` • ${tt('Lv')} ${sp.unlockLevel}` : ''}</div>
-            <button class="buy-btn" data-sp="${sp.id}" ${locked ? 'disabled' : ''}>${price}</button>
+            <button class="buy-btn" data-sp="${sp.id}" ${locked ? `aria-disabled="true" data-unlock="${sp.unlockLevel}"` : ''}>${price}</button>
           </div>`;
       }).join('')}</div>`;
     } else if (tab === 'eggs') {
@@ -1115,7 +1143,7 @@ export class UI {
         ].join('');
         const action = ownedT
           ? `<button class="buy-btn owned" disabled>${tt('You own this ✓')}</button>`
-          : `<button class="buy-btn" data-tank="${t.id}" ${locked ? 'disabled' : ''}>${t.price === 0 ? tt('Free') : `${cur} ${fmt(t.price)}`}</button>`;
+          : `<button class="buy-btn" data-tank="${t.id}" ${locked ? `aria-disabled="true" data-unlock="${t.unlockLevel}"` : ''}>${t.price === 0 ? tt('Free') : `${cur} ${fmt(t.price)}`}</button>`;
         return tankCard(t, { locked, meta, action });
       }).join('')}</div>`;
     } else {
@@ -1173,6 +1201,16 @@ export class UI {
 
     el.querySelectorAll<HTMLButtonElement>('.buy-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
+        // Level-locked: aria-disabled rather than disabled, so the tap can say why nothing happened.
+        if (btn.getAttribute('aria-disabled') === 'true') {
+          audio.error();
+          haptic('error');
+          this.toast(tt('Unlocks at level {n}', { n: btn.dataset.unlock ?? '?' }));
+          if (!reducedMotion()) {
+            btn.animate([{ rotate: '0deg' }, { rotate: '-6deg' }, { rotate: '5deg' }, { rotate: '-3deg' }, { rotate: '0deg' }], { duration: 280, easing: 'ease-out' });
+          }
+          return;
+        }
         const st = bodyEl.scrollTop; // keep the scroll position across bulk purchases
         if (btn.dataset.sp) {
           const res = this.game.buyFish(btn.dataset.sp);
@@ -1780,7 +1818,8 @@ export class UI {
       ? `<button class="buy-btn claim-all" id="ach-claim-all">${tt('Claim all ({n})', { n: readyCount })}</button>`
       : '';
 
-    const el = this.panelShell(tt('Achievements'), claimAll + rows);
+    const el = this.panelShell(tt('Achievements'), `<button class="back-link" id="ach-back">‹ ${tt('Quests')}</button>` + claimAll + rows);
+    el.querySelector('#ach-back')!.addEventListener('click', () => { audio.click(); this.renderQuests(); });
     el.querySelector('#ach-claim-all')?.addEventListener('click', () => {
       const res = this.game.claimAllAchievements();
       this.toast(res.msg);
@@ -1905,6 +1944,7 @@ export class UI {
       <div class="set-row"><span>${tt('🎵 Music')}</span><button class="tgl ${s.music ? 'on' : ''}" data-t="music">${s.music ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('🔊 Sound Effects')}</span><button class="tgl ${s.sfx ? 'on' : ''}" data-t="sfx">${s.sfx ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('🔔 Reminders')}</span><button class="tgl ${s.notifications ? 'on' : ''}" data-t="notifications">${s.notifications ? tt('On') : tt('Off')}</button></div>
+      <div class="set-row"><span>${tt('🐢 Reduce motion')}</span><button class="tgl ${s.reduceMotion ? 'on' : ''}" data-t="reduceMotion">${s.reduceMotion ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('📳 Vibration')}</span><button class="tgl ${s.haptics ? 'on' : ''}" data-t="haptics">${s.haptics ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('📤 Tell your friends')}</span><button class="tgl" data-t="share">${tt('Share')}</button></div>
       <div class="set-row"><span>${tt('🧾 Restore purchases')}</span>
@@ -1985,6 +2025,8 @@ export class UI {
         } else if (t === 'notifications') {
           s.notifications = !s.notifications; this.game.syncSave(); this.renderSettings();
           if (s.notifications) void askNotificationPermissionOnce();
+        } else if (t === 'reduceMotion') {
+          s.reduceMotion = !s.reduceMotion; setReduceMotion(s.reduceMotion); this.game.syncSave(); this.renderSettings();
         } else if (t === 'haptics') {
           s.haptics = !s.haptics; setHaptics(s.haptics); haptic('light'); this.game.syncSave(); this.renderSettings();
         } else if (t === 'share') {
@@ -2395,6 +2437,7 @@ export class UI {
       body += `<div class="receipt-lede">${tt('You were away')} <b>${this.awayLabel(o.minutes)}</b></div>`;
       if (o.income > 0) body += row(tt('Your fish produced'), `${ICON_COIN}${fmt(o.income)}`);
       if (o.grown > 0) body += row(tt('Grew up'), String(o.grown));
+      if (o.minutes >= 60) body += `<small class="receipt-note">${tt('While you are away, fish and income progress at half speed, for up to 8 hours.')}</small>`;
       const hungry = this.game.fishes.filter((f) => f.isSad).length;
       if (hungry > 0) body += row(tt('Hungry now'), String(hungry));
     }

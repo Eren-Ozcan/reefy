@@ -3,6 +3,7 @@ import './style.css';
 import { audio } from './audio';
 import { Game } from './game';
 import { setHaptics } from './haptics';
+import { setReduceMotion } from './juice';
 import { initRemoteConfig } from './remote-config';
 import { UI } from './ui';
 import { APP_VERSION } from './version';
@@ -75,6 +76,7 @@ playBtn.addEventListener('click', () => {
     audio.music = game.save.music;
     audio.sfx = game.save.sfx;
     setHaptics(game.save.haptics);
+    setReduceMotion(game.save.reduceMotion);
 
     await game.init(document.getElementById('canvas-wrap')!);
     // A cloud sync may have resolved inside game.init()'s CLOUD_STARTUP_GRACE_MS
@@ -85,6 +87,7 @@ playBtn.addEventListener('click', () => {
     audio.music = game.save.music;
     audio.sfx = game.save.sfx;
     setHaptics(game.save.haptics);
+    setReduceMotion(game.save.reduceMotion);
     ui.mount(document.getElementById('ui')!);
     mountedUI = ui;
 

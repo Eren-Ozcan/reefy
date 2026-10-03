@@ -112,7 +112,7 @@ html, body {
   transition: opacity 0.6s ease, visibility 0.6s;
   overflow: hidden;
 }
-#menu.hidden { opacity: 0; visibility: hidden; }
+#menu.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
 /* Yumuşak, dönen ışık hüzmeleri — kart ve balıkların altında, tıklanamaz */
 #menu::before {
@@ -179,7 +179,7 @@ html, body {
   font-size: var(--fs-lg); font-weight: 700;
   padding: 14px 52px; border: none; border-radius: var(--btn-radius);
   background: linear-gradient(180deg, #ffa25c, #ff7e4d);
-  color: #fff; cursor: pointer;
+  color: #46170a; cursor: pointer;
   box-shadow: 0 8px 20px rgba(255, 126, 77, 0.45), inset 0 2px 0 rgba(255,255,255,0.35);
   transition: transform 0.15s ease;
 }
@@ -318,10 +318,10 @@ html, body {
   gap: 2px;
 }
 #carebar button.care-collect span {
-  color: #ffffff; letter-spacing: 0.5px;
+  color: #46170a; letter-spacing: 0.5px;
   font-size: var(--fs-md); line-height: 1.1;
 }
-#carebar button.care-collect small { color: rgba(255, 255, 255, 0.9); font-size: var(--fs-xs); }
+#carebar button.care-collect small { color: #46170a; font-size: var(--fs-xs); }
 /* Nothing to collect: still there, still legible, just not asking to be pressed. */
 #carebar button.care-collect.empty { background: #d98a6d; box-shadow: none; }
 
@@ -712,7 +712,7 @@ html, body {
 }
 .buy-btn:hover { transform: scale(1.04); }
 .buy-btn:active { transform: var(--btn-press); }
-.buy-btn:disabled { background: var(--card-2); color: var(--ink-faint); box-shadow: none; cursor: default; transform: none; }
+.buy-btn:disabled, .buy-btn[aria-disabled="true"] { background: var(--card-2); color: var(--ink-faint); box-shadow: none; cursor: default; transform: none; }
 
 /* Yem seçici */
 #feed-pop {
@@ -1134,6 +1134,9 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
 .receipt .welcome-ok { width: 100%; margin-top: 18px; }
 
 /* Toast */
+/* Plain toasts sit over the water for ~3.8 s; they must not eat taps meant for fish. */
+#toasts .toast { pointer-events: none; }
+#toasts .toast:has(.toast-action) { pointer-events: auto; }
 #toasts {
   position: fixed; top: 108px; left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; gap: 8px; align-items: center;
@@ -1228,3 +1231,24 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
   background: transparent; border: 0; color: var(--ink-soft); font: inherit; font-weight: 600; text-decoration: underline;
 }
 @media (prefers-reduced-motion: reduce) { .tut-ring-pulse { animation: none; } }
+
+/* Press feedback for the tappables that had none (BTN-01). */
+.close-btn:active, .tab:active, .toast-action:active, .inv-row.clickable:active, .hud-tank:active { transform: var(--btn-press); }
+.close-btn, .tab, .toast-action, .inv-row, .hud-tank { transition: transform 0.08s ease-out, background 0.15s ease, color 0.15s ease; }
+
+/* In-game "Reduce motion" (Settings): the same calm as the OS setting, switchable without leaving the game. */
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after { animation: none !important; transition: none !important; }
+.reduce-motion .reveal-egg { animation: none !important; }
+
+/* Gentle notes inside panels and the back link on a sub-screen */
+.receipt-note { display: block; margin-top: 6px; color: var(--ink-faint); font-size: var(--fs-xs); line-height: 1.4; }
+.back-link {
+  background: transparent; border: 0; color: var(--accent); font: inherit; font-weight: 700;
+  min-height: 44px; padding: 0 4px; margin-bottom: 4px; cursor: pointer;
+}
+
+/* A long tank name wraps instead of running off a 360px card. */
+.tc-name { overflow-wrap: anywhere; hyphens: auto; }
+
+/* The start menu is hidden, not gone: stop its ~16 animations from running behind the game. */
+#menu.hidden, #menu.hidden * , #menu.hidden::before, #menu.hidden::after { animation-play-state: paused !important; }

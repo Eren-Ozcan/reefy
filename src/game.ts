@@ -377,7 +377,8 @@ export class Game {
     // same sanitation/validation steps as the local save.
     const cloudSyncPromise = this.cloud.sync(this.save);
 
-    await this.app.init({ resizeTo: host, antialias: true, background: 0x2f7f96 });
+    // Sharp on high-density phones, capped at 2x so a 3x panel does not pay for pixels nobody can tell apart.
+    await this.app.init({ resizeTo: host, antialias: true, background: 0x2f7f96, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true });
     host.appendChild(this.app.canvas);
 
     // Every layer here is paint except the fish. Left on the default event mode they
