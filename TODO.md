@@ -1,5 +1,78 @@
 # Roadmap
 
+## UX audit — open gaps (2026-10-03)
+
+From a full audit against the `mobile-game-ux` rulebook (210 rules); rule IDs
+refer to it. The six policy/money blockers it found are fixed (save backup,
+repeat-tap guard on ads and packs, ad privacy choices, in-app privacy policy
+link, account deletion, 44px touch targets), and so is the tutorial's wrong
+"bottom menu" instruction. What is still open, highest impact first:
+
+1. **Collecting doesn't feel like anything** (RWD-01, JUI-07, JUI-08). Collect,
+   sell and quest claims are a toast plus an instant number change. Wanted: coins
+   flying from the source to the counter, the counter counting up and bumping,
+   a light haptic. The first collect pays 1 coin; seed the pot so it pays ~50–100.
+   Effort M.
+2. **The tutorial tells instead of shows** (FTUE-05/06/08/15). Four text cards,
+   69 words, "Next" only, and the starter fish are already fed so there is
+   nothing to feed. Wanted: one welcome card, then three guided actions with a
+   spotlight and a hand: feed a hungry fish, collect a seeded pot, sell the fish
+   that just grew. Effort M.
+3. **No analytics or remote config** (DATA-01…07). FTUE drop-off, level funnel,
+   economy and ad placements are invisible after launch. Add Firebase Analytics
+   (`tutorial_begin/complete`, `ftue_step`, `level_up`, `earn/spend_virtual_currency`,
+   `rewarded_offer`, `interstitial`, `iap_flow`), respect consent, and move the ad
+   cooldown and caps to Remote Config. Effort M.
+4. **No local notifications** (PRG-08). For this genre they are the strongest
+   reason to come back: fish grown, egg hatched, tank dirty, pot full. Ask for
+   permission in context (first timer), not at launch; at most ~1 a day. Effort M.
+5. **No haptics at all** (JUI-01, HAP-*). Add `@capacitor/haptics` with a
+   Settings toggle: light on collect/tap, success on claims, heavy on rare drops.
+   Effort S.
+6. **No next action after the tutorial** (LAY-01, FTUE-21). Nothing is
+   highlighted, and the "Next up" strip opens Quests instead of the screen the
+   goal needs (e.g. Shop → Fish). Effort S.
+7. **Low contrast** (LAY-08). White text on COLLECT is 2.3:1, on Play 2.0–2.5:1,
+   on the rarity chips 2.15–2.63:1. Target 4.5:1 (3:1 for large text). Effort S.
+8. **Missing press states** (BTN-01). No `:active` on `.close-btn`, `.tab`,
+   `.toast-action`, `.inv-row`, `.hud-tank`. `cta-breathe` animates `transform`,
+   which overrides the `:active` scale on breathing CTAs. Breathe on the `scale`
+   property instead. Effort S.
+9. **Dead clicks on level-locked items** (BTN-05, LAY-20). Their buy buttons are
+   real `disabled`, so a tap does nothing. Use `aria-disabled` and show
+   "Unlocks at level N" with a small shake. Effort S.
+10. **Toasts swallow taps on fish** (LAY-12). They sit over the water for 3.8 s
+    with `pointer-events: auto`. Make plain toasts `pointer-events: none`.
+    Effort S.
+11. **Egg reveal is the same for every rarity** (JUI-11, RWD-03). The same 1.1 s
+    shake every time. Scale the anticipation with rarity, and add particles and a
+    "New species!" tag for epic and legendary. Effort M.
+12. **Streak resets to 1 after one missed day** (PRG-09, RWD-12). Add one streak
+    freeze a week. Days roll over at UTC midnight, which is mid-afternoon in the
+    Americas. Effort S.
+13. Smaller items:
+    - The offline receipt doesn't say income caps at 8 h at half speed (RWD-13).
+    - The feed picker has no outside-tap close (LAY-14).
+    - Back doesn't leave feed/edit mode (LAY-16).
+    - `fmt()` ignores the locale decimal comma (LAY-18).
+    - Long Turkish tank names clip at 360 px (ACC-11).
+    - There is no in-game reduce-motion toggle (ACC-03).
+    - Pearl buyers still see interstitials (MON-12).
+    - Guests aren't nudged to cloud save after real progress (PRG-14).
+    - The interstitial shows right after the new tank is built, with no buffer
+      (MON-06). Show it during a short transition before the switch.
+14. **Not in the rulebook:**
+    - The Pixi canvas has no `resolution`/`autoDensity`, so the reef is likely
+      blurry on high-DPR phones (`game.ts` `app.init`). Check on a device and
+      measure with `perf:check`.
+    - The hidden menu keeps 16 CSS animations running after Play.
+    - Achievements replaces Quests with no Back button.
+
+Still to verify on a device: Auto Backup restoring the WebView save after a
+reinstall (backup is on and Reefy was backed up, but a restore needs an
+uninstall), FPS and cold start on a low-end phone, audio stopping in the
+background, and the privacy-choices row on an EEA test device.
+
 ## Where to pick up
 
 1.2.0 went out to closed testing on 2026-08-22 and is live on a real handset.
