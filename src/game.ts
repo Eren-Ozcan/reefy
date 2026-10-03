@@ -1,10 +1,11 @@
 import { Application, Container, FillGradient, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
+import { track } from './analytics';
 import { audio } from './audio';
 import { DECOR, DECOR_BOOST, DECOR_BOOST_CAP, DecorDef, MAX_PLACED, decorById } from './decor';
 import { Bounds, Fish, HUNGER_RATE, SAD_THRESHOLD, hungerGrowthMult } from './fish';
 import { EventDef, EventTier, activeEvent, claimableEvent, tierReached } from './events';
 import { ACHIEVEMENTS, QuestDef, QuestEvent, questsForDay, weekKeyFor, weeklyQuestForWeek } from './quests';
-import { GROWTH_ADS_PER_DAY, GROWTH_AD_MS, REWARDED_ADS_PER_DAY } from './ads';
+import { GROWTH_AD_MS, growthAdsPerDay, rewardedAdsPerDay } from './ads';
 import { DirtSpot, FishSave, PendingEgg, SaveData, loadSave, persist, wipeSave } from './save';
 import { CloudSave, type CloudSyncResult } from './cloud-save';
 import { deleteCurrentUser } from './firebase-app';
@@ -1224,8 +1225,8 @@ export class Game {
    */
   adRewardsLeftToday(): number {
     const today = this.todayKey();
-    if (this.save.adRewardDay !== today) return REWARDED_ADS_PER_DAY;
-    return Math.max(0, REWARDED_ADS_PER_DAY - this.save.adRewardCount);
+    if (this.save.adRewardDay !== today) return rewardedAdsPerDay();
+    return Math.max(0, rewardedAdsPerDay() - this.save.adRewardCount);
   }
 
   /**
@@ -1245,8 +1246,8 @@ export class Game {
 
   /** Growth-boost ads still available today (own cap, counted in the save like the pearl ads). */
   growthAdsLeftToday(): number {
-    if (this.save.growthAdDay !== this.todayKey()) return GROWTH_ADS_PER_DAY;
-    return Math.max(0, GROWTH_ADS_PER_DAY - this.save.growthAdCount);
+    if (this.save.growthAdDay !== this.todayKey()) return growthAdsPerDay();
+    return Math.max(0, growthAdsPerDay() - this.save.growthAdCount);
   }
 
   /**
@@ -2114,6 +2115,7 @@ export class Game {
       this.save.xp -= this.xpNeed(this.save.level);
       this.save.level++;
       this.save.pearls += 3;
+      track('level_up', { level: this.save.level });
       audio.levelup();
       this.ui.toast(t('⭐ Level {n}! +3 pearls, capacity {cap} fish', { n: this.save.level, cap: this.capacity }));
     }
@@ -2391,6 +2393,26 @@ export class Game {
     return this.cloudSync;
   }
 
+  /**
+   * Last coin/pearl balances reported to analytics. Balances change in dozens of
+   * places, so earn/spend is read as the difference since the previous save tick
+   * instead of being logged at each call site. That keeps the totals right but
+   * not the reason; the named events (level_up, rewarded_offer, iap_flow) carry that.
+   */
+  private reportedBalance: { coins: number; pearls: number } | null = null;
+
+  private trackEconomy(): void {
+    const now = { coins: this.save.coins, pearls: this.save.pearls };
+    const prev = this.reportedBalance;
+    this.reportedBalance = now;
+    if (!prev) return;
+    for (const cur of ['coins', 'pearls'] as const) {
+      const d = now[cur] - prev[cur];
+      if (d > 0) track('earn_virtual_currency', { virtual_currency_name: cur, value: d });
+      else if (d < 0) track('spend_virtual_currency', { virtual_currency_name: cur, value: -d, item_name: 'unattributed' });
+    }
+  }
+
   syncSave(): void {
     // After a restore, the scene is STALE (still holds the old save's fish), so
     // the fish list isn't rebuilt from it. persist() still runs though: this is
@@ -2398,6 +2420,7 @@ export class Game {
     if (!this.frozen) {
       this.save.fishes = [...this.dormant, ...this.fishes.map((f) => f.toSave())];
     }
+    if (!this.frozen) this.trackEconomy();
     persist(this.save);
     this.services.social.updateScore?.(this.save);
     // The same number, sent to the platform that ranks it. Both calls throttle

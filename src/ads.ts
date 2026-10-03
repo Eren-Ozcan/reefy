@@ -6,7 +6,9 @@
 
 import { Capacitor } from '@capacitor/core';
 import { AdMob, AdmobConsentStatus, RewardAdPluginEvents } from '@capacitor-community/admob';
+import { setAnalyticsEnabled, track } from './analytics';
 import { t } from './i18n';
+import { remoteNumber } from './remote-config';
 import type { SaveData } from './save';
 
 /** Ad unit IDs created in the AdMob dashboard (see apps.admob.com > Reefy). */
@@ -106,6 +108,12 @@ export const AD_TEST_DEVICE_TAGS: string[] = TEST_DEVICES.map((d) => d.slice(0, 
 const INTERSTITIAL_COOLDOWN_MS = 10 * 60 * 1000; // don't show ads back-to-back on tank transitions
 const REWARDED_COOLDOWN_MS = 30 * 1000;         // prevent accidental double-clicks
 
+// Remote Config may move these (see remote-config.ts); the clamps keep a bad published value harmless.
+const interstitialCooldownMs = () => remoteNumber('interstitial_cooldown_ms', INTERSTITIAL_COOLDOWN_MS, 120_000, 3_600_000);
+const rewardedCooldownMs = () => remoteNumber('rewarded_cooldown_ms', REWARDED_COOLDOWN_MS, 5_000, 300_000);
+export const rewardedAdsPerDay = () => Math.round(remoteNumber('rewarded_ads_per_day', REWARDED_ADS_PER_DAY, 0, 10));
+export const growthAdsPerDay = () => Math.round(remoteNumber('growth_ads_per_day', GROWTH_ADS_PER_DAY, 0, 15));
+
 /** Where the cooldown timer lives on disk. When kept only in memory, it reset
  *  whenever the player closed and reopened the app; every cold start yielded a
  *  fresh ad opportunity. Deliberately kept separate from the save file
@@ -183,6 +191,8 @@ export class AdMobAds implements AdsProvider {
         info = await AdMob.showConsentForm();
       }
       if (!info.canRequestAds) this.lastError = `consent: ${String(info.status)}`;
+      // Analytics follows the same answer: no consent where it is required, no events.
+      setAnalyticsEnabled(info.canRequestAds);
       // The enum itself is not exported from the plugin's package root.
       this.privacyOptionsRequired = String(info.privacyOptionsRequirementStatus) === 'REQUIRED';
       return info.canRequestAds;
@@ -244,10 +254,11 @@ export class AdMobAds implements AdsProvider {
   maybeShowInterstitial(): void {
     if (!this.ready || this.save.adsRemoved || !this.interstitialReady) return;
     const now = Date.now();
-    if (now - this.lastInterstitial < INTERSTITIAL_COOLDOWN_MS) return;
+    if (now - this.lastInterstitial < interstitialCooldownMs()) return;
     this.lastInterstitial = now;
     saveLastInterstitial(now);
     this.interstitialReady = false;
+    track('interstitial_shown');
     void AdMob.showInterstitial()
       .catch(() => {})
       .finally(() => void this.loadInterstitial());
@@ -276,7 +287,7 @@ export class AdMobAds implements AdsProvider {
     if (!this.ready) await this.setup();
     if (!this.ready) return { ok: false, msg: t("The ad system isn't ready yet, try again shortly.") };
     const now = Date.now();
-    if (now - this.lastRewarded < REWARDED_COOLDOWN_MS) {
+    if (now - this.lastRewarded < rewardedCooldownMs()) {
       return { ok: false, msg: t('You just watched an ad, try again in a bit.') };
     }
     let listener: { remove: () => Promise<void> } | null = null;
@@ -287,11 +298,16 @@ export class AdMobAds implements AdsProvider {
         rewarded = true;
       });
       await AdMob.showRewardVideoAd();
-      if (!rewarded) return { ok: false, msg: t('You exited before finishing the ad, no reward given.') };
+      if (!rewarded) {
+        track('rewarded_offer', { kind, result: 'abandoned' });
+        return { ok: false, msg: t('You exited before finishing the ad, no reward given.') };
+      }
+      track('rewarded_offer', { kind, result: 'earned' });
       this.lastRewarded = now;
       if (kind === 'growth') return { ok: true, msg: '' };
       return { ok: true, msg: t('You watched the ad! +{n} pearls 🦪', { n: REWARDED_AD_PEARLS }), grantPearls: REWARDED_AD_PEARLS };
     } catch {
+      track('rewarded_offer', { kind, result: 'no_fill' });
       return { ok: false, msg: t('No ad is available right now, try again later.') };
     } finally {
       // If showRewardVideoAd() rejects (ad expired, network dropped), the

@@ -13,6 +13,7 @@ import { CapacitorGameConnect } from 'capacitor-game-connect-8';
 import { Purchases, PURCHASES_ERROR_CODE, type PurchasesPackage } from '@revenuecat/purchases-capacitor';
 import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore/lite';
 import { AdMobAds, StubAds, type AdsProvider } from './ads';
+import { track } from './analytics';
 import { ensureUid, firestore } from './firebase-app';
 import { isFirebaseConfigured } from './firebase-config';
 import { rememberStoreCurrency, t } from './i18n';
@@ -310,6 +311,7 @@ export class RevenueCatIAP implements IAPProvider {
         return { ok: false, msg: t("This pack isn't currently available in the store.") };
       }
       await Purchases.purchasePackage({ aPackage: storePackage });
+      track('iap_flow', { pack: packId, result: 'purchased' });
       return {
         ok: true,
         msg: t('{name} purchased! 🎉', { name: t(pack.name) }),
@@ -320,6 +322,7 @@ export class RevenueCatIAP implements IAPProvider {
     } catch (err) {
       const rcError = err as { code?: PURCHASES_ERROR_CODE; message?: string };
       if (rcError.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) {
+        track('iap_flow', { pack: packId, result: 'cancelled' });
         return { ok: false, msg: t('Purchase canceled.') };
       }
       // "You already own this" is the store's answer to the ONE product that
@@ -333,6 +336,7 @@ export class RevenueCatIAP implements IAPProvider {
           ? { ok: true, msg: t('You already own this — restored. ✓'), grantRemovesAds: true }
           : { ok: false, msg: t('Purchase failed: {err}', { err: rcError.message ?? t('unknown error') }) };
       }
+      track('iap_flow', { pack: packId, result: 'failed' });
       return { ok: false, msg: t('Purchase failed: {err}', { err: rcError.message ?? t('unknown error') }) };
     }
   }

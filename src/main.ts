@@ -3,6 +3,7 @@ import './style.css';
 import { audio } from './audio';
 import { Game } from './game';
 import { setHaptics } from './haptics';
+import { initRemoteConfig } from './remote-config';
 import { UI } from './ui';
 import { APP_VERSION } from './version';
 import { getLang, initLang, t } from './i18n';
@@ -65,6 +66,7 @@ playBtn.addEventListener('click', () => {
   audio.click();
 
   void (async () => {
+    void initRemoteConfig();
     const game = new Game();
     initLang(game.save.lang, game.save.langChosen);
     const ui = new UI(game);
