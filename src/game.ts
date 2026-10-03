@@ -1883,7 +1883,7 @@ export class Game {
    * pay, roll, fish in the tank, one tap. A tier WITH one only takes payment
    * here and queues the egg; nothing is rolled until it is collected.
    */
-  hatchEgg(tier: EggTier): { ok: boolean; msg: string; species?: Species; pending?: PendingEgg } {
+  hatchEgg(tier: EggTier): { ok: boolean; msg: string; species?: Species; isNew?: boolean; pending?: PendingEgg } {
     if (this.reservedSlots >= this.capacity) return { ok: false, msg: t('This tank is full ({cap} fish)', { cap: this.capacity }) };
     if (tier.currency === 'coins') {
       if (this.save.coins < tier.cost) return { ok: false, msg: t('Not enough coins') };
@@ -1933,14 +1933,15 @@ export class Game {
   }
 
   /** The shared tail of both hatch paths: fish into the tank, stats, quests, sound. */
-  private deliverEgg(sp: Species): { ok: boolean; msg: string; species: Species } {
+  private deliverEgg(sp: Species): { ok: boolean; msg: string; species: Species; isNew: boolean } {
+    const isNew = !this.save.collection.includes(sp.id);
     this.spawnFish(this.newFishSave(sp));
     this.save.stats.eggsHatched++;
     this.questEvent('hatch', 1);
     audio.hatch(sp.rarity);
     this.syncSave();
     this.ui.refreshHUD();
-    return { ok: true, msg: '', species: sp };
+    return { ok: true, msg: '', species: sp, isNew };
   }
 
   /** Eggs currently incubating, soonest first. */
@@ -1987,7 +1988,7 @@ export class Game {
    * for in full at purchase, and the only thing the clock can steal is the
    * impatience surcharge.
    */
-  collectEgg(id: number): { ok: boolean; msg: string; species?: Species } {
+  collectEgg(id: number): { ok: boolean; msg: string; species?: Species; isNew?: boolean } {
     const idx = this.save.pendingEggs.findIndex((e) => e.id === id);
     if (idx < 0) return { ok: false, msg: t('That egg is gone.') };
     const egg = this.save.pendingEggs[idx];

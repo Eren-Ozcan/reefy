@@ -1024,6 +1024,24 @@ html, body {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
 .reveal-fish svg { filter: drop-shadow(0 0 26px var(--glow)); }
+/* Anticipation grows with rarity: the egg shakes harder and faster before a rarer fish. */
+.reveal[data-rarity="rare"] .reveal-egg { animation-duration: 0.22s; }
+.reveal[data-rarity="epic"] .reveal-egg, .reveal[data-rarity="legendary"] .reveal-egg { animation-duration: 0.16s; font-size: 104px; }
+@media (prefers-reduced-motion: reduce) { .reveal-egg { animation: none; } }
+.reveal-sparks { position: absolute; left: 50%; top: 40%; pointer-events: none; }
+.reveal-sparks i {
+  position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+  background: var(--glow); box-shadow: 0 0 10px var(--glow); opacity: 0;
+}
+.reveal.hatched .reveal-sparks i { animation: spark-out 0.9s ease-out forwards; }
+@keyframes spark-out {
+  0% { opacity: 1; transform: rotate(var(--a)) translateX(0); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)); }
+}
+.new-tag {
+  background: var(--accent-2); color: #46170a; font-size: var(--fs-xs); font-weight: 800;
+  padding: 3px 12px; border-radius: 999px;
+}
 .reveal.hatched .reveal-egg { display: none; }
 .reveal.hatched .reveal-fish { opacity: 1; transform: scale(1); }
 

@@ -883,6 +883,7 @@ const TR: Record<string, string> = {
   '🔔 Reminders': '🔔 Hatırlatıcılar',
   '🐢 Reduce motion': '🐢 Hareketi azalt',
   'While you are away, fish and income progress at half speed, for up to 8 hours.': 'Sen yokken balıklar ve gelir yarı hızda, en fazla 8 saat ilerler.',
+  'New species!': 'Yeni tür!',
   'Unlocks at level {n}': "Seviye {n}'de açılır",
   '🥚 Your egg has hatched!': '🥚 Yumurtan çatladı!',
   '🐟 A fish has grown up and is ready to sell.': '🐟 Bir balık büyüdü, satmaya hazır.',

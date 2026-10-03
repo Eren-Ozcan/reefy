@@ -1227,7 +1227,7 @@ export class UI {
           // button is at the bottom of the list — keeping the scroll would
           // leave the player looking at the shop instead of their egg.
           if (res.pending) { this.toast(res.msg); if (this.game.save.notifications) void askNotificationPermissionOnce(); this.renderShop('eggs', 0); return; }
-          this.showEggReveal(egg, res.species!);
+          this.showEggReveal(egg, res.species!, !!res.isNew);
         } else if (btn.dataset.collectEgg) {
           const id = Number(btn.dataset.collectEgg);
           // Read the tier BEFORE collecting: collectEgg removes the queue entry.
@@ -1236,7 +1236,7 @@ export class UI {
           const res = this.game.collectEgg(id);
           if (!res.ok) { audio.error(); this.toast(res.msg); return; }
           this.renderShop('eggs', st);
-          if (egg) this.showEggReveal(egg, res.species!);
+          if (egg) this.showEggReveal(egg, res.species!, !!res.isNew);
         } else if (btn.dataset.speedEgg) {
           const res = this.game.speedUpEgg(Number(btn.dataset.speedEgg));
           if (!res.ok) { audio.error(); this.toast(res.msg); return; }
@@ -2188,12 +2188,25 @@ export class UI {
 
   // ---------- modals ----------
 
-  private showEggReveal(egg: EggTier, sp: Species): void {
+  /** How long the egg shakes before it opens: the rarer the fish, the longer the wait. */
+  private static readonly REVEAL_DELAY_MS: Record<Rarity, number> = {
+    common: 800, uncommon: 1000, rare: 1400, epic: 1900, legendary: 2500,
+  };
+
+  private showEggReveal(egg: EggTier, sp: Species, isNew = false): void {
     const info = RARITY_INFO[sp.rarity];
+    const grand = sp.rarity === 'epic' || sp.rarity === 'legendary';
+    const calm = reducedMotion();
+    const delay = calm ? 500 : UI.REVEAL_DELAY_MS[sp.rarity];
+    const sparks = grand && !calm
+      ? Array.from({ length: 14 }, (_, i) => `<i style="--a:${Math.round((360 / 14) * i)}deg;--d:${90 + (i % 3) * 30}px"></i>`).join('')
+      : '';
     const el = this.panelShell('', `
-      <div class="reveal">
+      <div class="reveal" data-rarity="${sp.rarity}">
         <div class="reveal-egg">${egg.emoji}</div>
+        <div class="reveal-sparks" style="--glow:${info.color}">${sparks}</div>
         <div class="reveal-fish" style="--glow:${info.color}">
+          ${isNew ? `<span class="new-tag">${tt('New species!')}</span>` : ''}
           ${fishSVG(sp, 150)}
           <div class="card-name big">${tt(sp.name)}</div>
           ${rarityChip(sp.rarity)}
@@ -2201,7 +2214,10 @@ export class UI {
           <button class="buy-btn reveal-ok">${tt('Awesome! 🎉')}</button>
         </div>
       </div>`);
-    setTimeout(() => el.querySelector('.reveal')!.classList.add('hatched'), 1100);
+    setTimeout(() => {
+      el.querySelector('.reveal')?.classList.add('hatched');
+      haptic(sp.rarity === 'legendary' ? 'heavy' : grand || sp.rarity === 'rare' ? 'medium' : 'light');
+    }, delay);
     el.querySelector('.reveal-ok')!.addEventListener('click', () => {
       audio.click(); this.closePanel();
     });
