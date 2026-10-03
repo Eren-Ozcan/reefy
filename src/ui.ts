@@ -1167,7 +1167,9 @@ export class UI {
           this.toast(res.msg);
           if (res.ok) this.renderShop('tanks', st);
         } else if (btn.dataset.iap) {
-          void this.game.services.iap.purchase(btn.dataset.iap).then((res) => {
+          const iapId = btn.dataset.iap;
+          void this.withPending(btn, () => this.game.services.iap.purchase(iapId)).then((res) => {
+            if (!res) return; // a second tap while the first purchase was still open
             if (res.ok) {
               if (res.grantPearls) this.game.save.pearls += res.grantPearls;
               if (res.grantCoins) this.game.save.coins += res.grantCoins;
@@ -1186,7 +1188,8 @@ export class UI {
             this.toast(tt("That's all the ads for today — come back tomorrow."));
             return;
           }
-          void this.game.services.ads.showRewarded().then((res) => {
+          void this.withPending(btn, () => this.game.services.ads.showRewarded()).then((res) => {
+            if (!res || !res.msg) return; // a repeat tap, answered silently
             if (res.ok && res.grantPearls) {
               this.game.save.pearls += res.grantPearls;
               this.game.noteAdRewardWatched();
@@ -1201,6 +1204,23 @@ export class UI {
         }
       });
     });
+  }
+
+  /**
+   * Runs a slow store/ad call behind a pending state on its button: a second tap
+   * is ignored (resolves to null) instead of opening a second purchase or ad,
+   * and the player sees at once that the tap was taken.
+   */
+  private async withPending<T>(btn: HTMLButtonElement, run: () => Promise<T>): Promise<T | null> {
+    if (btn.classList.contains('pending')) return null;
+    btn.classList.add('pending');
+    btn.setAttribute('aria-busy', 'true');
+    try {
+      return await run();
+    } finally {
+      btn.classList.remove('pending');
+      btn.removeAttribute('aria-busy');
+    }
   }
 
   // ---------- INVENTORY ----------
@@ -2132,9 +2152,8 @@ export class UI {
       btn.disabled = true;
       void this.game.services.ads.showRewarded('growth').then((res) => {
         if (!res.ok) {
-          audio.error();
           btn.disabled = false;
-          this.toast(res.msg);
+          if (res.msg) { audio.error(); this.toast(res.msg); } // empty: another ad was already running
           return;
         }
         const out = this.game.applyGrowthAd(f);

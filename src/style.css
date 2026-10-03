@@ -1186,3 +1186,7 @@ hr { border: none; border-top: 1px solid var(--card-line); margin: 6px 0; }
   background: var(--accent-2); color: #06282b; font-size: var(--fs-xs); font-weight: 800;
   padding: 2px 10px; border-radius: 999px; white-space: nowrap;
 }
+
+/* A store or ad call in flight: the tap was taken, and a second one is ignored (see UI.withPending). */
+.buy-btn.pending { opacity: 0.7; pointer-events: none; animation: none; }
+.buy-btn.pending::after { content: ' …'; }

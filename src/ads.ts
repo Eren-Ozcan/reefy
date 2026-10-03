@@ -245,6 +245,21 @@ export class AdMobAds implements AdsProvider {
     // once at launch and reaches the network; a hiccup in that moment used to
     // disable ads for the WHOLE session with no way back, which on a phone that
     // was still connecting is most launches.
+    // A second tap while the first ad is still loading or showing used to start
+    // a second flow: both listeners hear the same Rewarded event, so one watch
+    // could pay twice. The second caller gets a silent no-op instead.
+    if (this.rewardedInFlight) return { ok: false, msg: '' };
+    this.rewardedInFlight = true;
+    try {
+      return await this.runRewarded(kind);
+    } finally {
+      this.rewardedInFlight = false;
+    }
+  }
+
+  private rewardedInFlight = false;
+
+  private async runRewarded(kind: RewardKind): Promise<{ ok: boolean; msg: string; grantPearls?: number }> {
     if (!this.ready) await this.setup();
     if (!this.ready) return { ok: false, msg: t("The ad system isn't ready yet, try again shortly.") };
     const now = Date.now();
