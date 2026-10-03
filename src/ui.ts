@@ -1,5 +1,6 @@
 import { AD_TEST_DEVICE_TAGS } from './ads';
 import { audio } from './audio';
+import { haptic, setHaptics } from './haptics';
 import { APP_VERSION } from './version';
 import { DECOR, DECOR_BOOST, DecorDef, MAX_PLACED, decorById } from './decor';
 import type { Fish } from './fish';
@@ -1856,6 +1857,7 @@ export class UI {
       ${langRowHTML}
       <div class="set-row"><span>${tt('🎵 Music')}</span><button class="tgl ${s.music ? 'on' : ''}" data-t="music">${s.music ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('🔊 Sound Effects')}</span><button class="tgl ${s.sfx ? 'on' : ''}" data-t="sfx">${s.sfx ? tt('On') : tt('Off')}</button></div>
+      <div class="set-row"><span>${tt('📳 Vibration')}</span><button class="tgl ${s.haptics ? 'on' : ''}" data-t="haptics">${s.haptics ? tt('On') : tt('Off')}</button></div>
       <div class="set-row"><span>${tt('📤 Tell your friends')}</span><button class="tgl" data-t="share">${tt('Share')}</button></div>
       <div class="set-row"><span>${tt('🧾 Restore purchases')}</span>
         <button class="tgl" id="restore-iap">${tt('Restore')}</button></div>
@@ -1932,6 +1934,8 @@ export class UI {
           s.music = !s.music; audio.setMusic(s.music); this.game.syncSave(); this.renderSettings();
         } else if (t === 'sfx') {
           s.sfx = !s.sfx; audio.setSfx(s.sfx); audio.click(); this.game.syncSave(); this.renderSettings();
+        } else if (t === 'haptics') {
+          s.haptics = !s.haptics; setHaptics(s.haptics); haptic('light'); this.game.syncSave(); this.renderSettings();
         } else if (t === 'share') {
           const data = { title: 'Reefy', text: tt('Check out my aquarium! 🐠'), url: 'https://reefy.games' };
           if (navigator.share) void navigator.share(data).catch(() => undefined);

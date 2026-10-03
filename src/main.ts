@@ -2,6 +2,7 @@ import './fonts.css';
 import './style.css';
 import { audio } from './audio';
 import { Game } from './game';
+import { setHaptics } from './haptics';
 import { UI } from './ui';
 import { APP_VERSION } from './version';
 import { getLang, initLang, t } from './i18n';
@@ -71,6 +72,7 @@ playBtn.addEventListener('click', () => {
 
     audio.music = game.save.music;
     audio.sfx = game.save.sfx;
+    setHaptics(game.save.haptics);
 
     await game.init(document.getElementById('canvas-wrap')!);
     // A cloud sync may have resolved inside game.init()'s CLOUD_STARTUP_GRACE_MS
@@ -80,6 +82,7 @@ playBtn.addEventListener('click', () => {
     initLang(game.save.lang, game.save.langChosen);
     audio.music = game.save.music;
     audio.sfx = game.save.sfx;
+    setHaptics(game.save.haptics);
     ui.mount(document.getElementById('ui')!);
     mountedUI = ui;
 

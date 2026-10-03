@@ -879,6 +879,7 @@ const TR: Record<string, string> = {
   'The save could not be read, the progress on this device was kept.': 'Kayıt okunamadı, bu cihazdaki ilerleme korundu.',
   '🎵 Music': '🎵 Müzik', 'On': 'Açık', 'Off': 'Kapalı',
   '🔊 Sound Effects': '🔊 Ses Efektleri',
+  '📳 Vibration': '📳 Titreşim',
   '📤 Tell your friends': '📤 Arkadaşlarına anlat', 'Share': 'Paylaş',
   '🌐 Language': '🌐 Dil / Language',
   '🗑️ Delete all progress': '🗑️ Tüm ilerlemeyi sil', 'Reset': 'Sıfırla',
