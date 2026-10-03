@@ -914,7 +914,7 @@ const TR: Record<string, string> = {
   '🌊 Welcome to Reefy!': "🌊 Reefy'ye hoş geldin!",
   'This reef is now yours. Grow your fish, complete your collection, and build your own reef.': 'Bu resif artık senin. Balıklarını büyüt, koleksiyonunu tamamla, kendi resifini kur.',
   '🍤 Learn to feed': '🍤 Beslemeyi öğren',
-  'Tap "Feed" in the bottom menu, pick a feed, then tap the water to feed. Quality feed boosts sale price!': 'Alt menüden "Besle"ye dokun, bir yem seç, sonra suya dokunarak yemle. Kaliteli yemler satış fiyatını artırır!',
+  'Tap "Feed" in the care bar at the top, pick a feed, then tap the water to feed. Quality feed boosts sale price!': 'Üstteki bakım çubuğunda "Besle"ye dokun, bir yem seç, sonra suya dokunarak yemle. Kaliteli yemler satış fiyatını artırır!',
   '🐟 Sell and grow': '🐟 Satış yap, büyü',
   'Tap adult fish to sell them, then use your earnings to buy new species and grow your reef.': 'Yetişkin olan balıklara dokunup satabilirsin. Kazandığın altınla yeni türler alıp resifini büyütebilirsin.',
   '📋 Daily quests': '📋 Günlük görevler',

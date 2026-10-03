@@ -2372,7 +2372,7 @@ export class UI {
     if (s.tutorialDone) return;
     const steps: { title: string; body: string }[] = [
       { title: tt('🌊 Welcome to Reefy!'), body: tt('This reef is now yours. Grow your fish, complete your collection, and build your own reef.') },
-      { title: tt('🍤 Learn to feed'), body: tt('Tap "Feed" in the bottom menu, pick a feed, then tap the water to feed. Quality feed boosts sale price!') },
+      { title: tt('🍤 Learn to feed'), body: tt('Tap "Feed" in the care bar at the top, pick a feed, then tap the water to feed. Quality feed boosts sale price!') },
       { title: tt('🐟 Sell and grow'), body: tt('Tap adult fish to sell them, then use your earnings to buy new species and grow your reef.') },
       { title: tt('📋 Daily quests'), body: tt('Complete daily quests, place decorations, and grow your tank to make room for more fish!') },
     ];
